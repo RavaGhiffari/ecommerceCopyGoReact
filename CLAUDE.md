@@ -14,14 +14,15 @@ Prefer explicit, readable code and clear SQL over generic frameworks. For every 
 
 ## 2. Current state of the repo
 
-Mid-way through Phase 0. **Inspect before overwriting; do not assume the repo is empty.**
+**Phase 0 is implemented and awaiting developer review.** Do not start Phase 1 until the developer approves. **Inspect before overwriting; do not assume the repo is empty.**
 
-- `git` repo initialised. Local PostgreSQL 18 on the dev machine already occupies host port 5432.
-- Go spike at the **repo root** (module `goFrameworkFirstTry`, go 1.27.1): `main.go`, `data/`, `repository/`, `handler/`, using `julienschmidt/httprouter` with an in-memory user list. Throwaway — to be replaced by the structure in §4 (moved under `backend/`).
-- `frontend/` is the stock Vite + React 19 + TS + Tailwind 4 + oxlint template; `App.tsx` just fetches `/api/users` through the Vite proxy (`/api` → `http://localhost:8081`). Reuse this scaffold, don't regenerate it.
-- Docker: root `Dockerfile` (multi-stage Go build, alpine runtime, builds `.` — path must change when code moves to `backend/`), `docker-compose.yml` (services `postgres:18` + `api`; named volume `pgdata` mounted at `/var/lib/postgresql` as PG18 requires; host port `POSTGRES_HOST_PORT` default **5433**), `.env.example`, `.gitignore`. The developer's `.env` holds real credentials — never read it into output, never commit it.
-- Not yet existing: config loader, DB connection, migrations, sqlc, Makefile, tests, health endpoints, frontend Dockerfile.
-- The shell used by Claude may not have `docker` on PATH; if so, ask the developer to run Docker commands rather than guessing.
+- Backend in `backend/` (module `github.com/RavaGhiffari/ecommerceCopyGoReact/backend`, go 1.27.3, Gin, pgx v5, testify). Request path: `internal/router` (middleware chain + routes) → `internal/modules/<module>/handler.go` → `repository.go` → sqlc code in `internal/database/queries` (generated from `db/queries/*.sql`; never edit by hand) → pgxpool from `internal/database`. `cmd/api/main.go` wires everything and does graceful shutdown. Middleware order: RequestID → Logging → Recovery → CORS → Timeout. `internal/platform/logger` adds `request_id` to every `slog.*Context` log line.
+- Only module so far is `health`: `/health` (no DB) and `/ready` (sqlc `Ping` = `SELECT 1`). It has no `service.go` because it has no business rules; real domains do.
+- Migrations: `backend/db/migrations`, golang-migrate, run via the compose `migrate` service (profile `tools`). `000001` creates the shared `set_updated_at()` trigger function for future `updated_at` columns.
+- Frontend: still the Vite + React 19 + TS + Tailwind 4 + oxlint scaffold, now with `src/lib/api.ts` (envelope-aware fetch + `ApiError`), `src/types/api.ts` (mirror of the Go envelope — keep in sync), and a dev `features/status/StatusPage.tsx`. Vite proxies `/api` and exactly `/health`, `/ready` to `localhost:8081`.
+- Docker: `backend/Dockerfile`, `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`). The developer's `.env` holds real credentials — never print it, never commit it.
+- Old httprouter spike deleted (recoverable from commit `e402892`).
+- **Host machine quirks:** Go and `make` are **not installed** on the host — run Go/sqlc via Docker (the Makefile does this). Docker CLI: `C:\Users\Rava\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`. Local PostgreSQL 18 uses host port 5432. **Another app of the developer's (a Laravel project) also uses port 5173 on IPv4** — `localhost:5173` may hit it instead of this Vite server (which binds `[::1]`). Never kill a process by port without confirming via its command line that it belongs to this repo.
 
 The detailed, phase-by-phase work plan lives in [PLAN.md](PLAN.md).
 
@@ -70,12 +71,13 @@ Frontend is organised by feature, not one big `components/`. Never pile logic in
 
 ## 5. Commands
 
-Currently working:
-- `docker compose up -d --build` / `docker compose down` / `docker compose logs -f` (never `down -v` casually — it deletes the database volume)
-- Backend spike (repo root): `go run .`, `go build ./...`, `go vet ./...`, `go test ./...`
+From the repo root (Makefile wraps Docker; needs `make`, e.g. `scoop install make`):
+- Stack: `make up` (`docker compose up -d --build`), `make down` (keeps the DB volume — never `down -v` casually), `make logs`, `make ps`
+- Migrations: `make migrate-up`, `make migrate-down` (one step), `make migrate-version`, `make migrate-create name=create_users_table`, `make migrate-force version=N` (dirty DB only). Raw form: `docker compose run --rm migrate up`.
+- Code: `make sqlc` (regenerate after editing `db/queries` or migrations), `make fmt`, `make vet`, `make test` (unit, no DB), `make test-integration` (build tag `integration`, against the compose Postgres; reads `.env`)
+- Single Go test: `docker run --rm -v <repo>/backend:/src -v gomodcache:/go/pkg/mod -w /src golang:1.27-alpine go test ./internal/middleware -run TestCORS -v`
+- Smoke check: `curl http://localhost:8081/health` and `/ready`
 - Frontend (`cd frontend`): `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (**oxlint**, not ESLint)
-
-Planned Makefile targets (Phase 0): `migrate-up`, `migrate-down`, `migrate-version`, `migrate-create name=...`, plus `sqlc` generate, test and run helpers. Single Go test: `go test ./internal/modules/<pkg> -run TestName`.
 
 ## 6. Roles and authorization
 
@@ -153,7 +155,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 6. **Reviews & frontend completion**: reviews, buyer/seller/admin dashboards.
 7. **Hardening**: integration + E2E tests, security review, performance/index review, OpenAPI docs, deploy prep.
 
-Scope status: Phases 0–2 have been requested by the developer, but **implementation starts only after the developer approves [PLAN.md](PLAN.md)**. Do not begin Phase 3+ without approval.
+Scope status: Phase 0 is done and under developer review. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
 
 ## 15. Where the two source briefs disagreed (resolved — newer brief wins)
 

@@ -1,8 +1,12 @@
 # PLAN.md — Phases 0–2
 
-Status: **awaiting developer approval.** Nothing below is implemented yet except the Docker pieces noted in Phase 0. Rules and conventions live in [CLAUDE.md](CLAUDE.md).
+Status: **Phase 0 implemented (0.1–0.10), awaiting developer review.** Phase 1 starts only after approval. Rules and conventions live in [CLAUDE.md](CLAUDE.md).
 
-## Open decisions (need a yes/no or an override)
+## Approved decisions
+
+Gin; cookie sessions + Argon2id + CSRF + Origin validation; variant price is authoritative (≥1 variant before publishing, listing shows lowest active variant price); inventory available/reserved/consumed/released with reservation implemented in the checkout phase, not Phase 2; spike moved to `backend/`; React stays on the host for Phases 0–2; module path from the Git remote (`github.com/RavaGhiffari/ecommerceCopyGoReact/backend`); no unnecessary Postgres extensions; email unique on `LOWER(email)`; product slug `UNIQUE (store_id, slug)` with store-scoped URLs; every inventory change writes a movement (available and reserved deltas, type, reference, actor) in the same transaction; admin created by a secure CLI seed command, never hardcoded credentials; Vite proxy for `/api/*` in development.
+
+## Original open decisions (resolved above)
 
 1. **Gin** (newer brief) instead of Chi — OK?
 2. **Cookie sessions + Argon2id + CSRF** instead of JWT — OK? (More moving parts than JWT; better security story and a good learning topic.)
