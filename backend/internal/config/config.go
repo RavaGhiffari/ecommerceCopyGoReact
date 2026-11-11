@@ -1,0 +1,145 @@
+// Package config loads application settings from environment variables.
+//
+// Every setting comes from the environment so the same binary runs locally,
+// in Docker Compose, and later in production without code changes. Load fails
+// fast on missing or malformed values: it is better for the API to refuse to
+// start than to start half-configured.
+package config
+
+import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Config struct {
+	AppEnv   string     // "development" or "production"
+	Port     string     // HTTP port the API listens on, e.g. "8081"
+	LogLevel slog.Level // debug, info, warn, error
+
+	// Browser origins allowed to call the API cross-origin, e.g. http://localhost:5173.
+	// In development the Vite proxy makes requests same-origin, so this is a backstop.
+	CORSAllowedOrigins []string
+
+	RequestTimeout  time.Duration // max time a handler's context stays valid
+	ShutdownTimeout time.Duration // how long to wait for in-flight requests on shutdown
+
+	DB DBConfig
+}
+
+// DBConfig controls the pgx connection pool. See internal/database.
+type DBConfig struct {
+	URL               string        // postgres://user:pass@host:port/db?sslmode=disable
+	MaxConns          int32         // upper bound of open connections
+	MinConns          int32         // connections kept open even when idle
+	MaxConnLifetime   time.Duration // recycle a connection after this long
+	MaxConnIdleTime   time.Duration // close idle connections after this long
+	HealthCheckPeriod time.Duration // how often the pool checks idle connections
+	ConnectTimeout    time.Duration // timeout for establishing one connection
+}
+
+func Load() (Config, error) {
+	var errs []error
+
+	cfg := Config{
+		AppEnv:             getString("APP_ENV", "development"),
+		Port:               getString("APP_PORT", "8081"),
+		LogLevel:           getLogLevel("LOG_LEVEL", slog.LevelInfo, &errs),
+		CORSAllowedOrigins: getOrigins("CORS_ALLOWED_ORIGINS", "http://localhost:5173", &errs),
+		RequestTimeout:     getDuration("REQUEST_TIMEOUT", 10*time.Second, &errs),
+		ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 15*time.Second, &errs),
+		DB: DBConfig{
+			URL:               os.Getenv("DATABASE_URL"),
+			MaxConns:          getInt32("DB_MAX_CONNS", 10, &errs),
+			MinConns:          getInt32("DB_MIN_CONNS", 2, &errs),
+			MaxConnLifetime:   getDuration("DB_MAX_CONN_LIFETIME", time.Hour, &errs),
+			MaxConnIdleTime:   getDuration("DB_MAX_CONN_IDLE_TIME", 30*time.Minute, &errs),
+			HealthCheckPeriod: getDuration("DB_HEALTH_CHECK_PERIOD", time.Minute, &errs),
+			ConnectTimeout:    getDuration("DB_CONNECT_TIMEOUT", 5*time.Second, &errs),
+		},
+	}
+
+	if cfg.DB.URL == "" {
+		errs = append(errs, errors.New("DATABASE_URL is required"))
+	}
+	if cfg.AppEnv != "development" && cfg.AppEnv != "production" {
+		errs = append(errs, fmt.Errorf("APP_ENV must be development or production, got %q", cfg.AppEnv))
+	}
+	if cfg.DB.MinConns > cfg.DB.MaxConns {
+		errs = append(errs, fmt.Errorf("DB_MIN_CONNS (%d) cannot exceed DB_MAX_CONNS (%d)", cfg.DB.MinConns, cfg.DB.MaxConns))
+	}
+
+	return cfg, errors.Join(errs...)
+}
+
+func (c Config) IsProduction() bool { return c.AppEnv == "production" }
+
+func getString(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func getLogLevel(key string, fallback slog.Level, errs *[]error) slog.Level {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(v)); err != nil {
+		*errs = append(*errs, fmt.Errorf("%s must be debug, info, warn or error, got %q", key, v))
+		return fallback
+	}
+	return level
+}
+
+// getOrigins parses a comma-separated list of exact origins.
+// "*" is rejected: the API will send cookies (credentials), and browsers
+// forbid a wildcard origin together with credentials for good reason.
+func getOrigins(key, fallback string, errs *[]error) []string {
+	raw := getString(key, fallback)
+	var origins []string
+	for _, o := range strings.Split(raw, ",") {
+		o = strings.TrimRight(strings.TrimSpace(o), "/")
+		if o == "" {
+			continue
+		}
+		if o == "*" || !(strings.HasPrefix(o, "http://") || strings.HasPrefix(o, "https://")) {
+			*errs = append(*errs, fmt.Errorf("%s entries must be exact http(s) origins, got %q", key, o))
+			continue
+		}
+		origins = append(origins, o)
+	}
+	return origins
+}
+
+func getInt32(key string, fallback int32, errs *[]error) int32 {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil || n < 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a non-negative integer, got %q", key, v))
+		return fallback
+	}
+	return int32(n)
+}
+
+func getDuration(key string, fallback time.Duration, errs *[]error) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a positive duration like 30s or 5m, got %q", key, v))
+		return fallback
+	}
+	return d
+}

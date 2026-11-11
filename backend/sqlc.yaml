@@ -1,0 +1,23 @@
+# sqlc turns the SQL in db/queries into type-safe Go code.
+#
+#   schema:  sqlc reads the migrations to learn the tables and column types.
+#            It understands golang-migrate files and ignores *.down.sql.
+#   queries: the SQL we write by hand; one file per module. Each query starts
+#            with "-- name: <GoMethod> :<kind>":
+#              :one  -> one row (pgx.ErrNoRows if none)
+#              :many -> a slice
+#              :exec -> only an error
+#            Comment lines right after it become the Go method's doc comment.
+#   out:     generated code. Never edit it by hand; change the SQL and run
+#            `make sqlc` again. It is committed so builds don't need sqlc.
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "db/queries"
+    gen:
+      go:
+        package: "queries"
+        out: "internal/database/queries"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true # :many returns [] instead of nil, so JSON shows [] not null

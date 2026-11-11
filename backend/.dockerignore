@@ -1,8 +1,7 @@
-.git
-frontend
-**/node_modules
-*.md
 .env
 .env.*
+*.md
 Dockerfile
 .dockerignore
+bin/
+tmp/
