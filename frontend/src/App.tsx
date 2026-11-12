@@ -1,5 +1,6 @@
-import { StatusPage } from './features/status/StatusPage'
+import { RouterProvider } from 'react-router-dom'
+import { router } from './app/router'
 
 export function App() {
-  return <StatusPage />
+  return <RouterProvider router={router} />
 }

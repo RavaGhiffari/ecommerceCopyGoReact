@@ -1,0 +1,59 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ApiError } from '../lib/api'
+
+export type AsyncState<T> =
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: ApiError }
+
+type Settled<T> = Exclude<AsyncState<T>, { status: 'loading' }>
+
+/**
+ * Runs `load` and reports loading / success / error.
+ *
+ * `key` identifies the request: when it changes, the previous result is
+ * discarded (state becomes "loading") and `load` runs again. Build it from
+ * every input `load` depends on, e.g. `products:${JSON.stringify(query)}`.
+ *
+ * Plain React on purpose. TanStack Query arrives together with the real API
+ * (it adds caching and retries that mock data does not need).
+ */
+export function useAsync<T>(load: () => Promise<T>, key: string) {
+  const [attempt, setAttempt] = useState(0)
+  const requestKey = `${key}#${attempt}`
+
+  // The result remembers which request produced it. A result for an older key
+  // is ignored, so there is no synchronous setState inside the effect.
+  const [result, setResult] = useState<{ key: string; state: Settled<T> } | null>(null)
+
+  // Always call the latest `load` without making it an effect dependency.
+  const loadRef = useRef(load)
+  useEffect(() => {
+    loadRef.current = load
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    loadRef
+      .current()
+      .then((data) => {
+        if (!cancelled) setResult({ key: requestKey, state: { status: 'success', data } })
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const error =
+          err instanceof ApiError ? err : new ApiError(0, 'UNKNOWN', 'Terjadi kesalahan tak terduga.')
+        setResult({ key: requestKey, state: { status: 'error', error } })
+      })
+    return () => {
+      cancelled = true // a newer request, or unmount, supersedes this one
+    }
+  }, [requestKey])
+
+  const reload = useCallback(() => setAttempt((n) => n + 1), [])
+
+  const state: AsyncState<T> =
+    result !== null && result.key === requestKey ? result.state : { status: 'loading' }
+
+  return { state, reload }
+}

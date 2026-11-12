@@ -14,12 +14,12 @@ Prefer explicit, readable code and clear SQL over generic frameworks. For every 
 
 ## 2. Current state of the repo
 
-**Phase 0 is implemented and awaiting developer review.** Do not start Phase 1 until the developer approves. **Inspect before overwriting; do not assume the repo is empty.**
+**Phase 0 is implemented and reviewed by the developer.** The developer chose to build a **UI-first prototype with mock data (§17)** before backend Phase 1; backend work is paused until the prototype is approved. **Inspect before overwriting; do not assume the repo is empty.**
 
 - Backend in `backend/` (module `github.com/RavaGhiffari/ecommerceCopyGoReact/backend`, go 1.27.3, Gin, pgx v5, testify). Request path: `internal/router` (middleware chain + routes) → `internal/modules/<module>/handler.go` → `repository.go` → sqlc code in `internal/database/queries` (generated from `db/queries/*.sql`; never edit by hand) → pgxpool from `internal/database`. `cmd/api/main.go` wires everything and does graceful shutdown. Middleware order: RequestID → Logging → Recovery → CORS → Timeout. `internal/platform/logger` adds `request_id` to every `slog.*Context` log line.
 - Only module so far is `health`: `/health` (no DB) and `/ready` (sqlc `Ping` = `SELECT 1`). It has no `service.go` because it has no business rules; real domains do.
 - Migrations: `backend/db/migrations`, golang-migrate, run via the compose `migrate` service (profile `tools`). `000001` creates the shared `set_updated_at()` trigger function for future `updated_at` columns.
-- Frontend: still the Vite + React 19 + TS + Tailwind 4 + oxlint scaffold, now with `src/lib/api.ts` (envelope-aware fetch + `ApiError`), `src/types/api.ts` (mirror of the Go envelope — keep in sync), and a dev `features/status/StatusPage.tsx`. Vite proxies `/api` and exactly `/health`, `/ready` to `localhost:8081`.
+- Frontend: Vite + React 19 + TS + Tailwind 4 + oxlint, plus react-router-dom and lucide-react. Real-API pieces: `src/lib/api.ts` (envelope-aware fetch + `ApiError`), `src/types/api.ts` (mirror of the Go envelope — keep in sync), `features/status/StatusPage.tsx` at `/status`. **Catalog prototype on mock data (§17):** `src/types/marketplace.ts` (expected API shapes) ← `src/services/catalog.ts` (the only importer of `src/mocks/`) ← `features/catalog/hooks.ts` ← pages in `src/pages/`; routes in `src/app/router.tsx`. Vite proxies `/api` and exactly `/health`, `/ready` to `localhost:8081`.
 - Docker: `backend/Dockerfile`, `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`). The developer's `.env` holds real credentials — never print it, never commit it.
 - Old httprouter spike deleted (recoverable from commit `e402892`).
 - **Host machine quirks:** Go and `make` are **not installed** on the host — run Go/sqlc via Docker (the Makefile does this). Docker CLI: `C:\Users\Rava\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`. Local PostgreSQL 18 uses host port 5432. **Another app of the developer's (a Laravel project) also uses port 5173 on IPv4** — `localhost:5173` may hit it instead of this Vite server (which binds `[::1]`). Never kill a process by port without confirming via its command line that it belongs to this repo.
@@ -146,7 +146,8 @@ First-class requirement. Backend: service unit tests, repository integration tes
 
 ## 14. Roadmap — one phase at a time
 
-0. **Foundation**: restructure into `backend/`, config, pgxpool, golang-migrate + Makefile, sqlc, `/health` + `/ready`, response helpers, Docker Compose (partly done), frontend↔backend connectivity.
+0. **Foundation**: restructure into `backend/`, config, pgxpool, golang-migrate + Makefile, sqlc, `/health` + `/ready`, response helpers, Docker Compose, frontend↔backend connectivity. *(Done and reviewed.)*
+0.5. **UI-first catalog prototype** (current, §17): homepage, product list/search, product detail, store page on typed mock data. No backend changes.
 1. **Identity & security**: register/login/logout, Argon2id, sessions, auth middleware, RBAC, CSRF, authorization tests.
 2. **Catalog**: categories, stores, products, variants, images, inventory basics, public listing, search/pagination/filter/sort.
 3. **Marketplace UI** on real APIs (homepage, nav, cards, detail, store page, search).
@@ -155,7 +156,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 6. **Reviews & frontend completion**: reviews, buyer/seller/admin dashboards.
 7. **Hardening**: integration + E2E tests, security review, performance/index review, OpenAPI docs, deploy prep.
 
-Scope status: Phase 0 is done and under developer review. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
+Scope status: Phase 0 is done. The UI prototype (0.5) is the current scope. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
 
 ## 15. Where the two source briefs disagreed (resolved — newer brief wins)
 
@@ -167,3 +168,32 @@ Router Chi→**Gin**; migrations Goose→**golang-migrate**; auth JWT→**cookie
 - During: small coherent steps, scoped to the requested feature, follow existing conventions, migrations for schema, backend validation, tests for business-critical behaviour, no unnecessary abstractions or dependencies, never hardcode secrets, never bypass security mechanisms.
 - After: review the diff, run formatting/lint/static analysis and relevant tests, check migrations up/down, check the frontend compiles, verify real API behaviour, list remaining risks, summarise modified files. **Never claim done because it compiles; never silently skip a failing test — report failures with their output.**
 - **Never commit, push, or deploy automatically**; never touch production infrastructure or expose credentials. When a feature is complete, propose a commit message and let the developer decide. Explain any destructive database operation before running it.
+
+## 17. UI-first catalog prototype (current, phase 0.5)
+
+The developer chose to see the marketplace interface before backend business logic. This is an intentional prototyping strategy, **not a relaxation of production standards**. It ends when the developer approves the prototype.
+
+### Scope
+
+Read-only catalog pages only: homepage, product list with category filter / price sort / keyword search / pagination, product detail, store page, not-found. Login, cart, checkout, orders, seller and admin screens are **out of scope** until their backend exists.
+
+### Rules
+
+- Stack and structure stay as in §3/§4: React, TypeScript, Tailwind, `features/`, `components/`, `lib/`, `types/`. New dependencies need justification (react-router-dom for routing, lucide-react for icons are the approved additions).
+- **Mock data** is typed fixtures in `frontend/src/mocks/`. **Only `frontend/src/services/` may import them.** Components get typed props or call feature hooks; they never import mock datasets and contain no mock business logic. Replacing mocks with the real API must only touch `services/`.
+- Types in `frontend/src/types/` describe the data the real API is expected to return; keep them aligned with §8/§9 when the backend lands.
+- Every data-driven view implements **loading, empty, error and success** states. Services accept `?simulate=slow|empty|error` in the URL during the prototype so those states can be checked by hand.
+- **Nothing pretends to be a real operation:** no fake auth (no stored tokens, no client-side role gates), no add-to-cart that "works", no checkout, no simulated payment, no stock reservation. Controls for unbuilt features are visibly disabled and say so.
+- Product URLs are store-scoped (`/stores/:storeSlug/products/:productSlug`) per the approved decision `UNIQUE (store_id, slug)`.
+- No backend changes, no migrations, and the existing `/status` page stays.
+
+### Completion criteria
+
+1. All scoped pages exist with working navigation and routing.
+2. Search, filter, sort and pagination work against mock data.
+3. Loading, empty and error states exist on every data view.
+4. Components are reusable and feature-organised; no component imports from `mocks/`.
+5. `npm run build` and `npm run lint` pass.
+6. The developer reviews and approves.
+
+Prototype completion does **not** mean production readiness. After approval, resume the backend roadmap at Phase 1 and replace mock services with real API calls one feature at a time.
