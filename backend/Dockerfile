@@ -12,8 +12,9 @@ RUN go mod download
 
 COPY . .
 
-# Static binary so it runs in a minimal runtime image.
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+# Static binaries so they run in a minimal runtime image.
+# ./cmd/... builds every command: /out/api and /out/seed-admin.
+RUN mkdir -p /out && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/ ./cmd/...
 
 # ---- Runtime stage ----
 FROM alpine:3.20
@@ -22,7 +23,7 @@ RUN adduser -D -u 10001 app
 USER app
 
 WORKDIR /app
-COPY --from=build /out/api /app/api
+COPY --from=build /out/ /app/
 
 EXPOSE 8081
 

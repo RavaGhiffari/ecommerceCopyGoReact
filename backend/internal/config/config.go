@@ -28,7 +28,17 @@ type Config struct {
 	RequestTimeout  time.Duration // max time a handler's context stays valid
 	ShutdownTimeout time.Duration // how long to wait for in-flight requests on shutdown
 
+	SessionTTL time.Duration // how long a login stays valid
+	Argon2     Argon2Config
+
 	DB DBConfig
+}
+
+// Argon2Config is the cost of hashing one password (see platform/password).
+type Argon2Config struct {
+	MemoryKiB   uint32
+	Iterations  uint32
+	Parallelism uint8
 }
 
 // DBConfig controls the pgx connection pool. See internal/database.
@@ -52,6 +62,13 @@ func Load() (Config, error) {
 		CORSAllowedOrigins: getOrigins("CORS_ALLOWED_ORIGINS", "http://localhost:5173", &errs),
 		RequestTimeout:     getDuration("REQUEST_TIMEOUT", 10*time.Second, &errs),
 		ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 15*time.Second, &errs),
+		SessionTTL:         getDuration("SESSION_TTL", 24*time.Hour, &errs),
+		Argon2: Argon2Config{
+			// Defaults: OWASP minimum for Argon2id (19 MiB, t=2, p=1).
+			MemoryKiB:   uint32(getInt32("ARGON2_MEMORY_KIB", 19*1024, &errs)),
+			Iterations:  uint32(getInt32("ARGON2_ITERATIONS", 2, &errs)),
+			Parallelism: uint8(min(getInt32("ARGON2_PARALLELISM", 1, &errs), 255)),
+		},
 		DB: DBConfig{
 			URL:               os.Getenv("DATABASE_URL"),
 			MaxConns:          getInt32("DB_MAX_CONNS", 10, &errs),
@@ -68,6 +85,9 @@ func Load() (Config, error) {
 	}
 	if cfg.AppEnv != "development" && cfg.AppEnv != "production" {
 		errs = append(errs, fmt.Errorf("APP_ENV must be development or production, got %q", cfg.AppEnv))
+	}
+	if cfg.Argon2.MemoryKiB < 8*1024 || cfg.Argon2.Iterations < 1 || cfg.Argon2.Parallelism < 1 {
+		errs = append(errs, errors.New("ARGON2_* settings are below the safe minimum (8 MiB memory, 1 iteration, 1 thread)"))
 	}
 	if cfg.DB.MinConns > cfg.DB.MaxConns {
 		errs = append(errs, fmt.Errorf("DB_MIN_CONNS (%d) cannot exceed DB_MAX_CONNS (%d)", cfg.DB.MinConns, cfg.DB.MaxConns))

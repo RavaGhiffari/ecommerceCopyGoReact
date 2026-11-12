@@ -40,6 +40,7 @@ services:
       APP_PORT: 8081
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      SESSION_TTL: ${SESSION_TTL:-24h}
       DATABASE_URL: "postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marketplace_dev}?sslmode=disable"
 
     ports:
@@ -60,6 +61,22 @@ services:
       - migrate
       - -path=/migrations
       - -database=postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marketplace_dev}?sslmode=disable
+
+  # Same migrations, applied to the separate test database that integration
+  # tests write to (and wipe). Keeps marketplace_dev untouched by tests.
+  #   make test-db
+  migrate-test:
+    image: migrate/migrate:v4.18.3
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/db/migrations:/migrations
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/marketplace_test?sslmode=disable
 
 volumes:
   pgdata:

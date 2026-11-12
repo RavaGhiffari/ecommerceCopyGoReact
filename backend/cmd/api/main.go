@@ -3,7 +3,7 @@
 // main is the "composition root": the only place that knows how every piece
 // is built and wired together. Dependencies flow one way:
 //
-//	config -> database pool -> repository -> handler -> router -> http.Server
+//	config -> database pool -> services -> handlers -> router -> http.Server
 package main
 
 import (
@@ -18,8 +18,11 @@ import (
 
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/logger"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/password"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/router"
 )
 
@@ -49,13 +52,27 @@ func run() error {
 	defer pool.Close() // runs last: after the server has stopped using it
 	slog.Info("connected to database")
 
+	authSvc, err := auth.NewService(pool, auth.Config{
+		SessionTTL: cfg.SessionTTL,
+		Password: password.Params{
+			MemoryKiB:   cfg.Argon2.MemoryKiB,
+			Iterations:  cfg.Argon2.Iterations,
+			Parallelism: cfg.Argon2.Parallelism,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
 	handlers := router.Handlers{
 		Health: health.NewHandler(health.NewRepository(pool)),
+		Auth:   auth.NewHandler(authSvc, cfg.IsProduction(), auth.DefaultLimits),
+		Users:  users.NewHandler(users.NewService(pool)),
 	}
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           router.New(cfg, handlers),
+		Handler:           router.New(cfg, handlers, authSvc.ResolveSession),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		// Hard backstop: a little longer than the per-request context timeout.
@@ -81,8 +98,7 @@ func run() error {
 
 	// Graceful shutdown: stop accepting new connections, let in-flight
 	// requests finish (up to ShutdownTimeout), then return so the deferred
-	// pool.Close runs. Killing the process instead could cut a checkout
-	// transaction in half from the client's point of view.
+	// pool.Close runs.
 	slog.Info("shutting down", "timeout", cfg.ShutdownTimeout.String())
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()

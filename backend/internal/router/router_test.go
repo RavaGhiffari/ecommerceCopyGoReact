@@ -15,6 +15,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/authctx"
 )
 
 func init() { gin.SetMode(gin.TestMode) }
@@ -36,8 +37,13 @@ func testRouter(t *testing.T) *gin.Engine {
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
 		RequestTimeout:     5 * time.Second,
 	}
+	// Only the health handler is exercised here; auth flows are covered by the
+	// integration tests against a real database.
 	h := Handlers{Health: health.NewHandler(health.NewRepository(unreachablePool(t)))}
-	return New(cfg, h)
+	noSession := func(context.Context, string) (authctx.Principal, bool, error) {
+		return authctx.Principal{}, false, nil
+	}
+	return New(cfg, h, noSession)
 }
 
 func get(r *gin.Engine, path string) *httptest.ResponseRecorder {

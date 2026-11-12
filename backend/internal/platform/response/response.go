@@ -7,7 +7,12 @@
 // between endpoints, and the frontend can rely on it.
 package response
 
-import "github.com/gin-gonic/gin"
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 type successBody struct {
 	Success bool   `json:"success"`
@@ -26,12 +31,20 @@ type ErrorInfo struct {
 	Details any    `json:"details,omitempty"` // optional, e.g. per-field validation errors
 }
 
-// Error codes shared across modules. Modules may define their own as well.
+// Error codes shared across modules. Modules define their own domain codes.
 const (
-	CodeInternal            = "INTERNAL_ERROR"
-	CodeNotFound            = "NOT_FOUND"
-	CodeMethodNotAllowed    = "METHOD_NOT_ALLOWED"
-	CodeDatabaseUnavailable = "DATABASE_UNAVAILABLE"
+	CodeInternal             = "INTERNAL_ERROR"
+	CodeNotFound             = "NOT_FOUND"
+	CodeMethodNotAllowed     = "METHOD_NOT_ALLOWED"
+	CodeDatabaseUnavailable  = "DATABASE_UNAVAILABLE"
+	CodeValidation           = "VALIDATION_ERROR"
+	CodeInvalidJSON          = "INVALID_JSON"
+	CodeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
+	CodePayloadTooLarge      = "PAYLOAD_TOO_LARGE"
+	CodeUnauthenticated      = "UNAUTHENTICATED"
+	CodeForbidden            = "FORBIDDEN"
+	CodeOriginRejected       = "ORIGIN_REJECTED"
+	CodeRateLimited          = "RATE_LIMITED"
 )
 
 func OK(c *gin.Context, status int, data any, message string) {
@@ -43,4 +56,16 @@ func Fail(c *gin.Context, status int, code, message string, details any) {
 		Success: false,
 		Error:   ErrorInfo{Code: code, Message: message, Details: details},
 	})
+}
+
+// Internal logs the real error (with the request ID) and answers with a
+// generic 500. Use it for anything the client cannot fix.
+func Internal(c *gin.Context, err error) {
+	slog.ErrorContext(c.Request.Context(), "internal error", "error", err)
+	Fail(c, http.StatusInternalServerError, CodeInternal, "Internal server error", nil)
+}
+
+// ValidationFailed answers 422 with one message per invalid field.
+func ValidationFailed(c *gin.Context, fields map[string]string) {
+	Fail(c, http.StatusUnprocessableEntity, CodeValidation, "Some fields are invalid", fields)
 }
