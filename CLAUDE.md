@@ -14,15 +14,16 @@ Prefer explicit, readable code and clear SQL over generic frameworks. For every 
 
 ## 2. Current state of the repo
 
-**Phase 0 is implemented and reviewed by the developer.** The developer chose to build a **UI-first prototype with mock data (§17)** before backend Phase 1; backend work is paused until the prototype is approved. **Inspect before overwriting; do not assume the repo is empty.**
+**Phase 0 done. Catalog UI prototype (0.5) done on mock data. Phase 1 (identity & security) implemented and awaiting developer review** — do not start Phase 2 until approved. **Inspect before overwriting; do not assume the repo is empty.**
 
-- Backend in `backend/` (module `github.com/RavaGhiffari/ecommerceCopyGoReact/backend`, go 1.27.3, Gin, pgx v5, testify). Request path: `internal/router` (middleware chain + routes) → `internal/modules/<module>/handler.go` → `repository.go` → sqlc code in `internal/database/queries` (generated from `db/queries/*.sql`; never edit by hand) → pgxpool from `internal/database`. `cmd/api/main.go` wires everything and does graceful shutdown. Middleware order: RequestID → Logging → Recovery → CORS → Timeout. `internal/platform/logger` adds `request_id` to every `slog.*Context` log line.
-- Only module so far is `health`: `/health` (no DB) and `/ready` (sqlc `Ping` = `SELECT 1`). It has no `service.go` because it has no business rules; real domains do.
-- Migrations: `backend/db/migrations`, golang-migrate, run via the compose `migrate` service (profile `tools`). `000001` creates the shared `set_updated_at()` trigger function for future `updated_at` columns.
-- Frontend: Vite + React 19 + TS + Tailwind 4 + oxlint, plus react-router-dom and lucide-react. Real-API pieces: `src/lib/api.ts` (envelope-aware fetch + `ApiError`), `src/types/api.ts` (mirror of the Go envelope — keep in sync), `features/status/StatusPage.tsx` at `/status`. **Catalog prototype on mock data (§17):** `src/types/marketplace.ts` (expected API shapes) ← `src/services/catalog.ts` (the only importer of `src/mocks/`) ← `features/catalog/hooks.ts` ← pages in `src/pages/`; routes in `src/app/router.tsx`. Vite proxies `/api` and exactly `/health`, `/ready` to `localhost:8081`.
-- Docker: `backend/Dockerfile`, `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`). The developer's `.env` holds real credentials — never print it, never commit it.
+- Backend in `backend/` (module `github.com/RavaGhiffari/ecommerceCopyGoReact/backend`, go 1.27.3, Gin, pgx v5, google/uuid, x/crypto, testify). Request path: `internal/router` (middleware chain + routes) → `internal/modules/<module>/handler.go` → `service.go` → `repository.go` → sqlc code in `internal/database/queries` (generated from `db/queries/*.sql`; never edit by hand) → pgxpool from `internal/database`. `cmd/api/main.go` wires everything and does graceful shutdown. Middleware order: RequestID → Logging → Recovery → CORS → Timeout → SameOrigin (CSRF) → Authenticate; per-route `RequireAuth` / `RequireRole`. `internal/platform/logger` adds `request_id` to every `slog.*Context` log line.
+- Modules: `health` (`/health`, `/ready`; no service, no rules), `auth` (register/login/logout, sessions, rate limits), `users` (profile, `GET`/`PATCH /api/v1/me`). Shared helpers in `internal/platform/`: `password` (Argon2id PHC strings), `token` (random session token + SHA-256), `ratelimit` (in-memory fixed window — single instance only), `validation` (`Errors` → 422 with field details), `authctx` (Principal in context), `request` (strict JSON: application/json only, unknown fields rejected, 1 MiB cap), `response`. Transactions: `database.WithTx`; services decide the boundary, repositories take `queries.DBTX` so they work with a pool or a tx. Services return plain errors / `validation.Errors`; handlers map them to HTTP.
+- Auth design (Phase 1 decisions): opaque 32-byte token in cookie `sid` (HttpOnly, SameSite=Lax, Secure in production), only SHA-256 stored in `user_sessions`, TTL `SESSION_TTL` (24h); register logs in; login rotates the session and resets the per IP+email failure counter (5 per 15 min); register limited to 10/hour per IP; suspended users are filtered in the session lookup; unknown email and wrong password give the same 401 (dummy hash equalizes timing); CSRF = SameSite + Origin-vs-Host/allow-list check + JSON-only bodies (no double-submit token). Admins only via `make seed-admin`. There is no `/auth/me`; use `GET /api/v1/me`.
+- Migrations: `backend/db/migrations`, golang-migrate, via compose services `migrate` (dev DB) and `migrate-test` (`marketplace_test`), profile `tools`. `000001` `set_updated_at()`, `000002` users (lowercase-email CHECK + unique `LOWER(email)` index), `000003` roles (seeded customer/seller/admin) + user_roles, `000004` user_sessions. **The developer's dev database is named `main`** (from `.env`), not `marketplace_dev`.
+- Frontend: Vite + React 19 + TS + Tailwind 4 + oxlint, plus react-router-dom, lucide-react, react-hook-form, zod 4, @hookform/resolvers. `src/lib/api.ts` (`apiRequest` for all methods, envelope-aware, `ApiError.fieldErrors()`), `src/types/api.ts` and `src/types/auth.ts` (mirrors of Go DTOs — keep in sync). **Real API:** auth via `src/services/auth.ts` → `features/auth/AuthProvider` (`useAuth()`), pages `/login`, `/register`, `/account` (guarded by `RequireAuth`, UX only), `/status`. **Mock data (§17):** catalog via `src/services/catalog.ts` (the only importer of `src/mocks/`). Vite proxies `/api` (changeOrigin **false**, required by the CSRF Origin/Host check) and exactly `/health`, `/ready` to `localhost:8081`.
+- Docker: `backend/Dockerfile` (builds every `cmd/*`: `/app/api`, `/app/seed-admin`), `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`; `migrate-test`). The developer's `.env` holds real credentials — never print it, never commit it.
 - Old httprouter spike deleted (recoverable from commit `e402892`).
-- **Host machine quirks:** Go and `make` are **not installed** on the host — run Go/sqlc via Docker (the Makefile does this). Docker CLI: `C:\Users\Rava\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`. Local PostgreSQL 18 uses host port 5432. **Another app of the developer's (a Laravel project) also uses port 5173 on IPv4** — `localhost:5173` may hit it instead of this Vite server (which binds `[::1]`). Never kill a process by port without confirming via its command line that it belongs to this repo.
+- **Host machine quirks:** Go is **not installed** on the host — run Go/sqlc via Docker (the Makefile does this). GNU make 4.4.1 is installed via scoop; the Makefile sets `MSYS_NO_PATHCONV=1` because Git Bash otherwise rewrites `-w /src` into a Windows path. Docker CLI: `C:\Users\Rava\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`. Local PostgreSQL 18 uses host port 5432. **Another app of the developer's (a Laravel project) also uses port 5173 on IPv4** — `localhost:5173` may hit it instead of this Vite server (which binds `[::1]`). Never kill a process by port without confirming via its command line that it belongs to this repo.
 
 The detailed, phase-by-phase work plan lives in [PLAN.md](PLAN.md).
 
@@ -71,10 +72,11 @@ Frontend is organised by feature, not one big `components/`. Never pile logic in
 
 ## 5. Commands
 
-From the repo root (Makefile wraps Docker; needs `make`, e.g. `scoop install make`):
+From the repo root (Makefile wraps Docker):
 - Stack: `make up` (`docker compose up -d --build`), `make down` (keeps the DB volume — never `down -v` casually), `make logs`, `make ps`
 - Migrations: `make migrate-up`, `make migrate-down` (one step), `make migrate-version`, `make migrate-create name=create_users_table`, `make migrate-force version=N` (dirty DB only). Raw form: `docker compose run --rm migrate up`.
-- Code: `make sqlc` (regenerate after editing `db/queries` or migrations), `make fmt`, `make vet`, `make test` (unit, no DB), `make test-integration` (build tag `integration`, against the compose Postgres; reads `.env`)
+- Code: `make sqlc` (regenerate after editing `db/queries` or migrations), `make fmt`, `make vet`, `make test` (unit, no DB), `make test-db` (create + migrate `marketplace_test`), `make test-integration` (runs `test-db`, then build tag `integration` against `marketplace_test`; the tests TRUNCATE users and refuse any URL without `_test`)
+- Accounts: `make seed-admin email=... name="..."` (password prompted, or `ADMIN_PASSWORD` env; needs the api image from `make up`)
 - Single Go test: `docker run --rm -v <repo>/backend:/src -v gomodcache:/go/pkg/mod -w /src golang:1.27-alpine go test ./internal/middleware -run TestCORS -v`
 - Smoke check: `curl http://localhost:8081/health` and `/ready`
 - Frontend (`cd frontend`): `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (**oxlint**, not ESLint)
@@ -156,7 +158,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 6. **Reviews & frontend completion**: reviews, buyer/seller/admin dashboards.
 7. **Hardening**: integration + E2E tests, security review, performance/index review, OpenAPI docs, deploy prep.
 
-Scope status: Phase 0 is done. The UI prototype (0.5) is the current scope. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
+Scope status: Phases 0, 0.5 (catalog prototype) and 1 are implemented; Phase 1 awaits developer review. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
 
 ## 15. Where the two source briefs disagreed (resolved — newer brief wins)
 
@@ -175,7 +177,7 @@ The developer chose to see the marketplace interface before backend business log
 
 ### Scope
 
-Read-only catalog pages only: homepage, product list with category filter / price sort / keyword search / pagination, product detail, store page, not-found. Login, cart, checkout, orders, seller and admin screens are **out of scope** until their backend exists.
+Read-only catalog pages only: homepage, product list with category filter / price sort / keyword search / pagination, product detail, store page, not-found. Cart, checkout, orders, seller and admin screens are **out of scope** until their backend exists. (Login, register and account were in this list; they now use the real Phase 1 API, not mocks.)
 
 ### Rules
 

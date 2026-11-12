@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, ShoppingCart, Store } from 'lucide-react'
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { LogOut, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
+import { useAuth } from '../../features/auth/authContext'
 import { useCategories } from '../../features/catalog/hooks'
 
 const COMING_SOON = 'Tersedia setelah backend siap'
@@ -33,22 +34,7 @@ export function Header() {
           >
             <ShoppingCart className="size-5" aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            disabled
-            title={COMING_SOON}
-            className="hidden rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-400 sm:block"
-          >
-            Masuk
-          </button>
-          <button
-            type="button"
-            disabled
-            title={COMING_SOON}
-            className="hidden rounded-md bg-slate-200 px-3 py-1.5 text-sm text-slate-500 sm:block"
-          >
-            Daftar
-          </button>
+          <AccountActions />
           <span className="hidden items-center gap-1 pl-2 text-sm text-slate-400 md:flex" title={COMING_SOON}>
             <Store className="size-4" aria-hidden="true" /> Buka toko
           </span>
@@ -57,6 +43,77 @@ export function Header() {
 
       <CategoryNav />
     </header>
+  )
+}
+
+/** Login / register links, or the signed-in user's name and a logout button. */
+function AccountActions() {
+  const { status, user, logout } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [busy, setBusy] = useState(false)
+
+  if (status === 'loading') {
+    return <span className="h-8 w-28 animate-pulse rounded-md bg-slate-100" aria-hidden="true" />
+  }
+
+  if (user) {
+    const signOut = async () => {
+      setBusy(true)
+      // Leave the current page FIRST. If we cleared the user while still on a
+      // protected page (e.g. /account), its RequireAuth guard would redirect
+      // to /login?next=/account and override this navigation.
+      navigate('/')
+      try {
+        await logout()
+      } finally {
+        setBusy(false)
+      }
+    }
+    return (
+      <div className="flex items-center gap-1">
+        <Link
+          to="/account"
+          className="flex max-w-40 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+        >
+          <UserRound className="size-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{user.name}</span>
+        </Link>
+        <button
+          type="button"
+          onClick={signOut}
+          disabled={busy}
+          aria-label="Keluar"
+          title="Keluar"
+          className="rounded-md p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+    )
+  }
+
+  // Come back to the current page after logging in.
+  const next =
+    location.pathname === '/login' || location.pathname === '/register'
+      ? ''
+      : `?next=${encodeURIComponent(location.pathname + location.search)}`
+
+  return (
+    <>
+      <Link
+        to={`/login${next}`}
+        className="rounded-md border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+      >
+        Masuk
+      </Link>
+      <Link
+        to={`/register${next}`}
+        className="hidden rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 sm:block"
+      >
+        Daftar
+      </Link>
+    </>
   )
 }
 
