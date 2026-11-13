@@ -8,11 +8,88 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
+
+type Category struct {
+	ID        uuid.UUID
+	ParentID  *uuid.UUID
+	Name      string
+	Slug      string
+	SortOrder int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Inventory struct {
+	VariantID         uuid.UUID
+	AvailableQuantity int32
+	ReservedQuantity  int32
+	UpdatedAt         time.Time
+}
+
+type InventoryMovement struct {
+	ID             uuid.UUID
+	VariantID      uuid.UUID
+	MovementType   string
+	AvailableDelta int32
+	ReservedDelta  int32
+	Reason         string
+	ReferenceType  *string
+	ReferenceID    *uuid.UUID
+	ActorID        *uuid.UUID
+	CreatedAt      time.Time
+}
+
+type Product struct {
+	ID          uuid.UUID
+	StoreID     uuid.UUID
+	CategoryID  uuid.UUID
+	Name        string
+	Slug        string
+	Description string
+	Status      string
+	SoldCount   int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Search      interface{}
+}
+
+type ProductImage struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+	Url       string
+	Alt       string
+	SortOrder int32
+	CreatedAt time.Time
+}
+
+type ProductVariant struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+	Sku       string
+	Name      string
+	Price     decimal.Decimal
+	SortOrder int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
 
 type Role struct {
 	ID   uuid.UUID
 	Name string
+}
+
+type Store struct {
+	ID          uuid.UUID
+	OwnerID     uuid.UUID
+	Name        string
+	Slug        string
+	Description string
+	Location    string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type User struct {

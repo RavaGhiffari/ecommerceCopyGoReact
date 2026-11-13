@@ -22,13 +22,13 @@ GO := docker run --rm -v "$(BACKEND_DIR):/src" -v gomodcache:/go/pkg/mod -v gobu
 
 .PHONY: help up down logs ps \
         migrate-up migrate-down migrate-version migrate-create migrate-force \
-        sqlc fmt vet test test-db test-integration seed-admin
+        sqlc fmt vet test test-db test-integration seed-admin seed-dev
 
 help:
 	@echo "Stack:      up | down | logs | ps"
 	@echo "Migrations: migrate-up | migrate-down | migrate-version | migrate-create name=... | migrate-force version=N"
 	@echo "Code:       sqlc | fmt | vet | test | test-db | test-integration"
-	@echo "Accounts:   seed-admin email=... name=..."
+	@echo "Accounts:   seed-admin email=... name=... | seed-dev (demo catalog)"
 
 # ---- Stack -------------------------------------------------------------------
 
@@ -114,3 +114,8 @@ ifndef name
 	$(error usage: make seed-admin email=admin@example.com name="Admin")
 endif
 	$(COMPOSE) run --rm -e ADMIN_PASSWORD --entrypoint /app/seed-admin api -email "$(email)" -name "$(name)"
+
+# Loads demo categories, stores and products into an EMPTY dev database.
+# Refuses APP_ENV=production; does nothing if categories already exist.
+seed-dev:
+	$(COMPOSE) run --rm --entrypoint /app/seed-dev api

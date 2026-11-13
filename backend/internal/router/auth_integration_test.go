@@ -25,7 +25,10 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/password"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/router"
@@ -37,6 +40,7 @@ type testApp struct {
 	t    *testing.T
 	r    *gin.Engine
 	pool *pgxpool.Pool
+	auth *auth.Service
 }
 
 func newTestApp(t *testing.T, limits auth.Limits) *testApp {
@@ -58,9 +62,10 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 
-	// CASCADE also empties user_roles and user_sessions. roles stays: it is
-	// schema data created by the migration.
-	_, err = pool.Exec(context.Background(), "TRUNCATE users CASCADE")
+	// CASCADE also empties every table that references these (user_roles,
+	// user_sessions, stores, products, variants, inventory, movements). roles
+	// stays: it is schema data created by the migration.
+	_, err = pool.Exec(context.Background(), "TRUNCATE users, categories CASCADE")
 	require.NoError(t, err)
 
 	authSvc, err := auth.NewService(pool, auth.Config{
@@ -75,11 +80,14 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		RequestTimeout:     5 * time.Second,
 	}
 	h := router.Handlers{
-		Health: health.NewHandler(health.NewRepository(pool)),
-		Auth:   auth.NewHandler(authSvc, false, limits),
-		Users:  users.NewHandler(users.NewService(pool)),
+		Health:     health.NewHandler(health.NewRepository(pool)),
+		Auth:       auth.NewHandler(authSvc, false, limits),
+		Users:      users.NewHandler(users.NewService(pool)),
+		Categories: categories.NewHandler(categories.NewService(pool)),
+		Stores:     stores.NewHandler(stores.NewService(pool)),
+		Products:   products.NewHandler(products.NewService(pool)),
 	}
-	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool}
+	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool, auth: authSvc}
 }
 
 type result struct {

@@ -27,6 +27,14 @@ SELECT @user_id::uuid, r.id
 FROM roles r
 WHERE r.name = @role_name::text;
 
+-- name: EnsureRoleByName :exec
+-- Like AssignRoleByName, but having the role already is fine.
+INSERT INTO user_roles (user_id, role_id)
+SELECT @user_id::uuid, r.id
+FROM roles r
+WHERE r.name = @role_name::text
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
 -- name: ListUserRoleNames :many
 SELECT r.name
 FROM user_roles ur

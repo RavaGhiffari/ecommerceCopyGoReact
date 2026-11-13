@@ -70,6 +70,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const ensureRoleByName = `-- name: EnsureRoleByName :exec
+INSERT INTO user_roles (user_id, role_id)
+SELECT $1::uuid, r.id
+FROM roles r
+WHERE r.name = $2::text
+ON CONFLICT (user_id, role_id) DO NOTHING
+`
+
+type EnsureRoleByNameParams struct {
+	UserID   uuid.UUID
+	RoleName string
+}
+
+// Like AssignRoleByName, but having the role already is fine.
+func (q *Queries) EnsureRoleByName(ctx context.Context, arg EnsureRoleByNameParams) error {
+	_, err := q.db.Exec(ctx, ensureRoleByName, arg.UserID, arg.RoleName)
+	return err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, name, phone, status, created_at, updated_at
 FROM users

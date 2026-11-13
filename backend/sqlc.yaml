@@ -27,5 +27,15 @@ sql:
           # never has to know about the database driver.
           - db_type: "uuid"
             go_type: "github.com/google/uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
           - db_type: "timestamptz"
             go_type: "time.Time"
+          # Money: exact decimal arithmetic, never float64. The pgx codec for it
+          # is registered in internal/database/postgres.go.
+          - db_type: "pg_catalog.numeric"
+            go_type: "github.com/shopspring/decimal.Decimal"

@@ -19,7 +19,10 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/logger"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/password"
@@ -65,9 +68,12 @@ func run() error {
 	}
 
 	handlers := router.Handlers{
-		Health: health.NewHandler(health.NewRepository(pool)),
-		Auth:   auth.NewHandler(authSvc, cfg.IsProduction(), auth.DefaultLimits),
-		Users:  users.NewHandler(users.NewService(pool)),
+		Health:     health.NewHandler(health.NewRepository(pool)),
+		Auth:       auth.NewHandler(authSvc, cfg.IsProduction(), auth.DefaultLimits),
+		Users:      users.NewHandler(users.NewService(pool)),
+		Categories: categories.NewHandler(categories.NewService(pool)),
+		Stores:     stores.NewHandler(stores.NewService(pool)),
+		Products:   products.NewHandler(products.NewService(pool)),
 	}
 
 	srv := &http.Server{

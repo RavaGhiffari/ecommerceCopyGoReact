@@ -73,6 +73,14 @@ func (r *Repository) AssignRole(ctx context.Context, userID uuid.UUID, role stri
 	return nil
 }
 
+// EnsureRole grants a role; already having it is not an error.
+func (r *Repository) EnsureRole(ctx context.Context, userID uuid.UUID, role string) error {
+	if err := r.q.EnsureRoleByName(ctx, queries.EnsureRoleByNameParams{UserID: userID, RoleName: role}); err != nil {
+		return fmt.Errorf("ensure role %q: %w", role, err)
+	}
+	return nil
+}
+
 func (r *Repository) RoleNames(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	roles, err := r.q.ListUserRoleNames(ctx, userID)
 	if err != nil {

@@ -10,15 +10,22 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/authctx"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/response"
 )
 
 type Handlers struct {
-	Health *health.Handler
-	Auth   *auth.Handler
-	Users  *users.Handler
+	Health     *health.Handler
+	Auth       *auth.Handler
+	Users      *users.Handler
+	Categories *categories.Handler
+	Stores     *stores.Handler
+	Products   *products.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -60,19 +67,42 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 
 	api := r.Group("/api/v1")
 
-	// Public: anyone may try these.
+	// ---- Public: no login needed ---------------------------------------------
 	authRoutes := api.Group("/auth")
 	authRoutes.POST("/register", h.Auth.Register)
 	authRoutes.POST("/login", h.Auth.Login)
 	authRoutes.POST("/logout", h.Auth.Logout)
 
-	// Any logged-in user, whatever their role.
+	api.GET("/categories", h.Categories.List)
+	api.GET("/products", h.Products.List)
+	api.GET("/products/:id/related", h.Products.Related)
+	api.GET("/stores/:slug", h.Stores.Public)
+	api.GET("/stores/:slug/products/:productSlug", h.Products.Detail)
+
+	// ---- Any logged-in user ---------------------------------------------------
 	signedIn := api.Group("", middleware.RequireAuth())
 	signedIn.GET("/me", h.Users.GetMe)
 	signedIn.PATCH("/me", h.Users.UpdateMe)
+	// Opening a store is how a customer becomes a seller.
+	signedIn.POST("/seller/store", h.Stores.Open)
 
-	// Role-restricted groups arrive with their features, e.g.
-	//   seller := api.Group("/seller", middleware.RequireRole(authctx.RoleSeller))
+	// ---- Sellers: everything acts on the caller's own store -------------------
+	seller := api.Group("/seller", middleware.RequireRole(authctx.RoleSeller))
+	seller.GET("/store", h.Stores.Mine)
+	seller.PATCH("/store", h.Stores.UpdateMine)
+	seller.GET("/products", h.Products.ListMine)
+	seller.POST("/products", h.Products.Create)
+	seller.GET("/products/:id", h.Products.GetMine)
+	seller.PATCH("/products/:id", h.Products.Update)
+	seller.DELETE("/products/:id", h.Products.Archive)
+	seller.POST("/products/:id/variants", h.Products.AddVariant)
+	seller.PATCH("/products/:id/variants/:variantId", h.Products.UpdateVariant)
+	seller.PUT("/products/:id/variants/:variantId/stock", h.Products.SetStock)
+
+	// ---- Admins ----------------------------------------------------------------
+	admin := api.Group("/admin", middleware.RequireRole(authctx.RoleAdmin))
+	admin.POST("/categories", h.Categories.Create)
+	admin.PUT("/categories/:id", h.Categories.Replace)
 
 	return r
 }
