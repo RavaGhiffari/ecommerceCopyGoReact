@@ -9,13 +9,13 @@ import (
 
 func TestMake(t *testing.T) {
 	tests := map[string]string{
-		"Kemeja Batik Pria (Parang)!":         "kemeja-batik-pria-parang",
-		"  Power Bank 20.000 mAh  ":           "power-bank-20-000-mah",
-		"Café Crème":                          "cafe-creme",
-		"Gadget & Wearable":                   "gadget-wearable",
-		"---a---b---":                         "a-b",
-		"!!!":                                 "",
-		"Rumah--Asri":                         "rumah-asri",
+		"Kemeja Batik Pria (Parang)!": "kemeja-batik-pria-parang",
+		"  Power Bank 20.000 mAh  ":   "power-bank-20-000-mah",
+		"Café Crème":                  "cafe-creme",
+		"Gadget & Wearable":           "gadget-wearable",
+		"---a---b---":                 "a-b",
+		"!!!":                         "",
+		"Rumah--Asri":                 "rumah-asri",
 	}
 	for in, want := range tests {
 		got := Make(in)

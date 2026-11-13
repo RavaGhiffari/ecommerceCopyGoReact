@@ -11,6 +11,22 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type Cart struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type CartItem struct {
+	ID        uuid.UUID
+	CartID    uuid.UUID
+	VariantID uuid.UUID
+	Quantity  int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Category struct {
 	ID        uuid.UUID
 	ParentID  *uuid.UUID

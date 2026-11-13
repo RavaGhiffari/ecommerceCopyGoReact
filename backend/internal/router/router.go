@@ -10,6 +10,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
@@ -26,6 +27,7 @@ type Handlers struct {
 	Categories *categories.Handler
 	Stores     *stores.Handler
 	Products   *products.Handler
+	Cart       *cart.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -83,6 +85,11 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn := api.Group("", middleware.RequireAuth())
 	signedIn.GET("/me", h.Users.GetMe)
 	signedIn.PATCH("/me", h.Users.UpdateMe)
+	// The cart always belongs to the session user (no IDs from the client).
+	signedIn.GET("/cart", h.Cart.Get)
+	signedIn.POST("/cart/items", h.Cart.AddItem)
+	signedIn.PATCH("/cart/items/:id", h.Cart.UpdateItem)
+	signedIn.DELETE("/cart/items/:id", h.Cart.RemoveItem)
 	// Opening a store is how a customer becomes a seller.
 	signedIn.POST("/seller/store", h.Stores.Open)
 

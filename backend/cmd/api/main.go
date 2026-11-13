@@ -19,6 +19,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
@@ -74,6 +75,7 @@ func run() error {
 		Categories: categories.NewHandler(categories.NewService(pool)),
 		Stores:     stores.NewHandler(stores.NewService(pool)),
 		Products:   products.NewHandler(products.NewService(pool)),
+		Cart:       cart.NewHandler(cart.NewService(pool)),
 	}
 
 	srv := &http.Server{
