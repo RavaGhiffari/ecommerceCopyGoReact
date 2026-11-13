@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Info, MapPin, Minus, Plus, Store } from 'lucide-react'
 import { ProductImage } from '../../components/product/ProductImage'
 import { RatingBadge } from '../../components/shared/RatingBadge'
 import { formatCompactCount, formatPriceRange, formatRupiah } from '../../lib/format'
 import type { ProductDetail } from '../../types/marketplace'
+import { useAuth } from '../auth/authContext'
+import { messageFor } from '../auth/serverErrors'
+import { useCart } from '../cart/cartContext'
 
 /**
- * Pure view of one product. Selecting a variant and a quantity is local UI
- * state only; nothing here creates a cart, an order, or reserves stock.
+ * One product: pick a variant and a quantity, then add it to the cart.
+ * Adding to the cart never reserves stock (the server re-checks at checkout).
  * The parent renders it with key={product.id} so the selection resets when
  * the product changes.
  */
@@ -24,8 +27,34 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
   const chooseVariant = (id: string) => {
     const next = product.variants.find((v) => v.id === id)
     setVariantId(id)
+    setCartMessage(null)
     // Keep the quantity valid for the newly selected variant's stock.
     if (next) setQuantity((q) => Math.max(1, Math.min(q, next.stock || 1)))
+  }
+
+  // Signed-out visitors go to login first and come back here afterwards.
+  const { user } = useAuth()
+  const { add } = useCart()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [adding, setAdding] = useState(false)
+  const [cartMessage, setCartMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+  const addToCart = async () => {
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(location.pathname)}`)
+      return
+    }
+    setAdding(true)
+    setCartMessage(null)
+    try {
+      await add(variant.id, quantity)
+      setCartMessage({ kind: 'ok', text: `${quantity} × ${variant.name} ditambahkan ke keranjang.` })
+    } catch (err) {
+      setCartMessage({ kind: 'error', text: messageFor(err) })
+    } finally {
+      setAdding(false)
+    }
   }
 
   return (
@@ -132,16 +161,36 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button type="button" disabled className="rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white opacity-50">
-              Tambah ke keranjang
+            <button
+              type="button"
+              onClick={addToCart}
+              disabled={!available || adding}
+              className="rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            >
+              {adding ? 'Menambahkan…' : 'Tambah ke keranjang'}
             </button>
             <button type="button" disabled className="rounded-md border border-emerald-600 px-5 py-2.5 text-sm font-semibold text-emerald-700 opacity-50">
               Beli sekarang
             </button>
           </div>
+          {cartMessage && (
+            <p
+              role={cartMessage.kind === 'error' ? 'alert' : 'status'}
+              className={`rounded-md px-3 py-2 text-sm ${
+                cartMessage.kind === 'error' ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              {cartMessage.text}{' '}
+              {cartMessage.kind === 'ok' && (
+                <Link to="/cart" className="font-medium underline">
+                  Lihat keranjang
+                </Link>
+              )}
+            </p>
+          )}
           <p className="flex items-start gap-2 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Keranjang dan checkout belum tersedia di prototipe ini. Tombol akan aktif setelah backend selesai.
+            Checkout ("Beli sekarang") tersedia di tahap berikutnya. Menambahkan ke keranjang tidak memesan stok.
           </p>
 
           <Link

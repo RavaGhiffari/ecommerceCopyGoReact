@@ -3,6 +3,7 @@ import { RequireAuth } from '../features/auth/RequireAuth'
 import { StatusPage } from '../features/status/StatusPage'
 import { MainLayout } from '../layouts/MainLayout'
 import { AccountPage } from '../pages/AccountPage'
+import { CartPage } from '../pages/CartPage'
 import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: 'register', element: <RegisterPage /> },
       // RequireAuth is UX only; the API enforces access on its own.
       { path: 'account', element: <RequireAuth><AccountPage /></RequireAuth> },
+      { path: 'cart', element: <RequireAuth><CartPage /></RequireAuth> },
       { path: 'seller', element: <RequireAuth><SellerPage /></RequireAuth> },
       { path: 'seller/products/new', element: <RequireSeller><SellerNewProductPage /></RequireSeller> },
       { path: 'seller/products/:id', element: <RequireSeller><SellerEditProductPage /></RequireSeller> },

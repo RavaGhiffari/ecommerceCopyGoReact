@@ -33,6 +33,27 @@ const CODE_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Kamu tidak punya akses untuk ini.',
   NETWORK_ERROR: 'Tidak dapat terhubung ke server. Pastikan backend berjalan.',
   ORIGIN_REJECTED: 'Permintaan ditolak karena berasal dari situs lain.',
+  OUT_OF_STOCK: 'Stok produk ini sedang habis.',
+  QUANTITY_EXCEEDS_STOCK: 'Jumlahnya melebihi stok yang tersedia.',
+  VARIANT_UNAVAILABLE: 'Produk ini sudah tidak dijual.',
+  VARIANT_NOT_FOUND: 'Varian produk tidak ditemukan.',
+  OWN_PRODUCT: 'Ini produk dari tokomu sendiri.',
+  CART_ITEM_NOT_FOUND: 'Barang ini sudah tidak ada di keranjang.',
+  VALIDATION_ERROR: 'Jumlah tidak valid (1–99 per barang).',
+}
+
+/** A user-facing Indonesian message for any error from the API. */
+export function messageFor(err: unknown): string {
+  if (!(err instanceof ApiError)) return 'Terjadi kesalahan tak terduga.'
+  if (err.code === 'QUANTITY_EXCEEDS_STOCK' && typeof err.details === 'object' && err.details !== null) {
+    const d = err.details as { available?: number; inCart?: number }
+    if (typeof d.available === 'number') {
+      return d.inCart
+        ? `Stok tersisa ${d.available}, dan ${d.inCart} sudah ada di keranjangmu.`
+        : `Stok tersisa ${d.available}.`
+    }
+  }
+  return CODE_MESSAGES[err.code] ?? err.message
 }
 
 /**

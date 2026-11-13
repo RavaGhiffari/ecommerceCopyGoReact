@@ -2,9 +2,27 @@ import { useState, type FormEvent } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogOut, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
 import { useAuth } from '../../features/auth/authContext'
+import { useCart } from '../../features/cart/cartContext'
 import { useCategories } from '../../features/catalog/hooks'
 
-const COMING_SOON = 'Tersedia setelah backend siap'
+/** Cart icon with the number of units in the cart (anonymous: /cart asks to log in). */
+function CartLink() {
+  const { itemCount } = useCart()
+  const label = itemCount > 0 ? `Keranjang, ${itemCount} barang` : 'Keranjang'
+  return (
+    <Link to="/cart" aria-label={label} title={label} className="relative rounded-md p-2 text-slate-600 hover:bg-slate-100 hover:text-emerald-700">
+      <ShoppingCart className="size-5" aria-hidden="true" />
+      {itemCount > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-semibold leading-5 text-white"
+        >
+          {itemCount > 99 ? '99+' : itemCount}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 export function Header() {
   const navigate = useNavigate()
@@ -25,15 +43,7 @@ export function Header() {
         <SearchForm key={urlQuery} initial={urlQuery} onSearch={(q) => navigate(q ? `/products?q=${encodeURIComponent(q)}` : '/products')} />
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <button
-            type="button"
-            disabled
-            title={COMING_SOON}
-            aria-label={`Keranjang. ${COMING_SOON}`}
-            className="rounded-md p-2 text-slate-400"
-          >
-            <ShoppingCart className="size-5" aria-hidden="true" />
-          </button>
+          <CartLink />
           <AccountActions />
           <SellerLink />
         </div>
