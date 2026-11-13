@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Starting a new session? Read [SESSION_HANDOFF.md](SESSION_HANDOFF.md) first**, then [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (verified state, checkpoints, decision log, known issues). This file holds the rules; those hold the current state.
+
 # E-Commerce Platform — Go, React & PostgreSQL
 
 ## 1. Project goal
@@ -14,14 +16,15 @@ Prefer explicit, readable code and clear SQL over generic frameworks. For every 
 
 ## 2. Current state of the repo
 
-**Phase 0 done. Catalog UI prototype (0.5) done on mock data. Phase 1 (identity & security) implemented and awaiting developer review** — do not start Phase 2 until approved. **Inspect before overwriting; do not assume the repo is empty.**
+**Phases 0, 0.5 and 1 done and reviewed. Phase 2 (catalog) implemented and awaiting developer review** — do not start Phase 3 until approved. The catalog UI no longer uses mocks. **Inspect before overwriting; do not assume the repo is empty.**
 
 - Backend in `backend/` (module `github.com/RavaGhiffari/ecommerceCopyGoReact/backend`, go 1.27.3, Gin, pgx v5, google/uuid, x/crypto, testify). Request path: `internal/router` (middleware chain + routes) → `internal/modules/<module>/handler.go` → `service.go` → `repository.go` → sqlc code in `internal/database/queries` (generated from `db/queries/*.sql`; never edit by hand) → pgxpool from `internal/database`. `cmd/api/main.go` wires everything and does graceful shutdown. Middleware order: RequestID → Logging → Recovery → CORS → Timeout → SameOrigin (CSRF) → Authenticate; per-route `RequireAuth` / `RequireRole`. `internal/platform/logger` adds `request_id` to every `slog.*Context` log line.
-- Modules: `health` (`/health`, `/ready`; no service, no rules), `auth` (register/login/logout, sessions, rate limits), `users` (profile, `GET`/`PATCH /api/v1/me`). Shared helpers in `internal/platform/`: `password` (Argon2id PHC strings), `token` (random session token + SHA-256), `ratelimit` (in-memory fixed window — single instance only), `validation` (`Errors` → 422 with field details), `authctx` (Principal in context), `request` (strict JSON: application/json only, unknown fields rejected, 1 MiB cap), `response`. Transactions: `database.WithTx`; services decide the boundary, repositories take `queries.DBTX` so they work with a pool or a tx. Services return plain errors / `validation.Errors`; handlers map them to HTTP.
+- Modules: `health` (`/health`, `/ready`; no service, no rules), `auth` (register/login/logout, sessions, rate limits), `users` (profile, `GET`/`PATCH /api/v1/me`), `categories` (public list; admin `POST /admin/categories`, `PUT /admin/categories/:id`; two levels), `stores` (`POST /seller/store` opens a store AND grants the seller role in one tx; `GET`/`PATCH /seller/store`; public `GET /stores/:slug`), `products` (public `GET /products?q=&category=&store=&sort=popular|newest|price_asc|price_desc&page=&pageSize=`, `GET /stores/:slug/products/:productSlug`, `GET /products/:id/related`; seller CRUD under `/seller/products`, archive via `DELETE`, variants, `PUT .../variants/:variantId/stock`), `inventory` (functions, not a service: `Create` / `SetAvailable` must run inside the caller's tx; lock row `FOR UPDATE` → update → ledger row). Seller routes resolve the store from the session and every query filters by that `store_id`, so foreign IDs are 404. Shared helpers in `internal/platform/`: `password` (Argon2id PHC strings), `token` (random session token + SHA-256), `ratelimit` (in-memory fixed window — single instance only), `validation` (`Errors` → 422 with field details; nested keys like `variants[0].price`), `authctx` (Principal in context), `request` (strict JSON: application/json only, unknown fields rejected, 1 MiB cap), `slug` (name → slug; same pattern as the DB CHECK), `response`.
+- Catalog design (Phase 2 decisions): money is `NUMERIC(12,2)` ↔ `shopspring/decimal` (codec registered in `database.NewPool` AfterConnect) ↔ JSON **string** with 2 decimals (`"349000.00"`); never float. Prices live on variants; a product is public only if active, its store is active and it has ≥1 variant; listings show min/max variant price. Products must sit on a leaf category. Categories are two levels (service check + DB trigger `categories_max_two_levels`); a parent filter includes its children. Search = PostgreSQL FTS (`search` generated tsvector, `'simple'` config, GIN index) with prefix terms built from sanitised words in `products/search.go`; no `pg_trgm`. Images are http(s) URLs only (placeholder in the UI when none). SKUs are global and upper-cased; product slugs `UNIQUE (store_id, slug)`; store slugs are immutable. `sold_count` is a denormalised counter (checkout will update it); ratings are 0 until reviews exist. Transactions: `database.WithTx`; services decide the boundary, repositories take `queries.DBTX` so they work with a pool or a tx. Services return plain errors / `validation.Errors`; handlers map them to HTTP.
 - Auth design (Phase 1 decisions): opaque 32-byte token in cookie `sid` (HttpOnly, SameSite=Lax, Secure in production), only SHA-256 stored in `user_sessions`, TTL `SESSION_TTL` (24h); register logs in; login rotates the session and resets the per IP+email failure counter (5 per 15 min); register limited to 10/hour per IP; suspended users are filtered in the session lookup; unknown email and wrong password give the same 401 (dummy hash equalizes timing); CSRF = SameSite + Origin-vs-Host/allow-list check + JSON-only bodies (no double-submit token). Admins only via `make seed-admin`. There is no `/auth/me`; use `GET /api/v1/me`.
-- Migrations: `backend/db/migrations`, golang-migrate, via compose services `migrate` (dev DB) and `migrate-test` (`marketplace_test`), profile `tools`. `000001` `set_updated_at()`, `000002` users (lowercase-email CHECK + unique `LOWER(email)` index), `000003` roles (seeded customer/seller/admin) + user_roles, `000004` user_sessions. **The developer's dev database is named `main`** (from `.env`), not `marketplace_dev`.
-- Frontend: Vite + React 19 + TS + Tailwind 4 + oxlint, plus react-router-dom, lucide-react, react-hook-form, zod 4, @hookform/resolvers. `src/lib/api.ts` (`apiRequest` for all methods, envelope-aware, `ApiError.fieldErrors()`), `src/types/api.ts` and `src/types/auth.ts` (mirrors of Go DTOs — keep in sync). **Real API:** auth via `src/services/auth.ts` → `features/auth/AuthProvider` (`useAuth()`), pages `/login`, `/register`, `/account` (guarded by `RequireAuth`, UX only), `/status`. **Mock data (§17):** catalog via `src/services/catalog.ts` (the only importer of `src/mocks/`). Vite proxies `/api` (changeOrigin **false**, required by the CSRF Origin/Host check) and exactly `/health`, `/ready` to `localhost:8081`.
-- Docker: `backend/Dockerfile` (builds every `cmd/*`: `/app/api`, `/app/seed-admin`), `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`; `migrate-test`). The developer's `.env` holds real credentials — never print it, never commit it.
+- Migrations: `backend/db/migrations`, golang-migrate, via compose services `migrate` (dev DB) and `migrate-test` (`marketplace_test`), profile `tools`. `000001` `set_updated_at()`, `000002` users (lowercase-email CHECK + unique `LOWER(email)` index), `000003` roles (seeded customer/seller/admin) + user_roles, `000004` user_sessions, `000005` categories (+ two-level trigger), `000006` stores (`owner_id` UNIQUE), `000007` products / product_variants / product_images, `000008` inventory / inventory_movements (CHECK ≥ 0; append-only ledger). Invariant: for every variant, `SUM(inventory_movements.available_delta) = inventory.available_quantity`. **The developer's dev database is named `main`** (from `.env`), not `marketplace_dev`. Demo data: `make seed-dev` (sellers `penjual1..4@contoh.id` / `penjual-123`, local only).
+- Frontend: Vite + React 19 + TS + Tailwind 4 + oxlint, plus react-router-dom, lucide-react, react-hook-form, zod 4, @hookform/resolvers. `src/lib/api.ts` (`apiRequest` for all methods, envelope-aware, `ApiError.fieldErrors()`), `src/types/api.ts` and `src/types/auth.ts` (mirrors of Go DTOs — keep in sync). **Real API:** auth via `src/services/auth.ts` → `features/auth/AuthProvider` (`useAuth()`), pages `/login`, `/register`, `/account` (guarded by `RequireAuth`, UX only), `/status`. Catalog via `src/services/catalog.ts` (real API; types in `src/types/marketplace.ts`, prices are `Money` strings). Seller UI via `src/services/seller.ts` + `src/types/seller.ts`: `/seller` (open store or dashboard), `/seller/products/new`, `/seller/products/:id` (guarded by `RequireSeller`, UX only). `CategorySelect` mounts the registered `<select>` only after categories load (otherwise RHF's default value is lost). `applyServerError` maps API keys like `variants[0].price` to RHF paths `variants.0.price`. Vite proxies `/api` (changeOrigin **false**, required by the CSRF Origin/Host check) and exactly `/health`, `/ready` to `localhost:8081`.
+- Docker: `backend/Dockerfile` (builds every `cmd/*`: `/app/api`, `/app/seed-admin`, `/app/seed-dev`), `docker-compose.yml` (`postgres:18` with volume `pgdata` at `/var/lib/postgresql` as PG18 requires, host port **5433**; `api`; `migrate`; `migrate-test`). The developer's `.env` holds real credentials — never print it, never commit it.
 - Old httprouter spike deleted (recoverable from commit `e402892`).
 - **Host machine quirks:** Go is **not installed** on the host — run Go/sqlc via Docker (the Makefile does this). GNU make 4.4.1 is installed via scoop; the Makefile sets `MSYS_NO_PATHCONV=1` because Git Bash otherwise rewrites `-w /src` into a Windows path. Docker CLI: `C:\Users\Rava\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`. Local PostgreSQL 18 uses host port 5432. **Another app of the developer's (a Laravel project) also uses port 5173 on IPv4** — `localhost:5173` may hit it instead of this Vite server (which binds `[::1]`). Never kill a process by port without confirming via its command line that it belongs to this repo.
 
@@ -76,7 +79,7 @@ From the repo root (Makefile wraps Docker):
 - Stack: `make up` (`docker compose up -d --build`), `make down` (keeps the DB volume — never `down -v` casually), `make logs`, `make ps`
 - Migrations: `make migrate-up`, `make migrate-down` (one step), `make migrate-version`, `make migrate-create name=create_users_table`, `make migrate-force version=N` (dirty DB only). Raw form: `docker compose run --rm migrate up`.
 - Code: `make sqlc` (regenerate after editing `db/queries` or migrations), `make fmt`, `make vet`, `make test` (unit, no DB), `make test-db` (create + migrate `marketplace_test`), `make test-integration` (runs `test-db`, then build tag `integration` against `marketplace_test`; the tests TRUNCATE users and refuse any URL without `_test`)
-- Accounts: `make seed-admin email=... name="..."` (password prompted, or `ADMIN_PASSWORD` env; needs the api image from `make up`)
+- Accounts & data: `make seed-admin email=... name="..."` (password prompted, or `ADMIN_PASSWORD` env; needs the api image from `make up`); `make seed-dev` (demo catalog through the real services; refuses production; no-op if categories exist)
 - Single Go test: `docker run --rm -v <repo>/backend:/src -v gomodcache:/go/pkg/mod -w /src golang:1.27-alpine go test ./internal/middleware -run TestCORS -v`
 - Smoke check: `curl http://localhost:8081/health` and `/ready`
 - Frontend (`cd frontend`): `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (**oxlint**, not ESLint)
@@ -119,7 +122,7 @@ Roles (RBAC via `roles` + `user_roles`): **customer**, **seller**, **admin**.
 
 Base path `/api/v1`. Health endpoints `GET /health` and `GET /ready` (outside the prefix; readiness checks the DB; don't leak infra details).
 
-Route groups: public (`auth/register|login|logout`, `products`, `products/:id/related`, `products/:id/reviews`, `categories`, `stores/:slug`), customer (`me`, `cart`, `cart/items`, `checkout`, `checkout/:id`, `orders`, `orders/:id`, `orders/:id/cancel`, `payments/:id/simulate`, `reviews`), seller (`seller/stores`, `seller/store`, `seller/products`, `seller/orders`, `seller/orders/:id/status`, `seller/inventory`), admin (`admin/users`, `admin/users/:id/status`, `admin/stores`, `admin/orders`, `admin/audit-logs`). Endpoint details may be adjusted, but keep REST conventions and ownership rules.
+Route groups: public (`auth/register|login|logout`, `products`, `products/:id/related`, `products/:id/reviews`, `categories`, `stores/:slug`), customer (`me`, `cart`, `cart/items`, `checkout`, `checkout/:id`, `orders`, `orders/:id`, `orders/:id/cancel`, `payments/:id/simulate`, `reviews`), seller (`seller/store` [POST opens a store; any signed-in user], `seller/products` [+ `/:id`, `/:id/variants`, `/:id/variants/:variantId`, `/:id/variants/:variantId/stock`], `seller/orders`, `seller/orders/:id/status`, `seller/inventory`), admin (`admin/users`, `admin/users/:id/status`, `admin/stores`, `admin/orders`, `admin/audit-logs`). Endpoint details may be adjusted, but keep REST conventions and ownership rules.
 
 Responses:
 
@@ -149,7 +152,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 ## 14. Roadmap — one phase at a time
 
 0. **Foundation**: restructure into `backend/`, config, pgxpool, golang-migrate + Makefile, sqlc, `/health` + `/ready`, response helpers, Docker Compose, frontend↔backend connectivity. *(Done and reviewed.)*
-0.5. **UI-first catalog prototype** (current, §17): homepage, product list/search, product detail, store page on typed mock data. No backend changes.
+0.5. **UI-first catalog prototype** (§17): homepage, product list/search, product detail, store page. *(Done; mocks replaced by the real API in Phase 2.)*
 1. **Identity & security**: register/login/logout, Argon2id, sessions, auth middleware, RBAC, CSRF, authorization tests.
 2. **Catalog**: categories, stores, products, variants, images, inventory basics, public listing, search/pagination/filter/sort.
 3. **Marketplace UI** on real APIs (homepage, nav, cards, detail, store page, search).
@@ -158,7 +161,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 6. **Reviews & frontend completion**: reviews, buyer/seller/admin dashboards.
 7. **Hardening**: integration + E2E tests, security review, performance/index review, OpenAPI docs, deploy prep.
 
-Scope status: Phases 0, 0.5 (catalog prototype) and 1 are implemented; Phase 1 awaits developer review. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
+Scope status: Phases 0, 0.5, 1 and 2 are implemented; Phase 2 awaits developer review. Phase 3 (marketplace UI on real APIs) is largely covered already because the prototype UI was wired to the Phase 2 API. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
 
 ## 15. Where the two source briefs disagreed (resolved — newer brief wins)
 
@@ -171,31 +174,13 @@ Router Chi→**Gin**; migrations Goose→**golang-migrate**; auth JWT→**cookie
 - After: review the diff, run formatting/lint/static analysis and relevant tests, check migrations up/down, check the frontend compiles, verify real API behaviour, list remaining risks, summarise modified files. **Never claim done because it compiles; never silently skip a failing test — report failures with their output.**
 - **Never commit, push, or deploy automatically**; never touch production infrastructure or expose credentials. When a feature is complete, propose a commit message and let the developer decide. Explain any destructive database operation before running it.
 
-## 17. UI-first catalog prototype (current, phase 0.5)
+## 17. UI-first catalog prototype (completed)
 
-The developer chose to see the marketplace interface before backend business logic. This is an intentional prototyping strategy, **not a relaxation of production standards**. It ends when the developer approves the prototype.
+The developer chose to see the marketplace interface before backend business logic, so the catalog pages were first built on typed mock data (phase 0.5) and then switched to the real API in Phase 2 by rewriting only `src/services/catalog.ts`; pages and components did not change. `src/mocks/` and the `?simulate=` helper were deleted.
 
-### Scope
+Lessons that still apply to new UI work:
 
-Read-only catalog pages only: homepage, product list with category filter / price sort / keyword search / pagination, product detail, store page, not-found. Cart, checkout, orders, seller and admin screens are **out of scope** until their backend exists. (Login, register and account were in this list; they now use the real Phase 1 API, not mocks.)
-
-### Rules
-
-- Stack and structure stay as in §3/§4: React, TypeScript, Tailwind, `features/`, `components/`, `lib/`, `types/`. New dependencies need justification (react-router-dom for routing, lucide-react for icons are the approved additions).
-- **Mock data** is typed fixtures in `frontend/src/mocks/`. **Only `frontend/src/services/` may import them.** Components get typed props or call feature hooks; they never import mock datasets and contain no mock business logic. Replacing mocks with the real API must only touch `services/`.
-- Types in `frontend/src/types/` describe the data the real API is expected to return; keep them aligned with §8/§9 when the backend lands.
-- Every data-driven view implements **loading, empty, error and success** states. Services accept `?simulate=slow|empty|error` in the URL during the prototype so those states can be checked by hand.
-- **Nothing pretends to be a real operation:** no fake auth (no stored tokens, no client-side role gates), no add-to-cart that "works", no checkout, no simulated payment, no stock reservation. Controls for unbuilt features are visibly disabled and say so.
-- Product URLs are store-scoped (`/stores/:storeSlug/products/:productSlug`) per the approved decision `UNIQUE (store_id, slug)`.
-- No backend changes, no migrations, and the existing `/status` page stays.
-
-### Completion criteria
-
-1. All scoped pages exist with working navigation and routing.
-2. Search, filter, sort and pagination work against mock data.
-3. Loading, empty and error states exist on every data view.
-4. Components are reusable and feature-organised; no component imports from `mocks/`.
-5. `npm run build` and `npm run lint` pass.
-6. The developer reviews and approves.
-
-Prototype completion does **not** mean production readiness. After approval, resume the backend roadmap at Phase 1 and replace mock services with real API calls one feature at a time.
+- Pages and components get data through feature hooks → `src/services/`; nothing else calls the API or holds fixtures.
+- Types in `src/types/` mirror the Go DTOs; update both together.
+- Every data view implements loading, empty, error and success states.
+- Controls for features without a backend (cart, checkout) stay visibly disabled; nothing pretends to be a real operation.

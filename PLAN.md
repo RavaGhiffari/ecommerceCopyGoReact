@@ -1,82 +1,75 @@
-# PLAN.md — Phases 0–2
+# PLAN.md — Phase 4: Cart (PROPOSED, NOT YET APPROVED)
 
-Status: **Phase 0 implemented (0.1–0.10), awaiting developer review.** Phase 1 starts only after approval. Rules and conventions live in [CLAUDE.md](CLAUDE.md).
+This replaces the Phase 0–2 plan, which is complete (see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) §1, §6). Nothing below is implemented. Rules live in [CLAUDE.md](CLAUDE.md).
 
-## Approved decisions
+## Preconditions (blockers)
 
-Gin; cookie sessions + Argon2id + CSRF + Origin validation; variant price is authoritative (≥1 variant before publishing, listing shows lowest active variant price); inventory available/reserved/consumed/released with reservation implemented in the checkout phase, not Phase 2; spike moved to `backend/`; React stays on the host for Phases 0–2; module path from the Git remote (`github.com/RavaGhiffari/ecommerceCopyGoReact/backend`); no unnecessary Postgres extensions; email unique on `LOWER(email)`; product slug `UNIQUE (store_id, slug)` with store-scoped URLs; every inventory change writes a movement (available and reserved deltas, type, reference, actor) in the same transaction; admin created by a secure CLI seed command, never hardcoded credentials; Vite proxy for `/api/*` in development.
+1. **CP-2 committed.** The catalog work is verified but only exists in the working tree (66 uncommitted paths). Commit commands: `docs/PROJECT_STATE.md` §1.
+2. **Developer approval of this plan**, and answers to the open questions below.
 
-## Original open decisions (resolved above)
+## Goal
 
-1. **Gin** (newer brief) instead of Chi — OK?
-2. **Cookie sessions + Argon2id + CSRF** instead of JWT — OK? (More moving parts than JWT; better security story and a good learning topic.)
-3. **Product price vs variant price.** Plan: every product has ≥1 variant; the *variant* price is the authoritative price for cart/checkout, and the product list shows the lowest active variant price. `products` has no price column of its own. OK?
-4. **Inventory semantics.** Plan: checkout moves stock `available → reserved`; successful payment consumes the reservation; failure/cancel/expiry releases it.
-5. **Repo restructure.** Move the Go spike into `backend/` (`cmd/api`, `internal/...`), delete the demo routes/`data`/`repository`/`handler` spike packages, and move the root `Dockerfile` to `backend/Dockerfile`. OK to delete the spike?
-6. Do you want the **React dev server in Compose** now, or keep running the frontend with `npm run dev` on the host during Phases 0–2? (Recommended: host, add the Compose service later.)
+A signed-in customer keeps a persistent cart across sessions. Adding validates stock **but does not reserve it** (CLAUDE.md §7); the cart shows **current** prices; items are grouped by store so Phase 5 can create one order per store.
 
----
+## Open questions (need an answer before coding)
 
-## Phase 0 — Foundation
-
-Already done: root `Dockerfile`, `docker-compose.yml` (Postgres 18 + API, port 5433), `.env.example`, `.gitignore`.
-
-| # | Work | Files |
+| # | Question | Proposed default |
 |---|---|---|
-| 0.1 | Restructure Go code under `backend/`; `go mod init` stays `goFrameworkFirstTry` (or rename — decide); add Gin, pgx, godotenv-free env reading | `backend/cmd/api/main.go`, `backend/go.mod` |
-| 0.2 | Config from env vars (port, DB URL, pool sizes, CORS origins, cookie settings, app env) with validation on startup | `internal/config/config.go` |
-| 0.3 | `pgxpool` factory with min/max conns, lifetime, health check, ping on start | `internal/database/postgres.go` |
-| 0.4 | Response helpers (`success`/`error` envelope, pagination meta) and error-code type | `internal/platform/response/` |
-| 0.5 | Logger (JSON `slog`), request ID, recovery, CORS, timeout middleware; graceful shutdown | `internal/platform/logger/`, `internal/middleware/`, `main.go` |
-| 0.6 | `GET /health` (liveness) and `GET /ready` (DB ping) | `internal/router/` |
-| 0.7 | golang-migrate + Makefile (`migrate-up/down/version/create`), first no-op or `pgcrypto`/`citext` extensions migration | `Makefile`, `db/migrations/000001_*` |
-| 0.8 | `sqlc.yaml` + one trivial query to prove generation works | `sqlc.yaml`, `db/queries/` |
-| 0.9 | Frontend: `VITE_API_BASE_URL`, status page calling `/health`/`/ready` with loading/error states; remove spike `App.tsx` logic | `frontend/src/...` |
-| 0.10 | Update `docker-compose.yml`/Dockerfile for `backend/` paths; add `migrate` workflow | compose, `backend/Dockerfile` |
+| Q1 | Cart for anonymous visitors (merge on login) or login required? | **Login required** — simplest, matches "each buyer has an independent cart" |
+| Q2 | Maximum quantity per line? | `min(stock, 99)` |
+| Q3 | May a seller add their own store's products? | **No** → 409 `OWN_PRODUCT` |
+| Q4 | Lines whose stock dropped below the cart quantity: error or warning? | **Warning flag in `GET /cart`**, hard error only on add/update |
+| Q5 | Header badge: separate lightweight endpoint or part of `GET /cart`? | Part of `GET /cart` (`itemCount`), refetched after mutations |
 
-**Acceptance:** `docker compose up -d --build` starts Postgres + API; `/health` and `/ready` respond; `make migrate-up` then `migrate-down` work on a clean DB; `sqlc generate` succeeds; frontend shows live API status; `go build/vet/test ./...` and `npm run build && npm run lint` pass.
+## Backend
 
-## Phase 1 — Identity & security
+**Migration `000009_create_cart_tables`** (up + down; verify up → down → up on dev and test DBs):
 
-**Migrations:** `users` (UUID, unique email, `status` CHECK active/suspended), `roles` (seeded customer/seller/admin), `user_roles`, `user_sessions` (token hash, expiry, `user_id` index).
+- `carts(id uuid pk, user_id uuid not null unique references users on delete cascade, created_at, updated_at)` + `set_updated_at` trigger.
+- `cart_items(id uuid pk, cart_id uuid not null references carts on delete cascade, variant_id uuid not null references product_variants on delete restrict, quantity integer not null check (quantity > 0 and quantity <= 99), created_at, updated_at, unique (cart_id, variant_id))`.
 
-**Backend (`modules/auth`, `modules/users`, `middleware`):**
-- Argon2id hashing (params in config), register (always creates `customer`; role never from client), login (constant-time-ish failure message, session rotation), logout (deletes session row), `GET/PATCH /me`.
-- Session token: 32 random bytes → base64url in cookie; SHA-256 hash stored. Cookie `HttpOnly`, `Secure` in prod, `SameSite=Lax`.
-- CSRF: double-submit token (or `Origin`/header check) on non-GET requests.
-- Middleware: authenticate (loads user + roles into context), `RequireRole(...)`, rate limit on `/auth/*`.
-- Admin-seeding path (CLI flag or migration-free seed command) so an admin can exist — **needs your decision**.
+**Queries** (`db/queries/cart.sql`, then `make sqlc`; remember `::uuid` casts and `COALESCE` on LATERAL columns):
 
-**Tests:** hashing, register/login/logout flows, expired/invalid session, suspended user rejected, protected route returns 401, wrong role returns 403, CSRF rejection, rate limit 429. Repository tests against real Postgres.
+- `GetOrCreateCart` (INSERT … ON CONFLICT (user_id) DO UPDATE … RETURNING).
+- `UpsertCartItem` (INSERT … ON CONFLICT (cart_id, variant_id) DO UPDATE SET quantity = …) so concurrent adds of the same variant yield one row.
+- `ListCartLines`: join cart_items → variants → products → stores (+ first image, + `inventory.available_quantity`); filters nothing, so the service can flag lines that became unavailable (archived product, suspended store, out of stock).
+- `UpdateCartItemQuantity` / `DeleteCartItem`: **both filter by the caller's cart** (`WHERE id = $1 AND cart_id = $2`) → another user's item id is a 404.
 
-**Frontend:** login/register pages (RHF + Zod), auth context via TanStack Query on `/me`, header user state, route guards (UX only).
+**Module `modules/cart/`** (`handler.go`, `service.go`, `repository.go`, `dto.go`, `model.go`), following the products module pattern:
 
-**Acceptance:** per CLAUDE.md §14 Phase 1 — no plaintext/hashes in responses, protected endpoints reject anonymous callers, roles enforced server-side, logout invalidates the session.
+- `GET /api/v1/cart` → `{ stores: [{ store, items: [{ id, variant, product, quantity, unitPrice, lineTotal, available, issue? }], subtotal }], itemCount, subtotal }`. Totals are computed server-side with `decimal` and sent as strings.
+- `POST /api/v1/cart/items` `{ variantId, quantity }` → validates: variant exists and is **publicly visible** (active product, active store), quantity ≥ 1, resulting quantity ≤ `min(stock, 99)`, not the caller's own store (Q3). Adds to an existing line.
+- `PATCH /api/v1/cart/items/:id` `{ quantity }`; `DELETE /api/v1/cart/items/:id` (204).
+- Routes go in the `signedIn` group of `router/router.go`. Sellers are also customers, so no role gate.
+- New error codes: `CART_ITEM_NOT_FOUND`, `OUT_OF_STOCK`, `QUANTITY_EXCEEDS_STOCK`, `VARIANT_UNAVAILABLE`, `OWN_PRODUCT`.
 
-## Phase 2 — Catalog (stores, categories, products, inventory basics)
+## Frontend
 
-**Migrations:** `stores` (unique slug, unique `owner_id`), `categories` (self-FK `parent_id`, unique slug), `products` (store_id, category_id, slug unique per store or global — decide, `status` active/archived, search `tsvector` + GIN index, `pg_trgm` index on name), `product_images`, `product_variants` (SKU unique, `price NUMERIC(12,2) CHECK >= 0`), `inventory` (`CHECK available_quantity >= 0 AND reserved_quantity >= 0`), `inventory_movements`.
+- `types/cart.ts` (mirror of the DTOs), `services/cart.ts` (`apiRequest`), `features/cart/` (hook + provider for the item count, `CartLine`, `StoreGroup`, `CartSummary`).
+- `/cart` page behind `RequireAuth`: store groups, quantity steppers, remove, subtotal, loading / empty / error states; checkout button stays **disabled** until Phase 5.
+- Enable "Tambah ke keranjang" in `features/catalog/ProductDetailView.tsx` (send the selected variant + quantity; anonymous → `/login?next=…`); enable the cart button + badge in `components/layout/Header.tsx`.
+- Show server field/code errors via the existing `applyServerError` / `ApiError` pattern.
 
-**Backend:**
-- `stores`: `POST /seller/stores` (promotes user to `seller` role in the same transaction), `GET/PATCH /seller/store`, public `GET /stores/:slug`.
-- `categories`: public list/tree; admin create/update.
-- `products`: seller CRUD scoped by `store_id` taken from the session user's store (never from the request body); archive instead of hard-delete; public list with pagination, `category`, `sort=price_asc|price_desc|newest`, `q` keyword; public detail; `related`.
-- `inventory`: seller sets stock via adjustment endpoint that writes an `inventory_movements` row in the same transaction.
-- Ownership checks in the SQL (`WHERE id = $1 AND store_id = $2`) so a foreign ID returns 404.
+## Tests (must exist before calling it done)
 
-**Tests:** seller A cannot read/update/archive seller B's product; slug uniqueness conflict → 409; pagination/filter/sort correctness; negative stock rejected by DB constraint; inventory adjustment writes movement atomically; search returns expected results.
+- Unit: quantity/price/line-total calculations, DTO shape.
+- Integration (`marketplace_test`): add → increments; cap by stock; archived / suspended-store variants rejected; cannot exceed 99; own-store product rejected; update and delete; **user B cannot update or delete user A's item (404)**; price shown follows a seller's later price change; groups and subtotal per store; **concurrent adds of the same variant produce one row with the summed quantity**; stock reduced after adding → line flagged, `GET` still 200.
+- Browser: extend `docs/e2e-reference/` style script (register → add two products from two stores → cart groups → change quantity → remove).
 
-**Frontend:** seller store setup and product form (preparation for Phase 3 UI); public listing page consuming the real API.
+## Acceptance criteria
 
-**Acceptance:** per CLAUDE.md §14 Phase 2.
+1. up → down → up on dev and test DBs; `make test` and `make test-integration` pass; `npm run build` and `npm run lint` pass.
+2. A cart persists across logout/login.
+3. Cart totals equal the sum of current variant prices × quantities, computed server-side.
+4. No cart route can read or change another user's cart.
+5. Docs updated: `docs/PROJECT_STATE.md` (new checkpoint CP-4), CLAUDE.md §2, `SESSION_HANDOFF.md`.
 
-## Working method for every step
+## Out of scope
 
-For each numbered item: state the files to change → implement → run `gofmt`, `go vet`, tests, `npm run build/lint` → report results honestly → propose a commit message. I won't commit; you decide.
+Reservation of stock, checkout, orders, shipping, payment, anonymous carts (unless Q1 changes), coupons.
 
-## Risks to watch
+## Risks
 
-- Docker CLI not on my shell PATH — I'll ask you to run compose/migrate commands (or give me a working path).
-- Local PG18 on 5432 vs Docker on 5433 — tests must target the Compose DB explicitly.
-- Argon2id parameters can make tests slow — use lower cost in test config only.
-- Cookie + CSRF across `localhost:5173` ↔ `localhost:8081` needs a correct CORS/credentials setup (or keep using the Vite proxy so everything is same-origin in dev).
+- Price/stock shown in the cart can be stale by checkout time → Phase 5 must re-validate everything inside its transaction.
+- `ListCartLines` joins several tables; check the plan with `EXPLAIN` on seeded data (Phase 7 will repeat this at scale).
+- The rate limiter shares one IP bucket in dev (known issue, `docs/PROJECT_STATE.md` §9) — irrelevant to cart routes, which are not rate limited.

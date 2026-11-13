@@ -24,3 +24,5 @@ Thumbs.db
 
 # Logs
 *.log
+
+/docs/e2e-reference
