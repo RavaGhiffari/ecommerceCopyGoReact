@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-13 |
-| Last commit | `316c1dc` Add login, register and account pages on the real auth API |
-| Uncommitted | Phase 2 (catalog) + docs — 66 changed paths at the end of the handoff (30 modified, 32 untracked, 4 deleted; 62 before the handoff docs were added), **not yet committed** (see §1 for the commit commands). Re-verified in the handoff session, see §1a |
-| Current phase | Phase 2 implemented, **awaiting developer review** |
-| Next phase | Phase 4 — Cart (Phase 3 UI is largely done; see roadmap) |
+| Last commit | `41679b9` Add project state, session handoff and refresh roadmap docs (Phase 2 = `2838782` + `d0c2a54`) |
+| Uncommitted | Phase 4 (cart) + doc updates — **not yet committed** (commit commands in §1) |
+| Current phase | Phase 4 implemented and verified, **awaiting developer review** |
+| Next phase | Phase 5 — Checkout & orders (needs a plan and answers to its open questions first; see §10) |
 
 ---
 
@@ -22,28 +22,23 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-0 | Foundation | `0d45a70`…`b92f582`, `c4a5582` | ✅ reviewed | docker compose up; `/health` 200, `/ready` 200, and 503 with the DB stopped; migrate up→down→up; sqlc generate; unit + integration tests; frontend build/lint; graceful shutdown in logs |
 | CP-1 | Identity & security | `759a82e`, `316c1dc` | ✅ reviewed | 13 auth integration tests on a real DB; curl register/login/me/logout/cross-site; 15-step browser E2E; logs contain no password/hash/token |
 | CP-0.5 | UI prototype on mocks | `830c33d` (+ docs `d30b4ef`) | ✅ reviewed, superseded | 7 pages screenshotted incl. loading/empty/error; no component imported `mocks/`. Mocks were deleted in CP-2 |
-| CP-2 | Catalog | **uncommitted** | 🟡 awaiting review | migrate up→down(4)→up; 13 unit packages; 12 catalog integration tests; concurrency test **fails without `FOR UPDATE`** (proved) and passes with it; ledger invariant = 0 mismatches; 17-step seller/catalog browser E2E + auth E2E re-run (no regression) |
+| CP-2 | Catalog | `2838782` (backend), `d0c2a54` (frontend), docs `41679b9` | ✅ committed by the developer, who then approved Phase 4 | migrate up→down(4)→up; 13 unit packages; 12 catalog integration tests; concurrency test **fails without `FOR UPDATE`** (proved) and passes with it; ledger invariant = 0 mismatches; 17-step seller/catalog browser E2E + auth E2E re-run (no regression) |
+| CP-4 | Cart | **uncommitted** | 🟡 awaiting review | see §1b |
 
-**Commit CP-2** (the developer commits; Claude never does). Suggested split:
+**Commit CP-4** (the developer commits; Claude never does). Suggested split — run `git reset -q` first if anything is staged:
 
 ```bash
-git add -A -- backend Makefile scripts .env.example docker-compose.yml
-git commit -m "Add Phase 2 catalog: categories, stores, products, variants, inventory" \
-  -m "- Migrations 000005-000008 (two-level category trigger, stock CHECKs, append-only ledger)" \
-  -m "- Seller store/product/variant/stock API scoped to the caller's store" \
-  -m "- Public listing: FTS prefix search, category/store filters, sorting, pagination" \
-  -m "- NUMERIC money via shopspring/decimal, sent as decimal strings; seed-dev command; tests"
+git add -A -- backend
+git commit -m "Add Phase 4 cart: carts, cart items, stock-checked add/update/remove" -m "- Migration 000009 (one cart per user, 1..99 per line, unique variant per cart)" -m "- Cart row lock serialises changes; adding never reserves stock" -m "- Lines that became unbuyable stay in the cart with an issue flag" -m "- Unit and integration tests; also gofmt for slug_test.go" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 git add -A -- frontend
-git commit -m "Wire catalog UI to the real API and add seller pages" \
-  -m "- Replace mock services with API calls; remove src/mocks" \
-  -m "- Seller dashboard, new product and product editor pages"
+git commit -m "Add cart page, header badge and add-to-cart" -m "- CartProvider keeps the server's cart; totals never computed client-side" -m "- /cart grouped by store with quantity controls and issue fixes" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 git add -A -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs
-git commit -m "Add project state, session handoff and refresh roadmap docs"
+git commit -m "Update project docs for Phase 4" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-After committing, replace "uncommitted" in the CP-2 row with the hash.
+`docs/e2e-reference/` is git-ignored by the developer's choice, so the third commit only picks up `docs/PROJECT_STATE.md`. After committing, put the hashes in the CP-4 row.
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -65,6 +60,21 @@ Commands actually run in that session, against the working tree described above:
 
 **Not re-run at handoff** (observed earlier in the session; treat as "was true at CP-2", not re-confirmed): the concurrency test failing without `FOR UPDATE`; the curl flows; the two browser E2E scripts; graceful shutdown; screenshots.
 
+### 1b. Verified at CP-4 (cart), 2026-11-13
+
+| Check | Result |
+|---|---|
+| Migration `000009` | up → down 1 → up on the dev DB; `make test-db` applied it to `marketplace_test`; CHECK rejects quantity 0, UNIQUE rejects a second line for the same variant (tried by hand in psql) |
+| `gofmt`, `go vet` (incl. `-tags=integration`) | clean after `make fmt` (it also fixed `slug_test.go`, committed unformatted in CP-2) |
+| `make test` | 14 packages `ok` (new: `modules/cart`) |
+| `make test-integration` | 15 packages `ok`; 12 cart tests listed by `-v` and passing |
+| Lock check | `TestCart_ConcurrentAddsOfTheSameVariant` **failed** with the cart-row lock removed (quantity 1 instead of 10) and passed 5/5 with it restored |
+| `npm run build` / `npm run lint` | clean |
+| Browser E2E (headless Edge, Vite :5190, real API + dev DB) | `cart-flow.mjs` 16/16; `auth-flow.mjs` 15/15 and `catalog-flow.mjs` 17/17 re-run, no regression; 0 uncaught page errors |
+| Dev DB after E2E | ledger mismatches 0; `SUM(reserved_quantity)` = 0 (the cart reserved nothing); the demo stock changed by the E2E was restored (Kaos M = 80) |
+
+Test functions in source: 98 (was 83).
+
 ---
 
 ## 2. What exists, by phase
@@ -74,9 +84,9 @@ Commands actually run in that session, against the working tree described above:
 | 0 Foundation | `backend/` layout, config, pgxpool, JSON logging, request ID, CORS, graceful shutdown, `/health` `/ready`, golang-migrate, sqlc, Makefile, Compose, status page | ✅ |
 | 0.5 UI prototype | Catalog pages on typed mock data | ✅ (now on real API) |
 | 1 Identity | users, roles, sessions; register/login/logout; Argon2id; CSRF layers; rate limits; `/me`; `seed-admin` | ✅ |
-| 2 Catalog | categories (2 levels), stores, products, variants, images (URLs), inventory + ledger, public listing/search, seller dashboard, `seed-dev` | ✅ (review pending) |
+| 2 Catalog | categories (2 levels), stores, products, variants, images (URLs), inventory + ledger, public listing/search, seller dashboard, `seed-dev` | ✅ |
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
-| 4 Cart & inventory | cart, stock validation, reservation | ⬜ |
+| 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | 🟡 implemented + verified, review pending |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim | ⬜ |
 | 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ⬜ |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
@@ -100,13 +110,13 @@ Backend request path (`backend/internal/`):
 
 Frontend (`frontend/src/`): `pages/` (routes) → `features/<area>/` (hooks, forms, views) → `services/` (**only** place that calls the API) → `lib/api.ts` (envelope-aware fetch, `ApiError`). `types/` mirrors Go DTOs by hand.
 
-Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/status`, `*`. There is **no `/cart` route** yet; the header cart button and "Tambah ke keranjang" / "Beli sekarang" are rendered disabled.
+Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/cart` (RequireAuth), `/status`, `*`. "Tambah ke keranjang" works (anonymous → `/login?next=…`); **"Beli sekarang" and "Lanjut ke checkout" stay disabled** until Phase 5. `CartProvider` (inside `AuthProvider`) holds the server's cart for the badge, product page and `/cart`.
 
 Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend: react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4 (+ vite plugin). Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
 
 ---
 
-## 4. API surface (as of CP-2)
+## 4. API surface (as of CP-4)
 
 Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{code,message,details}}`.
 
@@ -114,15 +124,17 @@ Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{c
 |---|---|
 | Infra (no prefix) | `GET /health` (no DB), `GET /ready` (DB query) |
 | Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` · `GET /products/:id/related` · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
-| Signed in | `GET`/`PATCH /me` · `POST /seller/store` (opens store + grants seller role) |
+| Signed in | `GET`/`PATCH /me` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart |
 | Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` |
 | Admin (`admin` role) | `POST /admin/categories` · `PUT /admin/categories/:id` |
 
-Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …).
+Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422.
+
+Cart response: `{ stores: [{ store, items: [{ id, quantity, variantId, variantName, sku, productId, productSlug, productName, image|null, unitPrice, lineTotal, availableQuantity, issue|null }], subtotal }], itemCount, subtotal, hasIssues }`. `issue` ∈ `unavailable` (archived product / suspended store), `out_of_stock`, `insufficient_stock`; flagged lines are excluded from both subtotals. `itemCount` = total units.
 
 ---
 
-## 5. Data model (migrations 000001–000008)
+## 5. Data model (migrations 000001–000009)
 
 | Table | Notes |
 |---|---|
@@ -136,6 +148,8 @@ Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Er
 | `product_images` | URLs only (`^https?://` CHECK) |
 | `inventory` | PK = variant; `available_quantity`, `reserved_quantity` both CHECK ≥ 0 |
 | `inventory_movements` | append-only ledger; deltas, type, reason, reference, actor |
+| `carts` | one per user (`user_id` UNIQUE, cascade on user delete); created on the first add |
+| `cart_items` | `quantity` CHECK 1..99; `UNIQUE(cart_id, variant_id)`; variant FK RESTRICT |
 
 **Invariants worth re-checking after any inventory change**
 
@@ -146,7 +160,9 @@ LEFT JOIN (SELECT variant_id, SUM(available_delta) s FROM inventory_movements GR
 WHERE COALESCE(m.s,0) <> i.available_quantity;
 ```
 
-Not yet created (planned): `user_addresses`, `carts`, `cart_items`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`, `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
+Until Phase 5 also: `SELECT SUM(reserved_quantity) FROM inventory` must be 0 — nothing reserves stock yet (the cart must not).
+
+Not yet created (planned): `user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`, `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
 
 ---
 
@@ -188,14 +204,21 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 | Frontend `RequireAuth` / `RequireSeller` are UX only; API enforces access | CLAUDE.md §6 |
 | Logout navigates away first, then clears the user | otherwise a protected page's guard redirects to `/login?next=…` and overrides the navigation |
 | Frontend forms: React Hook Form + Zod, server field errors mapped to RHF paths (`variants[0].price` → `variants.0.price`) | one error path for client and server validation |
+| Cart (Phase 4, approved defaults Q1–Q5): login required; quantity per line `min(stock, 99)`; sellers cannot add their own products (`OWN_PRODUCT`); stock problems are flags in `GET /cart`, errors only on add/update; badge count comes from `GET /cart` | developer approved the proposed defaults |
+| A cart is not a reservation: no `inventory` writes, no ledger rows; prices shown are always current | CLAUDE.md §7; checkout (Phase 5) snapshots prices and reserves stock under lock |
+| Every cart mutation runs in one tx that first locks the cart row (`INSERT … ON CONFLICT DO UPDATE` / `SELECT … FOR UPDATE`) | proven: without it concurrent adds lose updates |
+| Unbuyable lines stay in the cart with `issue`, excluded from subtotals; they can only be removed (unavailable) or reduced (insufficient stock) | the user sees why, instead of items silently vanishing |
+| Cart endpoints return the whole cart, including after delete (200, not 204) | the UI never computes totals; one round trip |
+| Cart item ownership: update/delete filter by the caller's cart (`WHERE id = $1 AND cart_id = $2` / join on `carts.user_id`) | another user's item id is a 404 |
+| Frontend `CartProvider` keys the cart by user **object** (new key per login) | a re-login always refetches instead of showing a cached cart |
 
 ---
 
 ## 7. Test inventory
 
-- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model. 83 test functions in total (counted in source), 13 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`.
-- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive).
-- **Browser E2E**: two `playwright-core` scripts (`auth-flow.mjs`, 15 checks; `catalog-flow.mjs`, 17 checks) were run by hand against Vite on port 5190 + the real API and dev DB. A verbatim copy is kept in `docs/e2e-reference/` as reference (not wired into any command, not re-run from that location; they create throw-away accounts in the dev DB). A proper Playwright suite is a Phase 7 deliverable.
+- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`.
+- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds).
+- **Browser E2E**: three `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
 - **Frontend unit tests (Vitest)**: none yet.
 
 ---
@@ -231,11 +254,14 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Categories manageable only via admin API (no UI) | admin must use curl | Phase 6 |
 | Images are URLs only; no upload, no hotlink protection | seller can point at any host | decide with storage plan |
 | `sold_count` only seeded; ratings are 0 | "popular" is demo data | Phases 5–6 |
-| Reservation columns exist but nothing uses `reserved_quantity` yet | — | Phase 4–5 |
+| Reservation columns exist but nothing uses `reserved_quantity` yet | — | Phase 5 |
+| Right after "Keluar", the header badge keeps the old count until the logout request returns (the page navigates first by design) | cosmetic, milliseconds | accept, or clear the cart state optimistically |
+| Cart issue flags are recomputed on every `GET /cart`, but the page does not refresh by itself | a stock change by the seller shows up on the next load/mutation | acceptable; checkout re-validates |
+| `ListCartLines` joins six tables + a LATERAL image lookup; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
+| E2E reference scripts are git-ignored (`/docs/e2e-reference`) | they are lost if this machine is lost | promote into a real Playwright suite (Phase 7) |
 | No `/auth/me`; no email verification; no password reset | account recovery impossible | backlog |
 | No audit log table yet | admin actions untracked | Phase 6/7 |
 | Frontend has no automated tests | regressions caught manually | Phase 7 |
-| `PHASES.md` and `PLAN.md` predate several decisions (Chi/JWT wording, hour estimates) | may mislead | rewrite or delete |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
 | Money display converts strings to JS numbers | fine for display; never sum client-side for charging | rule for Phase 4–5 |
 | **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **before Phase 5 / deploy**; sign-up-heavy E2E runs can hit it |
@@ -248,21 +274,18 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
 | `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
 | No CI | nothing runs tests on push | Phase 7 |
-| CP-2 + docs uncommitted | a lot of verified work exists only in the working tree | **commit first** |
+| CP-4 uncommitted | verified work exists only in the working tree | **commit first** (§1) |
 | **Compose publishes Postgres (`0.0.0.0:5433`) and the API (`0.0.0.0:8081`) on all interfaces, and the developer's `.env` DB password is only 4 characters** (length checked; value not recorded) | anyone on the same network can attempt to log in to the dev database | developer decision: use `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432` in compose and a longer password; **not changed** at handoff |
 
 ---
 
 ## 10. Next steps (proposed)
 
-The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md) and the Phase 4 plan in [PLAN.md](../PLAN.md).
+The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews CP-2, commits it, and decides on cleaning dev test data.
-2. **Phase 4 — Cart**: `carts` + `cart_items` (`UNIQUE(cart_id, variant_id)`, `CHECK qty > 0`); endpoints `GET /cart`, `POST /cart/items`, `PATCH`/`DELETE /cart/items/:id`; validate stock on add (no reservation); group by store in the response; frontend cart page + header badge + enable "Tambah ke keranjang".
-3. **Phase 5 — Checkout**: one transaction, per-store orders, `available → reserved`, price/name snapshots, idempotency key, concurrency test for overselling.
-4. Re-evaluate: promote the Playwright E2E scripts into the repo before Phase 5.
-
-Open questions for the developer: cart for anonymous visitors (merge on login) or login-required? Shipping address model (one default vs list)? Payment expiry window for reservations?
+1. Developer reviews CP-4 and commits it (§1).
+2. Before Phase 5: decide the rate-limiter/trusted-proxy question (§9) and the dev DB exposure (compose binds `0.0.0.0`).
+3. **Phase 5 — Checkout & orders**: write the plan first (PLAN.md lists the open questions), get approval, then: `user_addresses`, shipping simulation, one-transaction checkout (lock inventory rows, `available → reserved` + ledger, per-store orders, price/name/SKU snapshots, idempotency key), order lifecycle + status history, payment simulation (consume / release reservations), cancellation and expiry. Concurrency test for overselling is mandatory.
 
 ---
 
@@ -285,6 +308,9 @@ Open questions for the developer: cart for anonymous visitors (merge on login) o
 | Rewriting a CLAUDE.md section ran two interpreters (unclosed heredoc) | shell mistake | prefer the Edit tool for doc changes |
 | Early PHASES.md carried hour estimates and `/auth/me` | written before decisions were made | PHASES.md was rewritten at handoff; do not reintroduce estimates |
 | Chi vs Gin / JWT vs cookies were argued in chat | two briefs conflicted | resolved in CLAUDE.md §15 (newer brief wins); the developer approved Gin + cookie sessions |
+| `slug_test.go` was committed unformatted in CP-2 | `gofmt -l` ran before that file was written | run `make fmt` as the **last** step before reporting a phase done |
+| Two cart test expectations were wrong (3 × 100000.50 written as 301501.50; 2 × 59000.50 as 119001.00) | hand arithmetic in the test | the code was right; confirm the actual value (`-run X -v`) before "fixing" either side |
+| Cart E2E saw the old badge count right after "Keluar" | the test read the badge before the logout request returned | wait for the "Masuk" link (logged-out header) before asserting |
 
 ---
 
