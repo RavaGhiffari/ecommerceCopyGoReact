@@ -112,7 +112,7 @@ Frontend (`frontend/src/`): `pages/` (routes) → `features/<area>/` (hooks, for
 
 Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/cart` (RequireAuth), `/status`, `*`. "Tambah ke keranjang" works (anonymous → `/login?next=…`); **"Beli sekarang" and "Lanjut ke checkout" stay disabled** until Phase 5. `CartProvider` (inside `AuthProvider`) holds the server's cart for the badge, product page and `/cart`.
 
-Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend: react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4 (+ vite plugin). Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
+Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend (as committed at HEAD): react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4 (+ vite plugin). **Uncommitted and not yet reviewed:** `shadcn`, `cn`, `class-variance-authority`, `tw-animate-css`, and a bump of `tailwindcss` / `@tailwindcss/vite` from 4.3.3 to 4.3.5 in `frontend/package.json` — see §9. Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
 
 ---
 
@@ -276,6 +276,10 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | No CI | nothing runs tests on push | Phase 7 |
 | CP-4 uncommitted | verified work exists only in the working tree | **commit first** (§1) |
 | **Compose publishes Postgres (`0.0.0.0:5433`) and the API (`0.0.0.0:8081`) on all interfaces, and the developer's `.env` DB password is only 4 characters** (length checked; value not recorded) | anyone on the same network can attempt to log in to the dev database | developer decision: use `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432` in compose and a longer password; **not changed** at handoff |
+
+| **Uncommitted, unreviewed frontend dependencies** in `frontend/package.json` and `package-lock.json`: `shadcn` ^4.23.0, `cn` ^0.5.2, `class-variance-authority` ^0.7.1, `tw-animate-css` ^1.4.0; `tailwindcss` and `@tailwindcss/vite` bumped 4.3.3 → 4.3.5. Not requested and not justified (CLAUDE.md §3). `cn` is an unusual package name for this project | supply-chain and bundle-size risk; no code uses them yet | **developer decision**: justify and document, or revert with `git checkout -- frontend/package.json frontend/package-lock.json`. The Phase 4 commit procedure deliberately excludes these files |
+| **Stray root artifacts, created 2026-11-13 15:51, cause unknown:** `package.json` (Tailwind deps only), `package-lock.json`, and `node_modules/` (about 860 untracked entries). Root `.gitignore` ignores only `/frontend/node_modules/` | an accidental `git add -A` at repo root would commit about 860 unrelated files | **developer decision**: delete with `rm -rf node_modules package.json package-lock.json` after confirming nothing needs them; then add `/node_modules/` to root `.gitignore` as its own commit |
+| Dependency list in §3 was out of date (did not list shadcn, cn, class-variance-authority, tw-animate-css) | misleading to a fresh session | §3 now marks them as uncommitted; keep §3 in sync whenever `package.json` changes |
 
 ---
 

@@ -94,6 +94,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 - **Dev DB exposure**: Compose publishes Postgres on `0.0.0.0:5433` and the API on `0.0.0.0:8081`; the developer's `.env` DB password is 4 characters (length only checked). Not changed — developer decision.
 - Rate limiter in memory (single instance); expired sessions only cleaned when the same user logs in; `Secure` cookie path untested; no `EXPLAIN` on catalog/cart queries; ratings 0 and `sold_count` demo-only; no admin category UI; mobile < 500 px unverified.
 - Dev DB holds many throw-away accounts from E2E runs (`e2e-…`, `seller-…`, `buyer-…@contoh.id`, `admin@contoh.id`, `demo@contoh.id`).
+- **Uncommitted, unreviewed frontend deps** in `frontend/package.json` and lock: `shadcn`, `cn`, `class-variance-authority`, `tw-animate-css`, and a Tailwind bump 4.3.3 → 4.3.5. Excluded from the commit procedure. Developer must justify or revert with `git checkout -- frontend/package.json frontend/package-lock.json`.
+- **Stray root artifacts** (created 15:51 on 2026-11-13, cause unknown): `package.json`, `package-lock.json`, and `node_modules/` at repo root (about 860 untracked entries). Never run `git add .` or `git add -A` without a path. Delete after confirmation; root `.gitignore` lacks `/node_modules/`.
 - Cosmetic: right after "Keluar" the badge keeps the old count until the logout request returns.
 
 **Technical debt**: no frontend unit tests; E2E scripts are hand-run and git-ignored; no CI; floating `golang:1.27-alpine` / `postgres:18` tags; `frontend/README.md` is the Vite template.
