@@ -1,21 +1,22 @@
-// Shapes the real catalog API is expected to return (see CLAUDE.md §8/§9).
-// During the UI prototype these come from src/services, backed by src/mocks.
-// When the backend lands, only src/services changes; keep this file aligned
-// with the real response contracts.
+// Mirrors of the catalog API (backend/internal/modules/{categories,stores,products}/dto.go).
+// Keep the two in sync.
 //
-// Money: the backend stores NUMERIC. The prototype uses whole rupiah as a
-// number; whether the API sends numbers or decimal strings is decided in the
-// catalog phase.
+// Money is a decimal STRING ("349000.00"), exactly as the backend stores it
+// (NUMERIC). Only convert to a number at the last moment, for display.
+
+/** A decimal amount of rupiah, e.g. "349000.00". */
+export type Money = string
 
 export interface Category {
   id: string
   slug: string
   name: string
-  parentId: string | null
+  parentId: string | null // null = top-level
+  sortOrder: number
 }
 
 export interface Rating {
-  average: number // 0 when there are no reviews yet
+  average: number // 0 when there are no reviews yet (reviews arrive in a later phase)
   count: number
 }
 
@@ -43,7 +44,7 @@ export interface ProductVariant {
   id: string
   sku: string
   name: string
-  price: number // variant price is authoritative (CLAUDE.md §7)
+  price: Money // variant price is authoritative (CLAUDE.md §7)
   stock: number // available quantity
 }
 
@@ -53,9 +54,9 @@ export interface ProductSummary {
   slug: string // unique per store, not globally
   name: string
   categoryId: string
-  images: ProductImage[]
-  lowestPrice: number
-  highestPrice: number
+  images: ProductImage[] // first image only in listings
+  lowestPrice: Money
+  highestPrice: Money
   rating: Rating
   soldCount: number
   inStock: boolean
@@ -69,7 +70,7 @@ export interface ProductDetail extends ProductSummary {
   category: Category
 }
 
-export type ProductSort = 'popular' | 'newest' | 'rating' | 'price_asc' | 'price_desc'
+export type ProductSort = 'popular' | 'newest' | 'price_asc' | 'price_desc'
 
 export interface ProductQuery {
   q?: string

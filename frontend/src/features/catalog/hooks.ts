@@ -1,26 +1,24 @@
 // Catalog hooks: the only thing pages and components use to get catalog data.
-// They call src/services, so switching from mocks to the real API never
-// touches this file's callers.
 import { useAsync } from '../../hooks/useAsync'
-import { getProduct, getStore, listCategories, listProducts } from '../../services/catalog'
-import { currentSimulation } from '../../services/simulate'
+import { getProduct, getRelatedProducts, getStore, listCategories, listProducts } from '../../services/catalog'
 import type { ProductQuery } from '../../types/marketplace'
 
-// The simulation flag is part of every key so changing ?simulate= refetches.
-const sim = () => currentSimulation() ?? 'none'
-
 export function useCategories() {
-  return useAsync(() => listCategories(), `categories:${sim()}`)
+  return useAsync(() => listCategories(), 'categories')
 }
 
 export function useProducts(query: ProductQuery) {
-  return useAsync(() => listProducts(query), `products:${sim()}:${JSON.stringify(query)}`)
+  return useAsync(() => listProducts(query), `products:${JSON.stringify(query)}`)
 }
 
 export function useProduct(storeSlug: string, productSlug: string) {
-  return useAsync(() => getProduct(storeSlug, productSlug), `product:${sim()}:${storeSlug}/${productSlug}`)
+  return useAsync(() => getProduct(storeSlug, productSlug), `product:${storeSlug}/${productSlug}`)
+}
+
+export function useRelatedProducts(productId: string) {
+  return useAsync(() => getRelatedProducts(productId), `related:${productId}`)
 }
 
 export function useStore(slug: string) {
-  return useAsync(() => getStore(slug), `store:${sim()}:${slug}`)
+  return useAsync(() => getStore(slug), `store:${slug}`)
 }

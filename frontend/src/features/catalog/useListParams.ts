@@ -13,7 +13,7 @@ export function useListParams() {
   const sort = parseSort(params.get('sort'))
   const page = parsePage(params.get('page'))
 
-  // Copies the existing params first so unrelated ones (like ?simulate=) stay.
+  // Copies the existing params first so unrelated ones stay.
   const update = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(changes)) {

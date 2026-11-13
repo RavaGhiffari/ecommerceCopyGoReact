@@ -39,12 +39,23 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
       </nav>
 
       <div className="grid gap-8 md:grid-cols-2">
-        <ProductImage
-          id={product.id}
-          name={product.name}
-          image={product.images[0]}
-          className="rounded-xl border border-slate-200"
-        />
+        <div className="space-y-3">
+          <ProductImage
+            id={product.id}
+            name={product.name}
+            image={product.images[0]}
+            className="rounded-xl border border-slate-200"
+          />
+          {product.images.length > 1 && (
+            <ul className="grid grid-cols-5 gap-2">
+              {product.images.slice(1).map((img) => (
+                <li key={img.url}>
+                  <img src={img.url} alt={img.alt} loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="space-y-5">
           <header>
@@ -116,7 +127,7 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
               </button>
             </div>
             {available && (
-              <span className="text-sm text-slate-500">Subtotal {formatRupiah(variant.price * quantity)}</span>
+              <span className="text-sm text-slate-500">Subtotal {formatRupiah(Number(variant.price) * quantity)}</span>
             )}
           </div>
 

@@ -10,6 +10,15 @@ const FIELD_MESSAGES: Record<string, string> = {
   'must be at least 8 characters': 'minimal 8 karakter',
   'must be at most 128 characters': 'maksimal 128 karakter',
   'must be at most 150 characters': 'maksimal 150 karakter',
+  'is already used': 'sudah dipakai',
+  'is already used in your store': 'sudah dipakai produk lain di toko kamu',
+  'is used by another variant': 'dipakai varian lain',
+  'is already used by another variant': 'dipakai varian lain',
+  'choose a subcategory': 'pilih subkategori',
+  'does not exist': 'tidak ditemukan',
+  'cannot be negative': 'tidak boleh negatif',
+  'may have at most 2 decimal places': 'maksimal 2 angka desimal',
+  'must be an http(s) URL': 'harus URL http(s)',
 }
 
 const CODE_MESSAGES: Record<string, string> = {
@@ -17,6 +26,11 @@ const CODE_MESSAGES: Record<string, string> = {
   ACCOUNT_SUSPENDED: 'Akun ini sedang ditangguhkan. Hubungi admin.',
   RATE_LIMITED: 'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.',
   EMAIL_TAKEN: 'Email ini sudah terdaftar.',
+  STORE_EXISTS: 'Kamu sudah punya toko.',
+  SLUG_TAKEN: 'Nama ini sudah dipakai. Coba nama lain.',
+  SKU_TAKEN: 'SKU ini sudah dipakai. Gunakan SKU lain.',
+  STORE_REQUIRED: 'Buka toko terlebih dahulu.',
+  FORBIDDEN: 'Kamu tidak punya akses untuk ini.',
   NETWORK_ERROR: 'Tidak dapat terhubung ke server. Pastikan backend berjalan.',
   ORIGIN_REJECTED: 'Permintaan ditolak karena berasal dari situs lain.',
 }
@@ -34,9 +48,13 @@ export function applyServerError<T extends FieldValues>(
 
   let placed = 0
   for (const [field, message] of Object.entries(err.fieldErrors())) {
-    if ((fields as readonly string[]).includes(field)) {
+    // The API names nested fields like "variants[0].price"; react-hook-form
+    // uses "variants.0.price". `fields` lists the allowed top-level names.
+    const path = field.replace(/\[(\d+)\]/g, '.$1')
+    const root = path.split('.')[0]
+    if ((fields as readonly string[]).includes(root)) {
       const text = FIELD_MESSAGES[message] ?? message
-      setError(field as Path<T>, { type: 'server', message: text.charAt(0).toUpperCase() + text.slice(1) })
+      setError(path as Path<T>, { type: 'server', message: text.charAt(0).toUpperCase() + text.slice(1) })
       placed++
     }
   }

@@ -1,11 +1,11 @@
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
-import { useProduct, useProducts } from '../features/catalog/hooks'
+import { useProduct, useRelatedProducts } from '../features/catalog/hooks'
 import { ProductDetailView } from '../features/catalog/ProductDetailView'
 import { ProductResults } from '../features/catalog/ProductResults'
 import type { AsyncState } from '../hooks/useAsync'
 import { usePageTitle } from '../hooks/usePageTitle'
-import type { Paginated, ProductDetail, ProductSummary } from '../types/marketplace'
+import type { Paginated, ProductSummary } from '../types/marketplace'
 
 export function ProductDetailPage() {
   const { storeSlug = '', productSlug = '' } = useParams()
@@ -44,28 +44,27 @@ export function ProductDetailPage() {
       return (
         <div className="space-y-12">
           <ProductDetailView key={product.state.data.id} product={product.state.data} />
-          <RelatedProducts product={product.state.data} />
+          <RelatedProducts productId={product.state.data.id} />
         </div>
       )
   }
 }
 
-function RelatedProducts({ product }: { product: ProductDetail }) {
-  const related = useProducts({
-    categorySlug: product.category.slug,
-    sort: 'popular',
-    page: 1,
-    pageSize: 5,
-  })
+/** GET /api/v1/products/:id/related: popular products from the same category. */
+function RelatedProducts({ productId }: { productId: string }) {
+  const related = useRelatedProducts(productId)
 
-  // Same category, minus the product being viewed, at most four.
+  // ProductResults renders a page of results; wrap the plain list as one page.
   const state: AsyncState<Paginated<ProductSummary>> =
     related.state.status === 'success'
       ? {
           status: 'success',
           data: {
-            ...related.state.data,
-            items: related.state.data.items.filter((p) => p.id !== product.id).slice(0, 4),
+            items: related.state.data,
+            page: 1,
+            pageSize: related.state.data.length,
+            total: related.state.data.length,
+            totalPages: 1,
           },
         }
       : related.state

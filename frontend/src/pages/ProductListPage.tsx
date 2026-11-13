@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, NavLink, useParams } from 'react-router-dom'
+import type { Category } from '../types/marketplace'
 import { Pagination } from '../components/shared/Pagination'
 import { EmptyState } from '../components/shared/StateViews'
 import { useCategories, useProducts } from '../features/catalog/hooks'
@@ -58,6 +59,10 @@ export function ProductListPage() {
         <SortSelect value={sort} onChange={setSort} />
       </div>
 
+      {category && categories.status === 'success' && (
+        <SubcategoryChips current={category} all={categories.data} />
+      )}
+
       <ProductResults
         state={products.state}
         onRetry={products.reload}
@@ -81,5 +86,37 @@ export function ProductListPage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Two-level navigation: on "Elektronik" or any of its subcategories, show
+ * "Semua Elektronik" plus every subcategory. Browsing a parent includes the
+ * products of its subcategories (the API does that).
+ */
+function SubcategoryChips({ current, all }: { current: Category; all: Category[] }) {
+  const parent = current.parentId ? all.find((c) => c.id === current.parentId) : current
+  if (!parent) return null
+  const children = all.filter((c) => c.parentId === parent.id)
+  if (children.length === 0) return null
+
+  const chip = ({ isActive }: { isActive: boolean }) =>
+    `whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
+      isActive
+        ? 'border-emerald-600 bg-emerald-50 font-medium text-emerald-800'
+        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
+    }`
+
+  return (
+    <nav aria-label={`Subkategori ${parent.name}`} className="mb-5 flex gap-2 overflow-x-auto pb-1">
+      <NavLink to={`/categories/${parent.slug}`} end className={chip}>
+        Semua {parent.name}
+      </NavLink>
+      {children.map((c) => (
+        <NavLink key={c.id} to={`/categories/${c.slug}`} end className={chip}>
+          {c.name}
+        </NavLink>
+      ))}
+    </nav>
   )
 }

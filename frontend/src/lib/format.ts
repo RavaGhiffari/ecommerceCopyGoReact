@@ -4,13 +4,18 @@ const rupiah = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 })
 
-export function formatRupiah(amount: number): string {
-  return rupiah.format(amount)
+/**
+ * Formats rupiah for DISPLAY. Accepts the API's decimal strings ("349000.00").
+ * Converting to a JS number is fine for showing a price; never add up money
+ * client-side for anything the server will charge (the server recomputes).
+ */
+export function formatRupiah(amount: number | string): string {
+  return rupiah.format(typeof amount === 'string' ? Number(amount) : amount)
 }
 
 /** "Rp49.000" or "Rp49.000 - Rp59.000" when variants differ in price. */
-export function formatPriceRange(lowest: number, highest: number): string {
-  return lowest === highest
+export function formatPriceRange(lowest: number | string, highest: number | string): string {
+  return Number(lowest) === Number(highest)
     ? formatRupiah(lowest)
     : `${formatRupiah(lowest)} - ${formatRupiah(highest)}`
 }

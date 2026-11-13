@@ -20,12 +20,12 @@ export function HomePage() {
   return (
     <div className="space-y-10">
       <section className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-10 text-white sm:px-10 sm:py-14">
-        <p className="text-sm font-medium text-emerald-100">Prototipe dengan data contoh</p>
+        <p className="text-sm font-medium text-emerald-100">Marketplace multi-penjual</p>
         <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight sm:text-4xl">
           Belanja dari banyak toko, dalam satu tempat.
         </h1>
         <p className="mt-3 max-w-xl text-emerald-50">
-          Jelajahi produk dari berbagai penjual. Keranjang dan checkout menyusul setelah backend selesai.
+          Jelajahi produk dari berbagai penjual. Keranjang dan checkout segera hadir.
         </p>
         <Link
           to="/products"
@@ -41,7 +41,7 @@ export function HomePage() {
         </h2>
         {categories.status === 'success' ? (
           <ul className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {categories.data.map((c) => {
+            {categories.data.filter((c) => c.parentId === null).map((c) => {
               const Icon = CATEGORY_ICONS[c.slug] ?? Boxes
               return (
                 <li key={c.id}>
@@ -73,9 +73,9 @@ export function HomePage() {
         seeAllTo="/products?sort=popular"
       />
       <ProductSection
-        title="Rekomendasi Untukmu"
-        query={{ sort: 'rating', page: 1, pageSize: 4 }}
-        seeAllTo="/products?sort=rating"
+        title="Harga Hemat"
+        query={{ sort: 'price_asc', page: 1, pageSize: 4 }}
+        seeAllTo="/products?sort=price_asc"
       />
       <ProductSection
         title="Baru Masuk"

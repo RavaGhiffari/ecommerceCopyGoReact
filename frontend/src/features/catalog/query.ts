@@ -3,7 +3,6 @@ import type { ProductSort } from '../../types/marketplace'
 export const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
   { value: 'popular', label: 'Terlaris' },
   { value: 'newest', label: 'Terbaru' },
-  { value: 'rating', label: 'Rating tertinggi' },
   { value: 'price_asc', label: 'Harga terendah' },
   { value: 'price_desc', label: 'Harga tertinggi' },
 ]

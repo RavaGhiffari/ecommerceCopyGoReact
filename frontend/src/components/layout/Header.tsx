@@ -35,14 +35,26 @@ export function Header() {
             <ShoppingCart className="size-5" aria-hidden="true" />
           </button>
           <AccountActions />
-          <span className="hidden items-center gap-1 pl-2 text-sm text-slate-400 md:flex" title={COMING_SOON}>
-            <Store className="size-4" aria-hidden="true" /> Buka toko
-          </span>
+          <SellerLink />
         </div>
       </div>
 
       <CategoryNav />
     </header>
+  )
+}
+
+/** "Toko saya" for sellers, "Buka toko" for everyone else (/seller decides what to show). */
+function SellerLink() {
+  const { user } = useAuth()
+  const isSeller = user?.roles.includes('seller') ?? false
+  return (
+    <Link
+      to="/seller"
+      className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-emerald-700 md:flex"
+    >
+      <Store className="size-4" aria-hidden="true" /> {isSeller ? 'Toko saya' : 'Buka toko'}
+    </Link>
   )
 }
 
@@ -166,7 +178,7 @@ function CategoryNav() {
             Semua
           </NavLink>
         </li>
-        {state.data.map((c) => (
+        {state.data.filter((c) => c.parentId === null).map((c) => (
           <li key={c.id}>
             <NavLink to={`/categories/${c.slug}`} className={link}>
               {c.name}
