@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-14 |
-| Last commit | `5efc212` (Phase 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 5b — checkout core** (backend only) + doc updates — see §1f |
-| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); 5a committed; slice 5b done and verified, awaiting review |
-| Next | slice 5c — payment simulation & order lifecycle (PLAN.md §5.1) |
+| Last commit | `98bff00` (Phase 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Phase 5c — payment & order lifecycle** (backend only) + doc updates — see §1g |
+| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); 5a and 5b committed; slice 5c done and verified, awaiting review |
+| Next | slice 5d — seller orders (PLAN.md §5.1) |
 
 ---
 
@@ -26,7 +26,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-4 | Cart | `7e57829`, `f312b0b`, docs `0d63dfc` | ✅ committed by the developer | see §1b |
 | CP-UI | shadcn/ui migration (frontend only) | `db15fef`, docs `83b34a7` | ✅ committed by the developer | see §1c |
 | CP-5a | Phase 5a addresses | `f7ef72f`, `7c1d441`, docs `5efc212` | ✅ committed by the developer | see §1e |
-| CP-5b | Phase 5b checkout core | **uncommitted** | 🟡 awaiting review | see §1f |
+| CP-5b | Phase 5b checkout core | `9eec081`, docs `98bff00` | ✅ committed by the developer | see §1f |
+| CP-5c | Phase 5c payment & lifecycle | **uncommitted** | 🟡 awaiting review | see §1g |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -136,9 +137,9 @@ git commit -m "Update project docs for Phase 5a" -m "Co-Authored-By: Claude Opus
 | curl against the rebuilt API (dev DB, demo login `penjual3`) | quote (Jakarta Barat store → no Same Day), missing key 400, place 201, repeat 200, `GET /orders` shows `PK-20261114-…`, empty cart 422; ledger invariant on the dev DB = 0. The smoke address was deleted afterwards (the order kept its copy) |
 | Frontend | unchanged in 5b (only the CORS allow-list gained `Idempotency-Key`, backend side) |
 
-**Left in the dev DB on purpose:** one `pending_payment` checkout of `penjual3@contoh.id` (1 × "Kabel USB-C Braided", Gadget Nusantara) holding 1 reserved unit. Nothing expires checkouts before 5c; the 5c sweeper will release it automatically.
+**Left in the dev DB on purpose:** one `pending_payment` checkout of `penjual3@contoh.id` holding 1 reserved unit. The 5c sweeper expired it on its first start (log `expired checkouts count=1`).
 
-**Commit CP-5b** (the developer commits):
+**Committed** as `9eec081` + `98bff00` with:
 
 ```bash
 git add -- backend
@@ -146,6 +147,29 @@ git commit -m "Add Phase 5b checkout core" -m "- Migration 000011: checkouts, or
 
 git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 5b" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 1g. Verified at CP-5c (payment & lifecycle), 2026-11-14
+
+| Check | Result |
+|---|---|
+| Migrations | none in 5c (000011 already had every table and the `restock` ledger type) |
+| `make fmt` / `make vet` / `make test` | clean; new unit tests: the full order transition table (7 statuses × 7 × 3 actors, final statuses final), config `CHECKOUT_SWEEP_INTERVAL` (default 1m, `0s` rejected) |
+| `make test-integration` | all packages ok; 9 new lifecycle tests: payment success (orders paid, reserved consumed, `sold_count` +, consumption ledger, history actor NULL; **same `eventId` again → 200 no-op**, same id with another outcome → 409 `PAYMENT_EVENT_CONFLICT`, new event after paid → 409 `CHECKOUT_NOT_PENDING`); payment failure (cancelled/failed, stock released); validation 422, other user 404, no login 401; payment after `expires_at` → 409 `CHECKOUT_EXPIRED` **and the expiry is committed** (stock released, no event stored); the sweeper expires only due checkouts and a second sweep is a no-op; buyer cancel (one unpaid order → 409 with `checkoutId`, other user 404, twice → 409, paying a cancelled checkout → 409); refund of a paid order (restock with `reference_type = 'order'`, `sold_count` −, the other store's order untouched, twice → 409, `processing` → 409 `{from: processing, to: refunded}`); **4 concurrent lifecycle requests (2 payments, 1 failure, 1 cancel) → exactly 1×200 + 3×409, 5 rounds**; **payment racing the sweeper on an expired checkout → payment always 409, exactly one release per line, 5 rounds**; ledger invariant 0 everywhere |
+| Concurrency tests repeated | the 2 new and 3 existing concurrency tests passed 5 runs in a row (`-count=5`) |
+| Checkout lock proven necessary | with `FOR UPDATE` removed from `LockUserCheckout` / `LockPaymentCheckout`, the 4-request race returned `{200:1, 500:3}` in 3 of 3 runs (the conditional `UPDATE … WHERE status = …` still kept the data correct, but the losers crashed instead of getting 409). Restored afterwards |
+| Rebuilt API on the dev DB | the sweeper ran at start-up and expired the 5b leftover checkout; graceful restart logs `shutting down` → `shutdown complete` with no sweeper error |
+| HTTP smoke test (`penjual3`, a product of another store) | place 201 → simulate success 200 `paid` → same event 200 "already processed" → new event 409 `CHECKOUT_NOT_PENDING`; `sold_count` 21000 → 21002; refund 200 `refunded`, again 409 `INVALID_STATUS_TRANSITION`; failure → `cancelled/failed`; cancel one unpaid order 409; cancel checkout 200, again 409. Afterwards stock 300 → 300 and `sold_count` back to 21000; dev ledger invariant 0, `SUM(reserved_quantity)` 0. Smoke address deleted |
+| Frontend | unchanged in 5c |
+
+**Commit CP-5c** (the developer commits):
+
+```bash
+git add -- backend
+git commit -m "Add Phase 5c payment and order lifecycle" -m "- POST /payments/:id/simulate (idempotent by eventId), POST /checkout/:id/cancel, POST /orders/:id/cancel (paid -> refunded, restock)" -m "- Every lifecycle change locks the checkout row first; orders change status only through the transition table in orders/transitions.go" -m "- inventory Release / Consume / Restock with ledger rows; sold_count on payment and refund" -m "- Expiry sweeper in the API process (CHECKOUT_SWEEP_INTERVAL, FOR UPDATE SKIP LOCKED), stopped before the pool on shutdown" -m "- Integration tests incl. idempotent events, expiry, refund, racing lifecycle requests and payment vs sweeper" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 5c" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -191,7 +215,7 @@ Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/dec
 
 ---
 
-## 4. API surface (as of CP-5b)
+## 4. API surface (as of CP-5c)
 
 Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{code,message,details}}`.
 
@@ -199,11 +223,13 @@ Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{c
 |---|---|
 | Infra (no prefix) | `GET /health` (no DB), `GET /ready` (DB query) |
 | Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` · `GET /products/:id/related` · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
-| Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart · `POST /checkout/quote` `{addressId, shipping:{<storeId>: regular\|express\|same_day}}` (read-only; missing store = regular) · `POST /checkout` (same body + header `Idempotency-Key: <uuid>`; 201 new, 200 repeat) · `GET /checkout/:id` · `GET /orders?page&pageSize` · `GET /orders/:id` (with `history`) |
+| Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart · `POST /checkout/quote` `{addressId, shipping:{<storeId>: regular\|express\|same_day}}` (read-only; missing store = regular) · `POST /checkout` (same body + header `Idempotency-Key: <uuid>`; 201 new, 200 repeat) · `GET /checkout/:id` · `POST /checkout/:id/cancel` (only while `pending_payment`; returns the checkout) · `POST /payments/:id/simulate` `{outcome: success\|failure, eventId: uuid}` (plays the gateway webhook; the same `eventId` again is a no-op 200; returns the checkout) · `GET /orders?page&pageSize` · `GET /orders/:id` (with `history`) · `POST /orders/:id/cancel` (a `paid` order → `refunded`, stock restocked; returns the order) |
 | Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` |
 | Admin (`admin` role) | `POST /admin/categories` · `PUT /admin/categories/:id` |
 
-Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204. Checkout: `IDEMPOTENCY_KEY_REQUIRED` 400 (missing or not a UUID), `CART_HAS_ISSUES` 409 (details `items[]` with `itemId, variantId, productName, variantName, quantity, availableQuantity, issue`; issue adds `own_product`), `IDEMPOTENCY_KEY_REUSED` 409, `CART_EMPTY` 422, `SHIPPING_METHOD_NOT_ALLOWED` 422 (details keyed `shipping.<storeId>`), `ADDRESS_NOT_FOUND` 404, `CHECKOUT_NOT_FOUND` 404, `ORDER_NOT_FOUND` 404 (also another buyer's order or a malformed id).
+Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204. Checkout: `IDEMPOTENCY_KEY_REQUIRED` 400 (missing or not a UUID), `CART_HAS_ISSUES` 409 (details `items[]` with `itemId, variantId, productName, variantName, quantity, availableQuantity, issue`; issue adds `own_product`), `IDEMPOTENCY_KEY_REUSED` 409, `CART_EMPTY` 422, `SHIPPING_METHOD_NOT_ALLOWED` 422 (details keyed `shipping.<storeId>`), `ADDRESS_NOT_FOUND` 404, `CHECKOUT_NOT_FOUND` 404, `ORDER_NOT_FOUND` 404 (also another buyer's order or a malformed id). Lifecycle (5c): `CHECKOUT_NOT_PENDING` 409, `CHECKOUT_EXPIRED` 409 (the checkout was closed as expired by this request), `PAYMENT_NOT_FOUND` 404, `PAYMENT_EVENT_CONFLICT` 409 (event id already used for another payment or outcome), `INVALID_STATUS_TRANSITION` 409 (details `{from, to}`, or `{from: "pending_payment", checkoutId}` when an unpaid order is cancelled on its own).
+
+Lifecycle states: checkout `pending_payment → paid | cancelled | expired`; payment `pending → succeeded | failed | cancelled | expired`; on failure, cancel or expiry every order becomes `cancelled`.
 
 Checkout response: `{ id, status, itemsTotal, shippingTotal, grandTotal, expiresAt, paidAt, cancelledAt, createdAt, payment: { id, reference (SIM-…), provider, amount, status, expiresAt, paidAt }, orders: [Order] }`. Order: `{ id, checkoutId, orderNumber (PK-YYYYMMDD-XXXXXX), status, store {id, slug, name (snapshot)}, shippingMethod, shippingFee, itemsSubtotal, total, shippingAddress {…snapshot}, items: [{ id, variantId, productId, productSlug, productName, variantName, sku, unitPrice, quantity, lineTotal, image }], history? , createdAt, updatedAt }`. Quote: `{ address, stores: [{ store, items (cart line shape with itemId), shippingOptions: [{method, fee}], shippingMethod, shippingFee, subtotal, total }], itemsTotal, shippingTotal, grandTotal, hasIssues }`.
 
@@ -246,7 +272,7 @@ LEFT JOIN (SELECT variant_id, SUM(available_delta) s FROM inventory_movements GR
 WHERE COALESCE(m.s,0) <> i.available_quantity;
 ```
 
-Since 5b the same must hold for `reserved_quantity` vs `SUM(reserved_delta)` (the integration helper `ledgerMismatches` checks both). `SUM(reserved_quantity)` now equals the units held by `pending_payment` checkouts.
+Since 5b the same must hold for `reserved_quantity` vs `SUM(reserved_delta)` (the integration helper `ledgerMismatches` checks both). `SUM(reserved_quantity)` equals the units held by `pending_payment` checkouts. Since 5c every ledger type is written: `reservation` (place), `consumption` (paid), `release` (failure, cancel, expiry; reference = checkout) and `restock` (refund; reference = order).
 
 Not yet created (planned): `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
 
@@ -258,6 +284,14 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 | Decision | Why |
 |---|---|
+| (5c) Payment simulation, cancel and expiry live in the `checkout` package (`lifecycle.go`), not a separate `payments` module | one payment per checkout (Q4) and every payment outcome is a checkout state change; a separate package would have to export checkout's transaction internals |
+| (5c) Every lifecycle change locks the checkout row first; lock order checkout → orders (id) → inventory (variant_id) → products (id) → payment | "pay" vs "cancel" vs "expire" serialise and exactly one wins (proven: without the lock the losers got 500) |
+| (5c) Order statuses change only through `orders.Repository.Transition` and the table in `orders/transitions.go`, which also says WHO may make each change (system / buyer / seller) | one place to read and test the lifecycle; a seller can never refund, a buyer can never ship |
+| (5c) Payment failure cancels the checkout and releases the stock (Q9 default); expiry sets checkout `expired`, payment `expired`, orders `cancelled` | simple and predictable; `orders` has no `expired` status |
+| (5c) An expired checkout touched by pay/cancel is closed as expired and committed, then 409 `CHECKOUT_EXPIRED` | the stock comes back immediately instead of waiting for the sweeper; an error inside the transaction would have rolled the close back, so the error is returned after commit |
+| (5c) Payment events: check under the checkout lock, then `INSERT … ON CONFLICT (event_id) DO NOTHING` | a redelivered event is a no-op 200; the same id used for something else is 409 instead of a 500 |
+| (5c) Cancelling one unpaid order → 409 with `checkoutId`; only paid orders are cancelled per order (refund) | one payment covers the whole checkout (Q8) |
+| (5c) A refund lowers `sold_count`; the payment row stays `succeeded` | refunded units were not sold; refunds are simulated per order and there is no partial-refund state on payments |
 | Money = `NUMERIC` ↔ `decimal.Decimal` ↔ JSON string `"349000.00"` | floats corrupt money; JSON numbers become JS floats |
 | Variant price is authoritative; product has none | one source of truth; listings show min/max |
 | Products only on leaf categories | avoids products parked on browse-only parents |
@@ -307,8 +341,8 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 ## 7. Test inventory
 
-- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`, `router/checkout_integration_test.go`. Since CP-5a also the `modules/addresses` unit package; since CP-5b `modules/shipping`, `modules/orders`, `modules/checkout`.
-- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e); 12 checkout flows incl. rollback, idempotency and two concurrency tests (see §1f).
+- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`, `router/checkout_integration_test.go`. Since CP-5a also the `modules/addresses` unit package; since CP-5b `modules/shipping`, `modules/orders`, `modules/checkout`; since CP-5c the order transition table (`orders/transitions_test.go`) and `router/lifecycle_integration_test.go`.
+- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e); 12 checkout flows incl. rollback, idempotency and two concurrency tests (see §1f); 9 lifecycle flows incl. idempotent payment events, expiry, refund and two race tests (see §1g).
 - **Browser E2E**: four `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16, `address-flow.mjs` 11, which uses the demo login `penjual3@contoh.id` and deletes what it creates) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
 - **Frontend unit tests (Vitest)**: none yet.
 
@@ -344,8 +378,11 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Dev DB contains leftover test accounts/stores (`seller-…@contoh.id`, `admin@contoh.id`, `e2e-…`) | clutter only | cleanup offered, not done |
 | Categories manageable only via admin API (no UI) | admin must use curl | Phase 6 |
 | Images are URLs only; no upload, no hotlink protection | seller can point at any host | decide with storage plan |
-| `sold_count` only seeded; ratings are 0 | "popular" is demo data | Phases 5–6 |
-| Unpaid checkouts never expire yet: reserved stock stays reserved until slice 5c adds the sweeper, payment and cancellation | dev DB holds 1 reserved unit from the 5b smoke test | 5c |
+| `sold_count` changes with real payments and refunds since 5c, but the demo values are seeded; ratings are 0 | "popular" is mostly demo data | Phase 6 (ratings) |
+| Updating `sold_count` fires the `products` `updated_at` trigger, and the seller product list sorts by `updated_at DESC` | a sale moves the product to the top of the seller's own list | accept, or sort that list by `created_at` / skip the trigger for counter-only updates |
+| `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | acceptable; the UI uses `expiresAt` for its countdown (5e) |
+| The sweeper runs inside the API process | with several instances each runs one; `SKIP LOCKED` prevents double work, but that setup is untested | before scaling out |
+| A payment event that arrives after expiry is not stored | no audit trail of late notifications | when a real gateway arrives (also signature checks) |
 | Sellers cannot see their orders yet | — | 5d |
 | `ListCheckoutLines` and `ListOrderItems` use LATERAL image lookups; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
 | Right after "Keluar", the header badge keeps the old count until the logout request returns (the page navigates first by design) | cosmetic, milliseconds | accept, or clear the cart state optimistically |
@@ -375,9 +412,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 5b (§1f).
-2. **Slice 5c** — `POST /payments/:id/simulate` (idempotent by `eventId`), inventory `Consume` / `Release` / `Restock`, `sold_count`, expiry sweeper, `POST /checkout/:id/cancel`, `POST /orders/:id/cancel`, the status-transition table.
-3. Then 5d (seller orders) and 5e (frontend). The trusted-proxy question stays in Phase 7 (§9).
+1. Developer reviews and commits 5c (§1g).
+2. **Slice 5d** — `GET /seller/orders?status=&page=`, `GET /seller/orders/:id`, `PATCH /seller/orders/:id/status` `{status, note?}` (paid → processing → shipped → delivered through `orders.Repository.Transition` with `BySeller`; `store_id` from the session, foreign ids 404).
+3. Then 5e (frontend). The trusted-proxy question stays in Phase 7 (§9).
 
 ---
 
