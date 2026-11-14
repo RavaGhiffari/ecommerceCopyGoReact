@@ -26,7 +26,7 @@ Updated 2026-11-14, after **Phase 4 (cart)** and the **shadcn/ui migration** wer
 | 4 Cart | committed (`7e57829`, `f312b0b`; docs `0d63dfc`) |
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
-| **5 Checkout & orders** | plan approved (Q1–Q12 defaults); **5a addresses done and verified, uncommitted** (PROJECT_STATE §1e); 5b next |
+| **5 Checkout & orders** | plan approved (Q1–Q12 defaults); 5a committed (`f7ef72f`, `7c1d441`, `5efc212`); **5b checkout core done and verified, uncommitted** (PROJECT_STATE §1f); 5c next |
 
 ---
 
@@ -102,8 +102,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 5a** (PROJECT_STATE §1e has the commands).
-2. **Exact next task — slice 5b (checkout core)** per PLAN.md §5.1–5.4, after the developer reviews and commits 5a. Stop after 5b for review. Original planning brief: go through PLAN.md Q1–Q8 with the developer (defaults proposed there), then write the Phase 5 plan in PLAN.md as slices 5a addresses → 5b checkout core → 5c payment + lifecycle → 5d seller orders → 5e UI (with Sonner + AlertDialog): migrations (`user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`), the checkout transaction step by step, reservation/consume/release ledger types, endpoints, tests (overselling concurrency, idempotency, rollback, ownership). **Stop for approval before writing code.**
+1. **Developer reviews and commits 5b** (PROJECT_STATE §1f has the commands).
+2. **Exact next task — slice 5c (payment & lifecycle)** per PLAN.md §5.1, §5.4 (payment success) and §5.5, after the developer reviews and commits 5b. Stop after 5c for review. A dev-DB checkout from the 5b smoke test is still `pending_payment` with 1 reserved unit; the 5c sweeper should release it. Original planning brief: go through PLAN.md Q1–Q8 with the developer (defaults proposed there), then write the Phase 5 plan in PLAN.md as slices 5a addresses → 5b checkout core → 5c payment + lifecycle → 5d seller orders → 5e UI (with Sonner + AlertDialog): migrations (`user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`), the checkout transaction step by step, reservation/consume/release ledger types, endpoints, tests (overselling concurrency, idempotency, rollback, ownership). **Stop for approval before writing code.**
 
 **First 10 minutes in a new session**
 

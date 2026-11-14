@@ -26,7 +26,7 @@ Deviations from the proposal:
 
 ## Phase 5 — Checkout & orders: PLAN (approved 2026-11-14 with the proposed answers to Q1–Q12)
 
-Progress: **5a done and verified, awaiting review** (evidence: PROJECT_STATE §1e). Next: 5b.
+Progress: 5a committed. **5b done and verified, awaiting review** (evidence: PROJECT_STATE §1f). Next: 5c.
 
 ### 5.0 Decisions
 
@@ -54,7 +54,7 @@ Each slice ends with its tests green and a short review; the developer commits.
 | Slice | Content |
 |---|---|
 | **5a Addresses** ✅ | Migration `000010_create_user_addresses`, module `addresses`, routes under `/me/addresses`, address management on `/account`. As built: create 201 / update 200 / set default 200 return the address, delete 204; PATCH has no `isDefault`; deleting the default promotes the newest; every write takes `SELECT … FROM users … FOR NO KEY UPDATE` |
-| **5b Checkout core** | Migration `000011_create_checkout_tables` (checkouts, orders, order_items, order_status_histories, payments, payment_events, new ledger type); module `shipping` (pure functions); module `checkout` (quote and place); inventory `Reserve`; buyer `GET /orders`, `GET /orders/:id`, `GET /checkout/:id` |
+| **5b Checkout core** ✅ | Migration `000011_create_checkout_tables` (checkouts, orders, order_items, order_status_histories, payments, payment_events, new ledger type); module `shipping` (pure functions); module `checkout` (quote and place); inventory `Reserve`; buyer `GET /orders`, `GET /orders/:id`, `GET /checkout/:id`. As built: `CHECKOUT_STOCK_CHANGED` was folded into `CART_HAS_ISSUES` (place re-validates under lock and reports every bad line the same way; the client reacts identically); a quote defaults a store without a choice to `regular`, placing requires a choice per store; payment rows are created by the checkout package (the `payments` package arrives with simulate in 5c); `CHECKOUT_SWEEP_INTERVAL` is deferred to 5c with the sweeper; nullable `timestamptz` maps to `*time.Time` (sqlc override) |
 | **5c Payment & lifecycle** | `POST /payments/:id/simulate`; inventory `Consume` / `Release` / `Restock`; `sold_count`; expiry sweeper; `POST /checkout/:id/cancel`; `POST /orders/:id/cancel`; status-transition table |
 | **5d Seller orders** | `GET /seller/orders`, `GET /seller/orders/:id`, `PATCH /seller/orders/:id/status` (processing → shipped → delivered) |
 | **5e Frontend** | `/checkout`, `/checkout/:id` (payment page), `/orders`, `/orders/:id`, seller order pages, Sonner toast and AlertDialog, enable the cart and product-page buttons |
