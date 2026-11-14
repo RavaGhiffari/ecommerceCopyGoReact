@@ -6,9 +6,9 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-13 |
-| Last commit | `41679b9` Add project state, session handoff and refresh roadmap docs (Phase 2 = `2838782` + `d0c2a54`) |
-| Uncommitted | Phase 4 (cart) + doc updates — **not yet committed** (commit commands in §1) |
-| Current phase | Phase 4 implemented and verified, **awaiting developer review** |
+| Last commit | `64f4a2b` (Phase 4 = `7e57829` backend, `f312b0b` frontend, `0d63dfc` docs; shadcn deps `7f156a7`) |
+| Uncommitted | **UI migration to shadcn/ui** (frontend only) + doc updates — see §1c |
+| Current phase | shadcn/ui migration done and verified, awaiting developer review; Phase 4 committed |
 | Next phase | Phase 5 — Checkout & orders (needs a plan and answers to its open questions first; see §10) |
 
 ---
@@ -23,22 +23,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-1 | Identity & security | `759a82e`, `316c1dc` | ✅ reviewed | 13 auth integration tests on a real DB; curl register/login/me/logout/cross-site; 15-step browser E2E; logs contain no password/hash/token |
 | CP-0.5 | UI prototype on mocks | `830c33d` (+ docs `d30b4ef`) | ✅ reviewed, superseded | 7 pages screenshotted incl. loading/empty/error; no component imported `mocks/`. Mocks were deleted in CP-2 |
 | CP-2 | Catalog | `2838782` (backend), `d0c2a54` (frontend), docs `41679b9` | ✅ committed by the developer, who then approved Phase 4 | migrate up→down(4)→up; 13 unit packages; 12 catalog integration tests; concurrency test **fails without `FOR UPDATE`** (proved) and passes with it; ledger invariant = 0 mismatches; 17-step seller/catalog browser E2E + auth E2E re-run (no regression) |
-| CP-4 | Cart | **uncommitted** | 🟡 awaiting review | see §1b |
-
-**Commit CP-4** (the developer commits; Claude never does). Suggested split — run `git reset -q` first if anything is staged:
-
-```bash
-git add -A -- backend
-git commit -m "Add Phase 4 cart: carts, cart items, stock-checked add/update/remove" -m "- Migration 000009 (one cart per user, 1..99 per line, unique variant per cart)" -m "- Cart row lock serialises changes; adding never reserves stock" -m "- Lines that became unbuyable stay in the cart with an issue flag" -m "- Unit and integration tests; also gofmt for slug_test.go" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-
-git add -A -- frontend
-git commit -m "Add cart page, header badge and add-to-cart" -m "- CartProvider keeps the server's cart; totals never computed client-side" -m "- /cart grouped by store with quantity controls and issue fixes" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-
-git add -A -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs
-git commit -m "Update project docs for Phase 4" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-```
-
-`docs/e2e-reference/` is git-ignored by the developer's choice, so the third commit only picks up `docs/PROJECT_STATE.md`. After committing, put the hashes in the CP-4 row.
+| CP-4 | Cart | `7e57829`, `f312b0b`, docs `0d63dfc` | ✅ committed by the developer | see §1b |
+| CP-UI | shadcn/ui migration (frontend only) | **uncommitted** | 🟡 awaiting review | see §1c |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -75,6 +61,31 @@ Commands actually run in that session, against the working tree described above:
 
 Test functions in source: 98 (was 83).
 
+### 1c. Verified at CP-UI (shadcn/ui migration), 2026-11-13
+
+Developer decisions: Radix `Select` (not a styled native select), account menu as `DropdownMenu`, toast (`Sonner`) and `AlertDialog` deferred to Phase 5, migration done before Phase 5 planning.
+
+| Check | Result |
+|---|---|
+| Setup | `components.json` (style `radix-nova`, CSS variables), `@/*` alias in `tsconfig.json`, `tsconfig.app.json`, `vite.config.ts`; `src/lib/utils.ts` (`cn` = `clsx` + `tailwind-merge`); theme tokens in `src/index.css` with `--primary`/`--ring` = emerald-600 |
+| `npm run build` / `npm run lint` | clean (lint rule `only-export-components` off for `src/components/ui/**` only) |
+| Browser E2E (Edge headless, Vite :5190, real API + dev DB) | `auth-flow.mjs` 15/15, `catalog-flow.mjs` 17/17 (incl. category shown after reload with Radix Select), `cart-flow.mjs` 16/16; scripts updated for the account menu and Radix Select |
+| Logout race (see §11) | from `/account`: original code ended on `/login` 9 of 10 runs; with `navigate('/', { flushSync: true })` on `/` 10 of 10 |
+| Dev DB after E2E | ledger mismatches 0; `SUM(reserved_quantity)` 0. The E2E scripts accidentally ran twice (one output discarded), so there are extra throw-away accounts |
+| Screenshots | home, cart, product editor, open account menu, open category and sort selects, checked by eye |
+
+Not checked: mobile widths, dark mode (tokens exist, no toggle; not a goal), keyboard-only walkthrough beyond what Radix provides.
+
+**Commit CP-UI** (the developer commits). Suggested — run `git reset -q` first if anything is staged:
+
+```bash
+git add -A -- frontend
+git commit -m "Migrate frontend components to shadcn/ui" -m "- shadcn init (radix-nova), @ alias, theme tokens with the emerald brand colour" -m "- Shared fields, state views, cards, pagination, tables and badges use shadcn components" -m "- Category and sort pickers use Radix Select (CategorySelect via RHF Controller)" -m "- Account actions moved into a DropdownMenu; logout navigates with flushSync" -m "- Remove the unrelated npm package cn and the Geist font added by shadcn init" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for the shadcn/ui migration" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ## 2. What exists, by phase
@@ -86,7 +97,7 @@ Test functions in source: 98 (was 83).
 | 1 Identity | users, roles, sessions; register/login/logout; Argon2id; CSRF layers; rate limits; `/me`; `seed-admin` | ✅ |
 | 2 Catalog | categories (2 levels), stores, products, variants, images (URLs), inventory + ledger, public listing/search, seller dashboard, `seed-dev` | ✅ |
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
-| 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | 🟡 implemented + verified, review pending |
+| 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim | ⬜ |
 | 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ⬜ |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
@@ -112,7 +123,9 @@ Frontend (`frontend/src/`): `pages/` (routes) → `features/<area>/` (hooks, for
 
 Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/cart` (RequireAuth), `/status`, `*`. "Tambah ke keranjang" works (anonymous → `/login?next=…`); **"Beli sekarang" and "Lanjut ke checkout" stay disabled** until Phase 5. `CartProvider` (inside `AuthProvider`) holds the server's cart for the badge, product page and `/cart`.
 
-Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend (as committed at HEAD): react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4 (+ vite plugin). **Uncommitted and not yet reviewed:** `shadcn`, `cn`, `class-variance-authority`, `tw-animate-css`, and a bump of `tailwindcss` / `@tailwindcss/vite` from 4.3.3 to 4.3.5 in `frontend/package.json` — see §9. Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
+Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend: react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4.3.5 (+ vite plugin), and for **shadcn/ui** (developer's choice): `radix-ui` (primitives), `class-variance-authority` (variants), `clsx` + `tailwind-merge` (`cn()`), `tw-animate-css` (open/close animations), `shadcn` (its `tailwind.css` is imported by `index.css`, so it stays a runtime dependency). The npm package `cn` and the Geist font were removed.
+
+**shadcn/ui components** live in `src/components/ui/` (generated, then owned by us). Add more with `npx shadcn add <name>`. **The CLI writes `import { cn } from "cn"` into new files** even though `components.json` points at `@/lib/utils`. After every `add`, run `sed -i 's#from "cn"#from "@/lib/utils"#' src/components/ui/*.tsx`; otherwise the build fails. The wrappers in `components/shared/` (`TextField`, `TextAreaField`, `FieldMessage`, `StateViews`, `Pagination`) keep their old props, so pages did not change. `CategorySelect` is now controlled (`value`/`onChange`/`ref`) and must be used through RHF `<Controller>`. Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
 
 ---
 
@@ -211,6 +224,11 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 | Cart endpoints return the whole cart, including after delete (200, not 204) | the UI never computes totals; one round trip |
 | Cart item ownership: update/delete filter by the caller's cart (`WHERE id = $1 AND cart_id = $2` / join on `carts.user_id`) | another user's item id is a 404 |
 | Frontend `CartProvider` keys the cart by user **object** (new key per login) | a re-login always refetches instead of showing a cached cart |
+| UI components = shadcn/ui (style `radix-nova`), brand colour as `--primary` (emerald-600), system font | consistent, accessible primitives; one place to change the look. Geist font from `shadcn init` dropped (no unrequested dependency) |
+| Selects use Radix `Select` (developer's choice) over a styled native `<select>` | consistent look; costs: RHF `Controller` instead of `register`, and E2E opens the list and picks an option instead of `selectOption` |
+| Account actions live in a `DropdownMenu` (name + email, "Akun saya", seller link on small screens, "Keluar") | developer's choice; cleaner header |
+| Logout runs `await navigate('/', { flushSync: true })` before `logout()` | proven: without flushSync the route change (a transition) lost to `setUser(null)` 9 of 10 times and the guard sent the user to `/login` |
+| Toast (`Sonner`) and `AlertDialog` are deferred to Phase 5 | developer's choice |
 
 ---
 
@@ -274,12 +292,10 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
 | `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
 | No CI | nothing runs tests on push | Phase 7 |
-| CP-4 uncommitted | verified work exists only in the working tree | **commit first** (§1) |
+| CP-UI uncommitted | verified work exists only in the working tree | commit (§1c) |
+| JS bundle grew from 522 kB to 672 kB (gzip 160 → 208 kB) with Radix; Vite warns about chunks over 500 kB | slower first load | route-level code splitting (`React.lazy`) in Phase 7 |
 | **Compose publishes Postgres (`0.0.0.0:5433`) and the API (`0.0.0.0:8081`) on all interfaces, and the developer's `.env` DB password is only 4 characters** (length checked; value not recorded) | anyone on the same network can attempt to log in to the dev database | developer decision: use `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432` in compose and a longer password; **not changed** at handoff |
-
-| **Uncommitted, unreviewed frontend dependencies** in `frontend/package.json` and `package-lock.json`: `shadcn` ^4.23.0, `cn` ^0.5.2, `class-variance-authority` ^0.7.1, `tw-animate-css` ^1.4.0; `tailwindcss` and `@tailwindcss/vite` bumped 4.3.3 → 4.3.5. Not requested and not justified (CLAUDE.md §3). `cn` is an unusual package name for this project | supply-chain and bundle-size risk; no code uses them yet | **developer decision**: justify and document, or revert with `git checkout -- frontend/package.json frontend/package-lock.json`. The Phase 4 commit procedure deliberately excludes these files |
-| **Stray root artifacts, created 2026-11-13 15:51, cause unknown:** `package.json` (Tailwind deps only), `package-lock.json`, and `node_modules/` (about 860 untracked entries). Root `.gitignore` ignores only `/frontend/node_modules/` | an accidental `git add -A` at repo root would commit about 860 unrelated files | **developer decision**: delete with `rm -rf node_modules package.json package-lock.json` after confirming nothing needs them; then add `/node_modules/` to root `.gitignore` as its own commit |
-| Dependency list in §3 was out of date (did not list shadcn, cn, class-variance-authority, tw-animate-css) | misleading to a fresh session | §3 now marks them as uncommitted; keep §3 in sync whenever `package.json` changes |
+| Root `.gitignore` ignores only `/frontend/node_modules/`. The stray root `package.json`, `package-lock.json` and `node_modules/` of 2026-11-13 are gone | an `npm install` at the repo root would again show about 860 untracked files | add `/node_modules/` to the root `.gitignore` |
 
 ---
 
@@ -315,6 +331,9 @@ The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF
 | `slug_test.go` was committed unformatted in CP-2 | `gofmt -l` ran before that file was written | run `make fmt` as the **last** step before reporting a phase done |
 | Two cart test expectations were wrong (3 × 100000.50 written as 301501.50; 2 × 59000.50 as 119001.00) | hand arithmetic in the test | the code was right; confirm the actual value (`-run X -v`) before "fixing" either side |
 | Cart E2E saw the old badge count right after "Keluar" | the test read the badge before the logout request returned | wait for the "Masuk" link (logged-out header) before asserting |
+| `shadcn init` wrote `import { cn } from "cn"` (an unrelated npm package) and added the Geist font | CLI behaviour with this setup | removed both; fix the import after every `shadcn add` (§3) |
+| Logout from `/account` landed on `/login` again after moving "Keluar" into the Radix menu; `await navigate('/')` alone did not fix it (1 of 2 runs still failed) | React Router commits navigations in a transition; the urgent `setUser(null)` could render first, so the guard on the old page redirected | `navigate('/', { flushSync: true })`; measured 9/10 failures before, 0/10 after. For timing bugs, repeat the scenario several times instead of trusting one green run |
+| A debug run timed out on sign-up | the register limit (10/hour per IP, shared Docker gateway IP) was used up by repeated E2E/debug runs | debug with existing demo logins; restart the `api` container before a full E2E run |
 
 ---
 
