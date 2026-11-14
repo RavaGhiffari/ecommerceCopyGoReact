@@ -43,3 +43,26 @@ SET available_quantity = available_quantity - @quantity::int,
     reserved_quantity  = reserved_quantity + @quantity::int
 WHERE variant_id = @variant_id
   AND available_quantity >= @quantity::int;
+
+-- name: ReleaseInventory :execrows
+-- Gives reserved units back to available (cancel, payment failure, expiry).
+-- Conditional like ReserveInventory: 0 rows = the reservation is not there,
+-- which would be a bug, and the caller rolls back.
+UPDATE inventory
+SET available_quantity = available_quantity + @quantity::int,
+    reserved_quantity  = reserved_quantity - @quantity::int
+WHERE variant_id = @variant_id
+  AND reserved_quantity >= @quantity::int;
+
+-- name: ConsumeInventory :execrows
+-- Payment succeeded: the reserved units are sold and leave the stock for good.
+UPDATE inventory
+SET reserved_quantity = reserved_quantity - @quantity::int
+WHERE variant_id = @variant_id
+  AND reserved_quantity >= @quantity::int;
+
+-- name: RestockInventory :execrows
+-- A paid order was refunded: the sold units come back as available.
+UPDATE inventory
+SET available_quantity = available_quantity + @quantity::int
+WHERE variant_id = @variant_id;

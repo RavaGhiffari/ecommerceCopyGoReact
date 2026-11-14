@@ -25,6 +25,10 @@ const (
 	CodeCartHasIssues          = "CART_HAS_ISSUES"
 	CodeShippingNotAllowed     = "SHIPPING_METHOD_NOT_ALLOWED"
 	CodeNotFound               = "CHECKOUT_NOT_FOUND"
+	CodeNotPending             = "CHECKOUT_NOT_PENDING"
+	CodeExpired                = "CHECKOUT_EXPIRED"
+	CodePaymentNotFound        = "PAYMENT_NOT_FOUND"
+	CodePaymentEventConflict   = "PAYMENT_EVENT_CONFLICT"
 )
 
 type Handler struct {
@@ -103,6 +107,72 @@ func (h *Handler) Get(c *gin.Context) {
 	response.OK(c, http.StatusOK, NewCheckoutResponse(co, list), "")
 }
 
+// Cancel handles POST /api/v1/checkout/:id/cancel (only while unpaid).
+func (h *Handler) Cancel(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.fail(c, ErrNotFound)
+		return
+	}
+	ctx := c.Request.Context()
+	if err := h.svc.Cancel(ctx, userID(c), id); err != nil {
+		h.fail(c, err)
+		return
+	}
+	h.respond(c, id, "Checkout cancelled")
+}
+
+// SimulatePayment handles POST /api/v1/payments/:id/simulate. It stands in
+// for a payment gateway's notification (webhook) while there is no real
+// gateway; the result is the checkout with its new status.
+func (h *Handler) SimulatePayment(c *gin.Context) {
+	paymentID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.fail(c, ErrPaymentNotFound)
+		return
+	}
+	var body SimulatePaymentRequest
+	if !request.BindJSON(c, &body) {
+		return
+	}
+	errs := validation.Errors{}
+	outcome := Outcome(body.Outcome)
+	if outcome != OutcomeSuccess && outcome != OutcomeFailure {
+		errs.Add("outcome", "must be success or failure")
+	}
+	if body.EventID == nil {
+		errs.Add("eventId", "is required")
+	}
+	if err := errs.Err(); err != nil {
+		h.fail(c, err)
+		return
+	}
+
+	checkoutID, applied, err := h.svc.SimulatePayment(c.Request.Context(), userID(c), paymentID, outcome, *body.EventID)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	msg := "Payment succeeded"
+	switch {
+	case !applied:
+		msg = "This payment event was already processed"
+	case outcome == OutcomeFailure:
+		msg = "Payment failed; the order was cancelled"
+	}
+	h.respond(c, checkoutID, msg)
+}
+
+// respond sends the checkout (with payment and orders) as it is now.
+func (h *Handler) respond(c *gin.Context, id uuid.UUID, msg string) {
+	co, list, err := h.svc.Get(c.Request.Context(), userID(c), id)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, NewCheckoutResponse(co, list), msg)
+}
+
 func bindInput(c *gin.Context) (Input, bool) {
 	var body Request
 	if !request.BindJSON(c, &body) {
@@ -150,6 +220,16 @@ func (h *Handler) fail(c *gin.Context, err error) {
 			"This Idempotency-Key was already used for a different order", nil)
 	case errors.Is(err, ErrNotFound):
 		response.Fail(c, http.StatusNotFound, CodeNotFound, "Checkout not found", nil)
+	case errors.Is(err, ErrPaymentNotFound):
+		response.Fail(c, http.StatusNotFound, CodePaymentNotFound, "Payment not found", nil)
+	case errors.Is(err, ErrNotPending):
+		response.Fail(c, http.StatusConflict, CodeNotPending, "This checkout is no longer waiting for payment", nil)
+	case errors.Is(err, ErrExpired):
+		response.Fail(c, http.StatusConflict, CodeExpired,
+			"The payment time ran out; the order was cancelled and its stock released", nil)
+	case errors.Is(err, ErrEventConflict):
+		response.Fail(c, http.StatusConflict, CodePaymentEventConflict,
+			"This eventId was already used for a different payment event", nil)
 	default:
 		response.Internal(c, err)
 	}

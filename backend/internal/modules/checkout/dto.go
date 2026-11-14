@@ -18,6 +18,14 @@ type Request struct {
 	Shipping  map[string]string `json:"shipping"`
 }
 
+// SimulatePaymentRequest is the body of POST /payments/:id/simulate.
+// eventId plays the gateway's notification id: send the same one again to
+// simulate a repeated delivery.
+type SimulatePaymentRequest struct {
+	Outcome string     `json:"outcome"` // "success" or "failure"
+	EventID *uuid.UUID `json:"eventId"`
+}
+
 type ImageResponse struct {
 	URL string `json:"url"`
 	Alt string `json:"alt"`

@@ -13,6 +13,22 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const addProductSoldCount = `-- name: AddProductSoldCount :exec
+UPDATE products SET sold_count = sold_count + $1::int WHERE id = $2
+`
+
+type AddProductSoldCountParams struct {
+	Delta int32
+	ID    uuid.UUID
+}
+
+// Denormalised counter for "popular" sorting: + on payment, - on refund.
+// CHECK (sold_count >= 0) guards against going below zero.
+func (q *Queries) AddProductSoldCount(ctx context.Context, arg AddProductSoldCountParams) error {
+	_, err := q.db.Exec(ctx, addProductSoldCount, arg.Delta, arg.ID)
+	return err
+}
+
 const countBuyerOrders = `-- name: CountBuyerOrders :one
 SELECT count(*) FROM orders WHERE buyer_id = $1
 `
@@ -283,6 +299,42 @@ func (q *Queries) ListBuyerOrders(ctx context.Context, arg ListBuyerOrdersParams
 	return items, nil
 }
 
+const listCheckoutStock = `-- name: ListCheckoutStock :many
+SELECT oi.variant_id, oi.product_id, SUM(oi.quantity)::int AS quantity
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.checkout_id = $1
+GROUP BY oi.variant_id, oi.product_id
+ORDER BY oi.variant_id
+`
+
+type ListCheckoutStockRow struct {
+	VariantID uuid.UUID
+	ProductID uuid.UUID
+	Quantity  int32
+}
+
+// What a checkout reserved, per variant, in lock order (variant_id).
+func (q *Queries) ListCheckoutStock(ctx context.Context, checkoutID uuid.UUID) ([]ListCheckoutStockRow, error) {
+	rows, err := q.db.Query(ctx, listCheckoutStock, checkoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCheckoutStockRow{}
+	for rows.Next() {
+		var i ListCheckoutStockRow
+		if err := rows.Scan(&i.VariantID, &i.ProductID, &i.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrderHistory = `-- name: ListOrderHistory :many
 SELECT from_status, to_status, note, created_at
 FROM order_status_histories
@@ -393,6 +445,39 @@ func (q *Queries) ListOrderItems(ctx context.Context, orderIds []uuid.UUID) ([]L
 	return items, nil
 }
 
+const listOrderStock = `-- name: ListOrderStock :many
+SELECT variant_id, product_id, quantity
+FROM order_items
+WHERE order_id = $1
+ORDER BY variant_id
+`
+
+type ListOrderStockRow struct {
+	VariantID uuid.UUID
+	ProductID uuid.UUID
+	Quantity  int32
+}
+
+func (q *Queries) ListOrderStock(ctx context.Context, orderID uuid.UUID) ([]ListOrderStockRow, error) {
+	rows, err := q.db.Query(ctx, listOrderStock, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrderStockRow{}
+	for rows.Next() {
+		var i ListOrderStockRow
+		if err := rows.Scan(&i.VariantID, &i.ProductID, &i.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrdersByCheckout = `-- name: ListOrdersByCheckout :many
 SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
        o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
@@ -464,4 +549,87 @@ func (q *Queries) ListOrdersByCheckout(ctx context.Context, checkoutID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockBuyerOrder = `-- name: LockBuyerOrder :one
+SELECT id, checkout_id, status
+FROM orders
+WHERE id = $1 AND buyer_id = $2
+FOR UPDATE
+`
+
+type LockBuyerOrderParams struct {
+	ID      uuid.UUID
+	BuyerID uuid.UUID
+}
+
+type LockBuyerOrderRow struct {
+	ID         uuid.UUID
+	CheckoutID uuid.UUID
+	Status     string
+}
+
+func (q *Queries) LockBuyerOrder(ctx context.Context, arg LockBuyerOrderParams) (LockBuyerOrderRow, error) {
+	row := q.db.QueryRow(ctx, lockBuyerOrder, arg.ID, arg.BuyerID)
+	var i LockBuyerOrderRow
+	err := row.Scan(&i.ID, &i.CheckoutID, &i.Status)
+	return i, err
+}
+
+const lockCheckoutOrders = `-- name: LockCheckoutOrders :many
+
+SELECT id, checkout_id, status
+FROM orders
+WHERE checkout_id = $1
+ORDER BY id
+FOR UPDATE
+`
+
+type LockCheckoutOrdersRow struct {
+	ID         uuid.UUID
+	CheckoutID uuid.UUID
+	Status     string
+}
+
+// ---- status changes (5c) --------------------------------------------------------
+// ORDER BY id: a fixed lock order, like the inventory rows.
+func (q *Queries) LockCheckoutOrders(ctx context.Context, checkoutID uuid.UUID) ([]LockCheckoutOrdersRow, error) {
+	rows, err := q.db.Query(ctx, lockCheckoutOrders, checkoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockCheckoutOrdersRow{}
+	for rows.Next() {
+		var i LockCheckoutOrdersRow
+		if err := rows.Scan(&i.ID, &i.CheckoutID, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setOrderStatus = `-- name: SetOrderStatus :execrows
+UPDATE orders SET status = $1
+WHERE id = $2 AND status = $3
+`
+
+type SetOrderStatusParams struct {
+	ToStatus   string
+	ID         uuid.UUID
+	FromStatus string
+}
+
+// "AND status = @from_status": the update only happens from the status the
+// caller checked against the transition table.
+func (q *Queries) SetOrderStatus(ctx context.Context, arg SetOrderStatusParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setOrderStatus, arg.ToStatus, arg.ID, arg.FromStatus)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

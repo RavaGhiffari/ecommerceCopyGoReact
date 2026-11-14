@@ -81,3 +81,45 @@ SELECT from_status, to_status, note, created_at
 FROM order_status_histories
 WHERE order_id = @order_id
 ORDER BY created_at, id;
+
+-- ---- status changes (5c) --------------------------------------------------------
+
+-- name: LockCheckoutOrders :many
+-- ORDER BY id: a fixed lock order, like the inventory rows.
+SELECT id, checkout_id, status
+FROM orders
+WHERE checkout_id = @checkout_id
+ORDER BY id
+FOR UPDATE;
+
+-- name: LockBuyerOrder :one
+SELECT id, checkout_id, status
+FROM orders
+WHERE id = @id AND buyer_id = @buyer_id
+FOR UPDATE;
+
+-- name: SetOrderStatus :execrows
+-- "AND status = @from_status": the update only happens from the status the
+-- caller checked against the transition table.
+UPDATE orders SET status = @to_status
+WHERE id = @id AND status = @from_status;
+
+-- name: ListCheckoutStock :many
+-- What a checkout reserved, per variant, in lock order (variant_id).
+SELECT oi.variant_id, oi.product_id, SUM(oi.quantity)::int AS quantity
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.checkout_id = @checkout_id
+GROUP BY oi.variant_id, oi.product_id
+ORDER BY oi.variant_id;
+
+-- name: ListOrderStock :many
+SELECT variant_id, product_id, quantity
+FROM order_items
+WHERE order_id = @order_id
+ORDER BY variant_id;
+
+-- name: AddProductSoldCount :exec
+-- Denormalised counter for "popular" sorting: + on payment, - on refund.
+-- CHECK (sold_count >= 0) guards against going below zero.
+UPDATE products SET sold_count = sold_count + @delta::int WHERE id = @id;

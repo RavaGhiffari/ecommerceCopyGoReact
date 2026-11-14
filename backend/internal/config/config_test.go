@@ -20,7 +20,7 @@ func clearEnv(t *testing.T) {
 		"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_MAX_CONN_LIFETIME",
 		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD", "DB_CONNECT_TIMEOUT",
 		"SESSION_TTL", "ARGON2_MEMORY_KIB", "ARGON2_ITERATIONS", "ARGON2_PARALLELISM",
-		"CHECKOUT_TTL", "SHIPPING_FEE_REGULAR", "SHIPPING_FEE_EXPRESS", "SHIPPING_FEE_SAME_DAY",
+		"CHECKOUT_TTL", "CHECKOUT_SWEEP_INTERVAL", "SHIPPING_FEE_REGULAR", "SHIPPING_FEE_EXPRESS", "SHIPPING_FEE_SAME_DAY",
 	} {
 		t.Setenv(k, "")
 	}
@@ -117,7 +117,13 @@ func TestLoad_CheckoutAndShipping(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	assert.Equal(t, 30*time.Minute, cfg.CheckoutTTL)
+	assert.Equal(t, time.Minute, cfg.CheckoutSweepInterval)
 	assert.Equal(t, "15000", cfg.Shipping.Regular.String())
+
+	t.Setenv("CHECKOUT_SWEEP_INTERVAL", "0s")
+	_, err = Load()
+	assert.ErrorContains(t, err, "CHECKOUT_SWEEP_INTERVAL", "a zero interval would make the ticker panic")
+	t.Setenv("CHECKOUT_SWEEP_INTERVAL", "")
 	assert.Equal(t, "45000", cfg.Shipping.SameDay.String())
 
 	t.Setenv("SHIPPING_FEE_EXPRESS", "25000.50")

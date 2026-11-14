@@ -6,8 +6,8 @@
 // edits to products, stores or addresses never change what was bought.
 //
 // Creating orders happens only inside the checkout transaction (Create takes
-// the caller's tx). Status changes (payment, cancellation, fulfilment) arrive
-// in slices 5c and 5d.
+// the caller's tx). Every status change goes through Repository.Transition
+// and the table in transitions.go.
 package orders
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// The 7 order statuses (CLAUDE.md §7); the transition table arrives in 5c.
+// The 7 order statuses (CLAUDE.md §7); allowed changes are in transitions.go.
 const (
 	StatusPendingPayment = "pending_payment"
 	StatusPaid           = "paid"
@@ -85,6 +85,29 @@ type Order struct {
 	History        []HistoryEntry // only filled for the detail view
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+// Locked is an order row locked FOR UPDATE by the current transaction.
+type Locked struct {
+	ID         uuid.UUID
+	CheckoutID uuid.UUID
+	Status     string
+}
+
+// StockLine is a quantity of one variant held by an order or a checkout.
+type StockLine struct {
+	VariantID uuid.UUID
+	ProductID uuid.UUID
+	Quantity  int32
+}
+
+// VariantIDs lists the variants of stock lines (already in variant order).
+func VariantIDs(lines []StockLine) []uuid.UUID {
+	ids := make([]uuid.UUID, len(lines))
+	for i, l := range lines {
+		ids[i] = l.VariantID
+	}
+	return ids
 }
 
 // Page is one page of the buyer's order list.

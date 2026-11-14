@@ -70,3 +70,64 @@ SELECT c.id, c.status, c.items_total, c.shipping_total, c.grand_total,
 FROM checkouts c
 JOIN payments p ON p.checkout_id = c.id
 WHERE c.id = @id AND c.user_id = @user_id;
+
+-- ---- lifecycle (5c) -----------------------------------------------------------
+-- Every state change of a checkout (pay, fail, cancel, expire) starts by
+-- locking the checkout row FOR UPDATE. Two of them for the same checkout
+-- therefore run one after the other, and the second sees the first's result
+-- (status is no longer pending_payment) and stops. is_expired uses the
+-- database clock, like expires_at itself.
+
+-- name: LockUserCheckout :one
+SELECT id, status, (expires_at <= NOW())::bool AS is_expired
+FROM checkouts
+WHERE id = @id AND user_id = @user_id
+FOR UPDATE;
+
+-- name: LockPaymentCheckout :one
+-- The checkout of a payment, filtered by its owner. FOR UPDATE OF c locks
+-- only the checkout row (the lock every lifecycle change agrees on).
+SELECT c.id, c.status, (c.expires_at <= NOW())::bool AS is_expired
+FROM payments p
+JOIN checkouts c ON c.id = p.checkout_id
+WHERE p.id = @payment_id AND c.user_id = @user_id
+FOR UPDATE OF c;
+
+-- name: LockDueCheckouts :many
+-- The sweeper's batch. SKIP LOCKED: a checkout that someone is paying or
+-- cancelling right now is skipped instead of waited for; whoever holds the
+-- lock checks the expiry themselves. Served by checkouts_pending_expires_idx.
+SELECT id
+FROM checkouts
+WHERE status = 'pending_payment' AND expires_at <= NOW()
+ORDER BY expires_at
+LIMIT @batch_size
+FOR UPDATE SKIP LOCKED;
+
+-- name: MarkCheckoutPaid :execrows
+UPDATE checkouts SET status = 'paid', paid_at = NOW()
+WHERE id = @id AND status = 'pending_payment';
+
+-- name: CloseCheckout :execrows
+-- status is 'cancelled' or 'expired'; cancelled_at records when it closed.
+UPDATE checkouts SET status = @status, cancelled_at = NOW()
+WHERE id = @id AND status = 'pending_payment';
+
+-- name: MarkPaymentSucceeded :execrows
+UPDATE payments SET status = 'succeeded', paid_at = NOW()
+WHERE checkout_id = @checkout_id AND status = 'pending';
+
+-- name: ClosePayment :execrows
+-- status is 'failed', 'cancelled' or 'expired'.
+UPDATE payments SET status = @status
+WHERE checkout_id = @checkout_id AND status = 'pending';
+
+-- name: GetPaymentEvent :one
+SELECT payment_id, event_type FROM payment_events WHERE event_id = @event_id;
+
+-- name: InsertPaymentEvent :execrows
+-- ON CONFLICT DO NOTHING: 0 rows = this event id is already stored (by a
+-- concurrent request), without aborting the transaction.
+INSERT INTO payment_events (payment_id, event_id, event_type, payload)
+VALUES (@payment_id, @event_id, @event_type, @payload)
+ON CONFLICT (event_id) DO NOTHING;

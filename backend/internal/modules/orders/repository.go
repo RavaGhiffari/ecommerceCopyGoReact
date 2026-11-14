@@ -1,9 +1,11 @@
 package orders
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,6 +107,106 @@ func (r *Repository) Create(ctx context.Context, o NewOrder, now time.Time) (uui
 		return uuid.Nil, "", fmt.Errorf("insert order history: %w", err)
 	}
 	return id, number, nil
+}
+
+// ---- status changes (inside the caller's transaction) ---------------------------
+
+// LockByCheckout locks every order of a checkout, in id order.
+func (r *Repository) LockByCheckout(ctx context.Context, checkoutID uuid.UUID) ([]Locked, error) {
+	rows, err := r.q.LockCheckoutOrders(ctx, checkoutID)
+	if err != nil {
+		return nil, fmt.Errorf("lock checkout orders: %w", err)
+	}
+	out := make([]Locked, len(rows))
+	for i, row := range rows {
+		out[i] = Locked{ID: row.ID, CheckoutID: row.CheckoutID, Status: row.Status}
+	}
+	return out, nil
+}
+
+// LockForBuyer locks one order of the buyer (another buyer's -> ErrNotFound).
+func (r *Repository) LockForBuyer(ctx context.Context, buyerID, orderID uuid.UUID) (Locked, error) {
+	row, err := r.q.LockBuyerOrder(ctx, queries.LockBuyerOrderParams{ID: orderID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Locked{}, ErrNotFound
+	}
+	if err != nil {
+		return Locked{}, fmt.Errorf("lock buyer order: %w", err)
+	}
+	return Locked{ID: row.ID, CheckoutID: row.CheckoutID, Status: row.Status}, nil
+}
+
+// Transition changes the status of a LOCKED order if the table allows it,
+// and appends the history row. actorID is nil for the system.
+func (r *Repository) Transition(ctx context.Context, o *Locked, to string, by Actor, actorID *uuid.UUID, note string) error {
+	if !CanTransition(o.Status, to, by) {
+		return &TransitionError{From: o.Status, To: to}
+	}
+	n, err := r.q.SetOrderStatus(ctx, queries.SetOrderStatusParams{ID: o.ID, FromStatus: o.Status, ToStatus: to})
+	if err != nil {
+		return fmt.Errorf("set order status: %w", err)
+	}
+	if n == 0 {
+		// The row is locked, so its status cannot have changed under us. A
+		// caller that forgot to lock ends up here instead of racing.
+		return fmt.Errorf("order %s is no longer %s", o.ID, o.Status)
+	}
+	from := o.Status
+	if err := r.q.InsertOrderStatusHistory(ctx, queries.InsertOrderStatusHistoryParams{
+		OrderID: o.ID, FromStatus: &from, ToStatus: to, ActorID: actorID, Note: note,
+	}); err != nil {
+		return fmt.Errorf("insert order history: %w", err)
+	}
+	o.Status = to
+	return nil
+}
+
+// StockForCheckout is what a checkout reserved, per variant, in variant order.
+func (r *Repository) StockForCheckout(ctx context.Context, checkoutID uuid.UUID) ([]StockLine, error) {
+	rows, err := r.q.ListCheckoutStock(ctx, checkoutID)
+	if err != nil {
+		return nil, fmt.Errorf("list checkout stock: %w", err)
+	}
+	out := make([]StockLine, len(rows))
+	for i, row := range rows {
+		out[i] = StockLine{VariantID: row.VariantID, ProductID: row.ProductID, Quantity: row.Quantity}
+	}
+	return out, nil
+}
+
+// StockForOrder is what one order bought, per variant, in variant order.
+func (r *Repository) StockForOrder(ctx context.Context, orderID uuid.UUID) ([]StockLine, error) {
+	rows, err := r.q.ListOrderStock(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list order stock: %w", err)
+	}
+	out := make([]StockLine, len(rows))
+	for i, row := range rows {
+		out[i] = StockLine{VariantID: row.VariantID, ProductID: row.ProductID, Quantity: row.Quantity}
+	}
+	return out, nil
+}
+
+// AddSoldCounts adds sign x quantity to products.sold_count (+1 on payment,
+// -1 on refund). Products are updated one by one in product_id order: like
+// the inventory rows, a fixed order means two transactions that touch the
+// same products cannot deadlock.
+func (r *Repository) AddSoldCounts(ctx context.Context, lines []StockLine, sign int32) error {
+	perProduct := map[uuid.UUID]int32{}
+	for _, l := range lines {
+		perProduct[l.ProductID] += l.Quantity
+	}
+	ids := make([]uuid.UUID, 0, len(perProduct))
+	for id := range perProduct {
+		ids = append(ids, id)
+	}
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
+	for _, id := range ids {
+		if err := r.q.AddProductSoldCount(ctx, queries.AddProductSoldCountParams{ID: id, Delta: sign * perProduct[id]}); err != nil {
+			return fmt.Errorf("update sold count: %w", err)
+		}
+	}
+	return nil
 }
 
 // ---- reads ----------------------------------------------------------------------

@@ -34,7 +34,9 @@ type Config struct {
 	Argon2     Argon2Config
 
 	CheckoutTTL time.Duration // how long an unpaid checkout holds its stock
-	Shipping    ShippingFees
+	// How often the API looks for checkouts whose time ran out.
+	CheckoutSweepInterval time.Duration
+	Shipping              ShippingFees
 
 	DB DBConfig
 }
@@ -82,7 +84,8 @@ func Load() (Config, error) {
 			Iterations:  uint32(getInt32("ARGON2_ITERATIONS", 2, &errs)),
 			Parallelism: uint8(min(getInt32("ARGON2_PARALLELISM", 1, &errs), 255)),
 		},
-		CheckoutTTL: getDuration("CHECKOUT_TTL", 30*time.Minute, &errs),
+		CheckoutTTL:           getDuration("CHECKOUT_TTL", 30*time.Minute, &errs),
+		CheckoutSweepInterval: getDuration("CHECKOUT_SWEEP_INTERVAL", time.Minute, &errs),
 		Shipping: ShippingFees{
 			Regular: getMoney("SHIPPING_FEE_REGULAR", 15_000, &errs),
 			Express: getMoney("SHIPPING_FEE_EXPRESS", 30_000, &errs),

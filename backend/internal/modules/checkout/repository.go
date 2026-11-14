@@ -155,3 +155,107 @@ func newPaymentReference() string {
 	}
 	return "SIM-" + string(out)
 }
+
+// ---- lifecycle (5c) ---------------------------------------------------------------
+
+// locked is a checkout row locked FOR UPDATE by the current transaction.
+type locked struct {
+	ID      uuid.UUID
+	Status  string
+	Expired bool // expires_at has passed (database clock)
+}
+
+// LockForUser locks a checkout of the user (someone else's -> ErrNotFound).
+func (r *Repository) LockForUser(ctx context.Context, userID, id uuid.UUID) (locked, error) {
+	row, err := r.q.LockUserCheckout(ctx, queries.LockUserCheckoutParams{ID: id, UserID: userID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return locked{}, ErrNotFound
+	}
+	if err != nil {
+		return locked{}, fmt.Errorf("lock checkout: %w", err)
+	}
+	return locked{ID: row.ID, Status: row.Status, Expired: row.IsExpired}, nil
+}
+
+// LockForPayment locks the checkout of a payment of the user (-> ErrPaymentNotFound).
+func (r *Repository) LockForPayment(ctx context.Context, userID, paymentID uuid.UUID) (locked, error) {
+	row, err := r.q.LockPaymentCheckout(ctx, queries.LockPaymentCheckoutParams{PaymentID: paymentID, UserID: userID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return locked{}, ErrPaymentNotFound
+	}
+	if err != nil {
+		return locked{}, fmt.Errorf("lock payment checkout: %w", err)
+	}
+	return locked{ID: row.ID, Status: row.Status, Expired: row.IsExpired}, nil
+}
+
+// LockDue locks up to batch expired pending checkouts, skipping locked ones.
+func (r *Repository) LockDue(ctx context.Context, batch int) ([]uuid.UUID, error) {
+	ids, err := r.q.LockDueCheckouts(ctx, int32(batch))
+	if err != nil {
+		return nil, fmt.Errorf("lock due checkouts: %w", err)
+	}
+	return ids, nil
+}
+
+// MarkPaid sets checkout -> paid and payment -> succeeded.
+func (r *Repository) MarkPaid(ctx context.Context, id uuid.UUID) error {
+	if err := one(r.q.MarkCheckoutPaid(ctx, id)); err != nil {
+		return fmt.Errorf("mark checkout paid: %w", err)
+	}
+	if err := one(r.q.MarkPaymentSucceeded(ctx, id)); err != nil {
+		return fmt.Errorf("mark payment succeeded: %w", err)
+	}
+	return nil
+}
+
+// Close gives a pending checkout and its payment their final status.
+func (r *Repository) Close(ctx context.Context, id uuid.UUID, checkoutStatus, paymentStatus string) error {
+	if err := one(r.q.CloseCheckout(ctx, queries.CloseCheckoutParams{ID: id, Status: checkoutStatus})); err != nil {
+		return fmt.Errorf("close checkout: %w", err)
+	}
+	if err := one(r.q.ClosePayment(ctx, queries.ClosePaymentParams{CheckoutID: id, Status: paymentStatus})); err != nil {
+		return fmt.Errorf("close payment: %w", err)
+	}
+	return nil
+}
+
+type paymentEvent struct {
+	PaymentID uuid.UUID
+	EventType string
+}
+
+func (r *Repository) PaymentEvent(ctx context.Context, eventID uuid.UUID) (paymentEvent, bool, error) {
+	row, err := r.q.GetPaymentEvent(ctx, eventID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return paymentEvent{}, false, nil
+	}
+	if err != nil {
+		return paymentEvent{}, false, fmt.Errorf("get payment event: %w", err)
+	}
+	return paymentEvent{PaymentID: row.PaymentID, EventType: row.EventType}, true, nil
+}
+
+// InsertPaymentEvent returns false when the event id is already stored.
+func (r *Repository) InsertPaymentEvent(ctx context.Context, paymentID, eventID uuid.UUID, eventType string, payload []byte) (bool, error) {
+	n, err := r.q.InsertPaymentEvent(ctx, queries.InsertPaymentEventParams{
+		PaymentID: paymentID, EventID: eventID, EventType: eventType, Payload: payload,
+	})
+	if err != nil {
+		return false, fmt.Errorf("insert payment event: %w", err)
+	}
+	return n == 1, nil
+}
+
+// one turns ":execrows" into an error unless exactly one row changed. The
+// status updates are conditional (WHERE status = 'pending...'); the row is
+// locked, so anything but 1 means a bug, and the transaction rolls back.
+func one(n int64, err error) error {
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return fmt.Errorf("expected 1 row, changed %d", n)
+	}
+	return nil
+}

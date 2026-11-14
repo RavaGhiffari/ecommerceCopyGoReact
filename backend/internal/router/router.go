@@ -106,8 +106,11 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn.POST("/checkout/quote", h.Checkout.Quote)
 	signedIn.POST("/checkout", h.Checkout.Place)
 	signedIn.GET("/checkout/:id", h.Checkout.Get)
+	signedIn.POST("/checkout/:id/cancel", h.Checkout.Cancel)
+	signedIn.POST("/payments/:id/simulate", h.Checkout.SimulatePayment)
 	signedIn.GET("/orders", h.Orders.List)
 	signedIn.GET("/orders/:id", h.Orders.Get)
+	signedIn.POST("/orders/:id/cancel", h.Orders.Cancel)
 	// Opening a store is how a customer becomes a seller.
 	signedIn.POST("/seller/store", h.Stores.Open)
 

@@ -11,6 +11,27 @@ import (
 	"github.com/google/uuid"
 )
 
+const consumeInventory = `-- name: ConsumeInventory :execrows
+UPDATE inventory
+SET reserved_quantity = reserved_quantity - $1::int
+WHERE variant_id = $2
+  AND reserved_quantity >= $1::int
+`
+
+type ConsumeInventoryParams struct {
+	Quantity  int32
+	VariantID uuid.UUID
+}
+
+// Payment succeeded: the reserved units are sold and leave the stock for good.
+func (q *Queries) ConsumeInventory(ctx context.Context, arg ConsumeInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, consumeInventory, arg.Quantity, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createInventory = `-- name: CreateInventory :exec
 INSERT INTO inventory (variant_id) VALUES ($1)
 `
@@ -115,6 +136,30 @@ func (q *Queries) LockInventoryRows(ctx context.Context, variantIds []uuid.UUID)
 	return items, nil
 }
 
+const releaseInventory = `-- name: ReleaseInventory :execrows
+UPDATE inventory
+SET available_quantity = available_quantity + $1::int,
+    reserved_quantity  = reserved_quantity - $1::int
+WHERE variant_id = $2
+  AND reserved_quantity >= $1::int
+`
+
+type ReleaseInventoryParams struct {
+	Quantity  int32
+	VariantID uuid.UUID
+}
+
+// Gives reserved units back to available (cancel, payment failure, expiry).
+// Conditional like ReserveInventory: 0 rows = the reservation is not there,
+// which would be a bug, and the caller rolls back.
+func (q *Queries) ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseInventory, arg.Quantity, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const reserveInventory = `-- name: ReserveInventory :execrows
 UPDATE inventory
 SET available_quantity = available_quantity - $1::int,
@@ -134,6 +179,26 @@ type ReserveInventoryParams struct {
 // last guard against overselling, even if a caller forgot to lock first.
 func (q *Queries) ReserveInventory(ctx context.Context, arg ReserveInventoryParams) (int64, error) {
 	result, err := q.db.Exec(ctx, reserveInventory, arg.Quantity, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restockInventory = `-- name: RestockInventory :execrows
+UPDATE inventory
+SET available_quantity = available_quantity + $1::int
+WHERE variant_id = $2
+`
+
+type RestockInventoryParams struct {
+	Quantity  int32
+	VariantID uuid.UUID
+}
+
+// A paid order was refunded: the sold units come back as available.
+func (q *Queries) RestockInventory(ctx context.Context, arg RestockInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restockInventory, arg.Quantity, arg.VariantID)
 	if err != nil {
 		return 0, err
 	}

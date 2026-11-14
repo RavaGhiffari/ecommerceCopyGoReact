@@ -42,10 +42,11 @@ import (
 var generousLimits = auth.Limits{LoginAttempts: 1000, LoginWindow: time.Minute, RegisterAttempts: 1000, RegisterWindow: time.Minute}
 
 type testApp struct {
-	t    *testing.T
-	r    *gin.Engine
-	pool *pgxpool.Pool
-	auth *auth.Service
+	t        *testing.T
+	r        *gin.Engine
+	pool     *pgxpool.Pool
+	auth     *auth.Service
+	checkout *checkout.Service // to run the expiry sweep directly
 }
 
 func newTestApp(t *testing.T, limits auth.Limits) *testApp {
@@ -84,6 +85,7 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
 		RequestTimeout:     5 * time.Second,
 	}
+	checkoutSvc := checkout.NewService(pool, checkout.Config{TTL: 30 * time.Minute, Rates: shipping.DefaultRates()})
 	h := router.Handlers{
 		Health:     health.NewHandler(health.NewRepository(pool)),
 		Addresses:  addresses.NewHandler(addresses.NewService(pool)),
@@ -93,12 +95,10 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		Stores:     stores.NewHandler(stores.NewService(pool)),
 		Products:   products.NewHandler(products.NewService(pool)),
 		Cart:       cart.NewHandler(cart.NewService(pool)),
-		Checkout: checkout.NewHandler(checkout.NewService(pool, checkout.Config{
-			TTL: 30 * time.Minute, Rates: shipping.DefaultRates(),
-		})),
-		Orders: orders.NewHandler(orders.NewService(pool)),
+		Checkout:   checkout.NewHandler(checkoutSvc),
+		Orders:     orders.NewHandler(orders.NewService(pool)),
 	}
-	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool, auth: authSvc}
+	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool, auth: authSvc, checkout: checkoutSvc}
 }
 
 type result struct {

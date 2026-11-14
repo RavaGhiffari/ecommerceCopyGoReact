@@ -72,6 +72,25 @@ func run() error {
 		return err
 	}
 
+	checkoutSvc := checkout.NewService(pool, checkout.Config{
+		TTL:   cfg.CheckoutTTL,
+		Rates: shipping.Rates{Regular: cfg.Shipping.Regular, Express: cfg.Shipping.Express, SameDay: cfg.Shipping.SameDay},
+	})
+
+	// The expiry sweeper releases the stock of checkouts nobody paid for. It
+	// stops when ctx is cancelled (shutdown signal). The deferred wait runs
+	// BEFORE the deferred pool.Close above (defers run last-in, first-out),
+	// so the sweeper never uses a closed pool.
+	sweeperDone := make(chan struct{})
+	go func() {
+		defer close(sweeperDone)
+		checkoutSvc.RunSweeper(ctx, cfg.CheckoutSweepInterval)
+	}()
+	defer func() {
+		stop() // also covers returning early with an error
+		<-sweeperDone
+	}()
+
 	handlers := router.Handlers{
 		Health:     health.NewHandler(health.NewRepository(pool)),
 		Addresses:  addresses.NewHandler(addresses.NewService(pool)),
@@ -81,11 +100,8 @@ func run() error {
 		Stores:     stores.NewHandler(stores.NewService(pool)),
 		Products:   products.NewHandler(products.NewService(pool)),
 		Cart:       cart.NewHandler(cart.NewService(pool)),
-		Checkout: checkout.NewHandler(checkout.NewService(pool, checkout.Config{
-			TTL:   cfg.CheckoutTTL,
-			Rates: shipping.Rates{Regular: cfg.Shipping.Regular, Express: cfg.Shipping.Express, SameDay: cfg.Shipping.SameDay},
-		})),
-		Orders: orders.NewHandler(orders.NewService(pool)),
+		Checkout:   checkout.NewHandler(checkoutSvc),
+		Orders:     orders.NewHandler(orders.NewService(pool)),
 	}
 
 	srv := &http.Server{

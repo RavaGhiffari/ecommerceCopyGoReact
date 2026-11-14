@@ -13,7 +13,10 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/validation"
 )
 
-const CodeNotFound = "ORDER_NOT_FOUND"
+const (
+	CodeNotFound          = "ORDER_NOT_FOUND"
+	CodeInvalidTransition = "INVALID_STATUS_TRANSITION"
+)
 
 type Handler struct {
 	svc *Service
@@ -61,6 +64,21 @@ func (h *Handler) Get(c *gin.Context) {
 	response.OK(c, http.StatusOK, NewOrderResponse(o), "")
 }
 
+// Cancel handles POST /api/v1/orders/:id/cancel (a paid order -> refunded).
+func (h *Handler) Cancel(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.fail(c, ErrNotFound)
+		return
+	}
+	o, err := h.svc.CancelForBuyer(c.Request.Context(), userID(c), id)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, NewOrderResponse(o), "Order cancelled; refund simulated")
+}
+
 func intQuery(c *gin.Context, errs validation.Errors, name string) int {
 	raw := c.Query(name)
 	if raw == "" {
@@ -74,10 +92,22 @@ func intQuery(c *gin.Context, errs validation.Errors, name string) int {
 }
 
 func (h *Handler) fail(c *gin.Context, err error) {
-	var fields validation.Errors
+	var (
+		fields     validation.Errors
+		transition *TransitionError
+		unpaid     *UnpaidError
+	)
 	switch {
 	case errors.As(err, &fields):
 		response.ValidationFailed(c, fields)
+	case errors.As(err, &transition):
+		response.Fail(c, http.StatusConflict, CodeInvalidTransition,
+			"This order can no longer be changed that way",
+			map[string]any{"from": transition.From, "to": transition.To})
+	case errors.As(err, &unpaid):
+		response.Fail(c, http.StatusConflict, CodeInvalidTransition,
+			"An unpaid order is cancelled together with its checkout",
+			map[string]any{"from": StatusPendingPayment, "checkoutId": unpaid.CheckoutID})
 	case errors.Is(err, ErrNotFound):
 		response.Fail(c, http.StatusNotFound, CodeNotFound, "Order not found", nil)
 	default:

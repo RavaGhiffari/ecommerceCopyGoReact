@@ -13,6 +13,44 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const closeCheckout = `-- name: CloseCheckout :execrows
+UPDATE checkouts SET status = $1, cancelled_at = NOW()
+WHERE id = $2 AND status = 'pending_payment'
+`
+
+type CloseCheckoutParams struct {
+	Status string
+	ID     uuid.UUID
+}
+
+// status is 'cancelled' or 'expired'; cancelled_at records when it closed.
+func (q *Queries) CloseCheckout(ctx context.Context, arg CloseCheckoutParams) (int64, error) {
+	result, err := q.db.Exec(ctx, closeCheckout, arg.Status, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const closePayment = `-- name: ClosePayment :execrows
+UPDATE payments SET status = $1
+WHERE checkout_id = $2 AND status = 'pending'
+`
+
+type ClosePaymentParams struct {
+	Status     string
+	CheckoutID uuid.UUID
+}
+
+// status is 'failed', 'cancelled' or 'expired'.
+func (q *Queries) ClosePayment(ctx context.Context, arg ClosePaymentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, closePayment, arg.Status, arg.CheckoutID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createCheckout = `-- name: CreateCheckout :one
 INSERT INTO checkouts
     (user_id, idempotency_key, request_hash, items_total, shipping_total, grand_total, expires_at)
@@ -178,6 +216,50 @@ func (q *Queries) GetCheckoutByIdempotencyKey(ctx context.Context, arg GetChecko
 	return i, err
 }
 
+const getPaymentEvent = `-- name: GetPaymentEvent :one
+SELECT payment_id, event_type FROM payment_events WHERE event_id = $1
+`
+
+type GetPaymentEventRow struct {
+	PaymentID uuid.UUID
+	EventType string
+}
+
+func (q *Queries) GetPaymentEvent(ctx context.Context, eventID uuid.UUID) (GetPaymentEventRow, error) {
+	row := q.db.QueryRow(ctx, getPaymentEvent, eventID)
+	var i GetPaymentEventRow
+	err := row.Scan(&i.PaymentID, &i.EventType)
+	return i, err
+}
+
+const insertPaymentEvent = `-- name: InsertPaymentEvent :execrows
+INSERT INTO payment_events (payment_id, event_id, event_type, payload)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (event_id) DO NOTHING
+`
+
+type InsertPaymentEventParams struct {
+	PaymentID uuid.UUID
+	EventID   uuid.UUID
+	EventType string
+	Payload   []byte
+}
+
+// ON CONFLICT DO NOTHING: 0 rows = this event id is already stored (by a
+// concurrent request), without aborting the transaction.
+func (q *Queries) InsertPaymentEvent(ctx context.Context, arg InsertPaymentEventParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertPaymentEvent,
+		arg.PaymentID,
+		arg.EventID,
+		arg.EventType,
+		arg.Payload,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listCartVariantIDs = `-- name: ListCartVariantIDs :many
 SELECT ci.variant_id
 FROM carts c
@@ -298,4 +380,122 @@ func (q *Queries) ListCheckoutLines(ctx context.Context, userID uuid.UUID) ([]Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockDueCheckouts = `-- name: LockDueCheckouts :many
+SELECT id
+FROM checkouts
+WHERE status = 'pending_payment' AND expires_at <= NOW()
+ORDER BY expires_at
+LIMIT $1
+FOR UPDATE SKIP LOCKED
+`
+
+// The sweeper's batch. SKIP LOCKED: a checkout that someone is paying or
+// cancelling right now is skipped instead of waited for; whoever holds the
+// lock checks the expiry themselves. Served by checkouts_pending_expires_idx.
+func (q *Queries) LockDueCheckouts(ctx context.Context, batchSize int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockDueCheckouts, batchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockPaymentCheckout = `-- name: LockPaymentCheckout :one
+SELECT c.id, c.status, (c.expires_at <= NOW())::bool AS is_expired
+FROM payments p
+JOIN checkouts c ON c.id = p.checkout_id
+WHERE p.id = $1 AND c.user_id = $2
+FOR UPDATE OF c
+`
+
+type LockPaymentCheckoutParams struct {
+	PaymentID uuid.UUID
+	UserID    uuid.UUID
+}
+
+type LockPaymentCheckoutRow struct {
+	ID        uuid.UUID
+	Status    string
+	IsExpired bool
+}
+
+// The checkout of a payment, filtered by its owner. FOR UPDATE OF c locks
+// only the checkout row (the lock every lifecycle change agrees on).
+func (q *Queries) LockPaymentCheckout(ctx context.Context, arg LockPaymentCheckoutParams) (LockPaymentCheckoutRow, error) {
+	row := q.db.QueryRow(ctx, lockPaymentCheckout, arg.PaymentID, arg.UserID)
+	var i LockPaymentCheckoutRow
+	err := row.Scan(&i.ID, &i.Status, &i.IsExpired)
+	return i, err
+}
+
+const lockUserCheckout = `-- name: LockUserCheckout :one
+
+SELECT id, status, (expires_at <= NOW())::bool AS is_expired
+FROM checkouts
+WHERE id = $1 AND user_id = $2
+FOR UPDATE
+`
+
+type LockUserCheckoutParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+type LockUserCheckoutRow struct {
+	ID        uuid.UUID
+	Status    string
+	IsExpired bool
+}
+
+// ---- lifecycle (5c) -----------------------------------------------------------
+// Every state change of a checkout (pay, fail, cancel, expire) starts by
+// locking the checkout row FOR UPDATE. Two of them for the same checkout
+// therefore run one after the other, and the second sees the first's result
+// (status is no longer pending_payment) and stops. is_expired uses the
+// database clock, like expires_at itself.
+func (q *Queries) LockUserCheckout(ctx context.Context, arg LockUserCheckoutParams) (LockUserCheckoutRow, error) {
+	row := q.db.QueryRow(ctx, lockUserCheckout, arg.ID, arg.UserID)
+	var i LockUserCheckoutRow
+	err := row.Scan(&i.ID, &i.Status, &i.IsExpired)
+	return i, err
+}
+
+const markCheckoutPaid = `-- name: MarkCheckoutPaid :execrows
+UPDATE checkouts SET status = 'paid', paid_at = NOW()
+WHERE id = $1 AND status = 'pending_payment'
+`
+
+func (q *Queries) MarkCheckoutPaid(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markCheckoutPaid, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markPaymentSucceeded = `-- name: MarkPaymentSucceeded :execrows
+UPDATE payments SET status = 'succeeded', paid_at = NOW()
+WHERE checkout_id = $1 AND status = 'pending'
+`
+
+func (q *Queries) MarkPaymentSucceeded(ctx context.Context, checkoutID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markPaymentSucceeded, checkoutID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
