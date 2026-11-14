@@ -19,6 +19,10 @@ const FIELD_MESSAGES: Record<string, string> = {
   'cannot be negative': 'tidak boleh negatif',
   'may have at most 2 decimal places': 'maksimal 2 angka desimal',
   'must be an http(s) URL': 'harus URL http(s)',
+  'is too short': 'terlalu pendek',
+  'is too long': 'terlalu panjang',
+  'must be 5 digits': 'harus 5 digit angka',
+  'must be 8-15 digits, optionally starting with +': 'harus 8–15 digit angka, boleh diawali +',
 }
 
 const CODE_MESSAGES: Record<string, string> = {
@@ -39,6 +43,8 @@ const CODE_MESSAGES: Record<string, string> = {
   VARIANT_NOT_FOUND: 'Varian produk tidak ditemukan.',
   OWN_PRODUCT: 'Ini produk dari tokomu sendiri.',
   CART_ITEM_NOT_FOUND: 'Barang ini sudah tidak ada di keranjang.',
+  ADDRESS_NOT_FOUND: 'Alamat ini sudah tidak ada. Muat ulang halaman.',
+  ADDRESS_LIMIT_REACHED: 'Maksimal 10 alamat. Hapus salah satu dulu.',
   VALIDATION_ERROR: 'Jumlah tidak valid (1–99 per barang).',
 }
 

@@ -10,6 +10,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { formatMonthYear } from '../lib/format'
 import type { User } from '../types/auth'
 import { SubmitButton } from '../features/auth/AuthCard'
+import { AddressBook } from '../features/addresses/AddressBook'
 
 const ROLE_LABELS: Record<string, string> = { customer: 'Pembeli', seller: 'Penjual', admin: 'Admin' }
 
@@ -51,7 +52,7 @@ function ProfileForm({ user }: { user: User }) {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold">Akun saya</h1>
 
       <Card className="p-5">
@@ -88,6 +89,8 @@ function ProfileForm({ user }: { user: User }) {
           </div>
         </form>
       </Card>
+
+      <AddressBook />
     </div>
   )
 }
