@@ -26,3 +26,5 @@ Thumbs.db
 *.log
 
 /docs/e2e-reference
+# Stray npm install at the repo root
+/node_modules/

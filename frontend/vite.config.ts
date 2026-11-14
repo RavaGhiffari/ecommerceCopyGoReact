@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 // In development the browser only talks to Vite. Vite forwards API paths to
 // the Go API, so for the browser everything is same-origin: the session cookie
 // is a normal first-party cookie and no CORS setup is needed.
-const API_TARGET = 'http://localhost:8081'
+const API_TARGET = 'http://127.0.0.1:8081'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

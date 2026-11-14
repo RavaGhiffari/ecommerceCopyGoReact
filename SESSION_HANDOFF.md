@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-13, at the end of **Phase 4 (cart)**, for a fresh Claude Code session.
+Updated 2026-11-14, after **Phase 4 (cart)** and the **shadcn/ui migration** were committed, for a fresh Claude Code session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -12,7 +12,7 @@ Updated 2026-11-13, at the end of **Phase 4 (cart)**, for a fresh Claude Code se
 
 **What it is.** A learning project: a multi-vendor marketplace (Tokopedia-style UX, original branding) with a Go backend, React frontend and PostgreSQL. The developer is **learning Go and backend engineering**: keep code explicit and explain important flows (request → handler → service → repository → SQL; why each constraint, lock and transaction exists). Talk to the developer in **Indonesian**; repo docs are English.
 
-**Stack.** Go 1.27.3 + Gin + pgx/pgxpool + sqlc + golang-migrate · PostgreSQL 18 · React 19 + TypeScript + Vite + Tailwind 4 + react-router-dom + react-hook-form + zod · Docker Compose (postgres + api; frontend on the host with `npm run dev`). Modular monolith: `router → middleware → handler → service → repository → sqlc → pgxpool`.
+**Stack.** Go 1.27.3 + Gin + pgx/pgxpool + sqlc + golang-migrate · PostgreSQL 18 · React 19 + TypeScript + Vite + Tailwind 4 + shadcn/ui (Radix) + react-router-dom + react-hook-form + zod · Docker Compose (postgres + api; frontend on the host with `npm run dev`). Modular monolith: `router → middleware → handler → service → repository → sqlc → pgxpool`.
 
 **Working agreement (CLAUDE.md §16):** plan and wait for approval before substantial work; one phase at a time and stop at the end for review; **never commit, push or deploy** (propose commit messages); never print or commit `.env`; report failures honestly; don't say "done" without running the checks.
 
@@ -23,25 +23,22 @@ Updated 2026-11-13, at the end of **Phase 4 (cart)**, for a fresh Claude Code se
 | 0 Foundation, 0.5 UI prototype, 1 Identity | committed, reviewed |
 | 2 Catalog | committed (`2838782`, `d0c2a54`; docs `41679b9`) |
 | 3 Marketplace UI | mostly delivered by Phase 2; polish open |
-| **4 Cart** | **implemented and verified, uncommitted, awaiting review** |
+| 4 Cart | committed (`7e57829`, `f312b0b`; docs `0d63dfc`) |
+| UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
+| Dev housekeeping (loopback ports, Vite target, `.gitignore`) | done and verified, **uncommitted** (PROJECT_STATE §1d) |
 | 5 Checkout & orders | next — needs answers to PLAN.md Q1–Q8 and a written plan |
 
 ---
 
-## 2. Completed work (Phase 4 in this session)
+## 2. Completed work (since Phase 4)
 
 | Area | Evidence |
 |---|---|
-| Migration `000009` (carts, cart_items) | [verified] up → down → up on dev DB; applied to `marketplace_test`; CHECK 1..99 and UNIQUE(cart, variant) tried by hand |
-| `modules/cart` + 4 routes | [verified] `make test` 14 packages ok; `make test-integration` 15 packages ok; 12 cart integration tests listed and passing |
-| Cart-row lock | [verified] concurrency test fails without it (quantity 1 instead of 10), passes 5/5 with it |
-| Frontend `/cart`, badge, add-to-cart, `CartProvider` | [verified] `npm run build`, `npm run lint` clean; browser E2E `cart-flow.mjs` 16/16; auth 15/15 and catalog 17/17 re-run |
-| Invariants on dev DB | [verified] ledger mismatches 0; `SUM(reserved_quantity)` 0; demo stock changed by E2E restored |
-| Docs | PROJECT_STATE (§1 CP-4 + commit commands, §1b evidence, §4/§5/§6/§7/§9/§10/§11), PLAN, PHASES, CLAUDE.md §2/§14, this file |
+| Phase 4 cart (backend + frontend) | committed; evidence in PROJECT_STATE §1b |
+| shadcn/ui migration: `components.json`, `@/` alias, theme tokens, `src/components/ui/*`, Radix Select for category/sort, account `DropdownMenu`, logout with `navigate('/', { flushSync: true })` | committed `db15fef`; [verified earlier] build + lint clean, E2E auth 15/15, catalog 17/17, cart 16/16; logout race 9/10 wrong before the fix, 10/10 right after |
+| Compose ports on `127.0.0.1`; Vite `API_TARGET` = `http://127.0.0.1:8081`; root `.gitignore` `/node_modules/` | [verified] containers recreated (volume kept, 30 products), `/ready` 200 direct and via Vite :5190, login POST via Vite 200, API not answering on a non-loopback adapter; **uncommitted**, commit command in PROJECT_STATE §1d |
 
-Working tree: Phase 4 + docs **uncommitted** on top of `41679b9`. Commit commands: PROJECT_STATE §1. `docs/e2e-reference/` is git-ignored by the developer (local-only copies of the three E2E scripts, incl. `cart-flow.mjs`).
-
-Test functions in source: 98 [verified].
+`docs/e2e-reference/` is git-ignored by the developer (local-only copies of the three E2E scripts); they were updated for the shadcn UI.
 
 ---
 
@@ -76,12 +73,13 @@ The next task is **planning**, not coding: answer PLAN.md Q1–Q8 with the devel
 | `backend/internal/database/tx.go` | `WithTx` |
 | `backend/internal/router/router.go` | new `signedIn` and `seller` routes (`/checkout`, `/orders`, `/seller/orders/:id/status`, `/payments/:id/simulate`) |
 | `backend/internal/router/cart_integration_test.go`, `catalog_integration_test.go` | fixtures (`newTestApp`, `newSeller`, `createProduct`, `newCartFixture`) to reuse; concurrency-test pattern |
-| `frontend/src/pages/CartPage.tsx` | disabled "Lanjut ke checkout" button |
+| `frontend/src/pages/CartPage.tsx` | disabled "Lanjut ke checkout" button (shadcn Card/Button) |
+| `frontend/src/components/ui/` | shadcn components; Phase 5 adds `sonner` (toast) and `alert-dialog` (developer decision). After `npx shadcn add`, fix `from "cn"` → `from "@/lib/utils"` |
 | `frontend/src/features/catalog/ProductDetailView.tsx` | disabled "Beli sekarang" |
 | `frontend/src/features/cart/CartProvider.tsx`, `services/cart.ts`, `types/cart.ts` | cart state to clear/refresh after checkout |
 | CLAUDE.md §7 | non-negotiable checkout rules |
 
-Dependencies: CP-4 committed; developer answers Q1–Q8; approval of the written plan; Docker up (`make up`), dev DB on host port 5433.
+Dependencies: developer answers Q1–Q8; approval of the written plan; Docker up (`make up`), dev DB on host port 5433.
 
 ---
 
@@ -91,11 +89,9 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 **Unresolved**
 - **Rate limiter shares one IP bucket in dev**: every request reaches the API from the Docker gateway (`172.18.0.1`, [verified earlier]); register is limited to 10/hour per IP, so sign-up-heavy E2E runs can hit 429 (restart the `api` container to reset). Needs a trusted-proxy decision before deploy.
-- **Dev DB exposure**: Compose publishes Postgres on `0.0.0.0:5433` and the API on `0.0.0.0:8081`; the developer's `.env` DB password is 4 characters (length only checked). Not changed — developer decision.
 - Rate limiter in memory (single instance); expired sessions only cleaned when the same user logs in; `Secure` cookie path untested; no `EXPLAIN` on catalog/cart queries; ratings 0 and `sold_count` demo-only; no admin category UI; mobile < 500 px unverified.
 - Dev DB holds many throw-away accounts from E2E runs (`e2e-…`, `seller-…`, `buyer-…@contoh.id`, `admin@contoh.id`, `demo@contoh.id`).
-- **Uncommitted, unreviewed frontend deps** in `frontend/package.json` and lock: `shadcn`, `cn`, `class-variance-authority`, `tw-animate-css`, and a Tailwind bump 4.3.3 → 4.3.5. Excluded from the commit procedure. Developer must justify or revert with `git checkout -- frontend/package.json frontend/package-lock.json`.
-- **Stray root artifacts** (created 15:51 on 2026-11-13, cause unknown): `package.json`, `package-lock.json`, and `node_modules/` at repo root (about 860 untracked entries). Never run `git add .` or `git add -A` without a path. Delete after confirmation; root `.gitignore` lacks `/node_modules/`.
+- JS bundle 672 kB (gzip 208 kB) after Radix; Vite warns about >500 kB chunks → route-level code splitting in Phase 7.
 - Cosmetic: right after "Keluar" the badge keeps the old count until the logout request returns.
 
 **Technical debt**: no frontend unit tests; E2E scripts are hand-run and git-ignored; no CI; floating `golang:1.27-alpine` / `postgres:18` tags; `frontend/README.md` is the Vite template.
@@ -106,14 +102,13 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews CP-4 and commits it** (PROJECT_STATE §1 has the commands; run `git reset -q` first if anything is staged).
-2. Decide the two open infrastructure items: trusted proxy / rate-limit key, and binding Compose ports to `127.0.0.1` + a longer DB password.
-3. **Exact next task — Phase 5 planning:** go through PLAN.md Q1–Q8 with the developer (defaults proposed there), then write the Phase 5 plan in PLAN.md: migrations (`user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`), the checkout transaction step by step, reservation/consume/release ledger types, endpoints, tests (overselling concurrency, idempotency, rollback, ownership), UI. **Stop for approval before writing code.**
+1. **Developer commits the housekeeping** (PROJECT_STATE §1d has the command).
+2. **Exact next task — Phase 5 approval:** the plan is drafted in PLAN.md (§5.0 decisions Q1–Q12). Walk the developer through it, apply their changes, and start slice 5a only after approval. Original planning brief: go through PLAN.md Q1–Q8 with the developer (defaults proposed there), then write the Phase 5 plan in PLAN.md as slices 5a addresses → 5b checkout core → 5c payment + lifecycle → 5d seller orders → 5e UI (with Sonner + AlertDialog): migrations (`user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`), the checkout transaction step by step, reservation/consume/release ledger types, endpoints, tests (overselling concurrency, idempotency, rollback, ownership). **Stop for approval before writing code.**
 
 **First 10 minutes in a new session**
 
 ```bash
-git status --short ; git log --oneline | head -4     # Phase 4 uncommitted (or committed by now) on top of 41679b9
+git status --short ; git log --oneline | head -4     # housekeeping uncommitted (or committed by now) on top of 83b34a7
 make ps                                               # postgres healthy, api up; otherwise: make up
 make test && make test-integration                    # all ok
 cd frontend && npm run build && npm run lint          # clean

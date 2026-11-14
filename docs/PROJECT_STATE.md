@@ -5,10 +5,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 
 |  |  |
 |---|---|
-| Snapshot date | 2026-11-13 |
-| Last commit | `64f4a2b` (Phase 4 = `7e57829` backend, `f312b0b` frontend, `0d63dfc` docs; shadcn deps `7f156a7`) |
-| Uncommitted | **UI migration to shadcn/ui** (frontend only) + doc updates — see §1c |
-| Current phase | shadcn/ui migration done and verified, awaiting developer review; Phase 4 committed |
+| Snapshot date | 2026-11-14 |
+| Last commit | `83b34a7` (shadcn/ui migration = `db15fef`, docs `83b34a7`; Phase 4 = `7e57829`, `f312b0b`, `0d63dfc`) |
+| Uncommitted | dev housekeeping (Compose loopback ports, Vite proxy target, root `.gitignore`) + doc updates — see §1d |
+| Current phase | between phases: Phase 4 and the shadcn/ui migration are committed |
 | Next phase | Phase 5 — Checkout & orders (needs a plan and answers to its open questions first; see §10) |
 
 ---
@@ -24,7 +24,7 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-0.5 | UI prototype on mocks | `830c33d` (+ docs `d30b4ef`) | ✅ reviewed, superseded | 7 pages screenshotted incl. loading/empty/error; no component imported `mocks/`. Mocks were deleted in CP-2 |
 | CP-2 | Catalog | `2838782` (backend), `d0c2a54` (frontend), docs `41679b9` | ✅ committed by the developer, who then approved Phase 4 | migrate up→down(4)→up; 13 unit packages; 12 catalog integration tests; concurrency test **fails without `FOR UPDATE`** (proved) and passes with it; ledger invariant = 0 mismatches; 17-step seller/catalog browser E2E + auth E2E re-run (no regression) |
 | CP-4 | Cart | `7e57829`, `f312b0b`, docs `0d63dfc` | ✅ committed by the developer | see §1b |
-| CP-UI | shadcn/ui migration (frontend only) | **uncommitted** | 🟡 awaiting review | see §1c |
+| CP-UI | shadcn/ui migration (frontend only) | `db15fef`, docs `83b34a7` | ✅ committed by the developer | see §1c |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -76,14 +76,23 @@ Developer decisions: Radix `Select` (not a styled native select), account menu a
 
 Not checked: mobile widths, dark mode (tokens exist, no toggle; not a goal), keyboard-only walkthrough beyond what Radix provides.
 
-**Commit CP-UI** (the developer commits). Suggested — run `git reset -q` first if anything is staged:
+Committed by the developer as `db15fef` (frontend) and `83b34a7` (docs).
+
+### 1d. Dev housekeeping, 2026-11-14 (uncommitted)
+
+| Change | Why | Verified |
+|---|---|---|
+| `docker-compose.yml`: ports published as `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432` and `127.0.0.1:${API_HOST_PORT:-8081}:8081` | the dev DB and API were reachable from the local network (`0.0.0.0`) | `docker compose up -d` recreated both containers (volume kept, 30 products still there); `docker compose ps` shows `127.0.0.1:` bindings; `/ready` 200 on `127.0.0.1:8081`; a request to the host's non-loopback adapter address on :8081 gets no answer |
+| `frontend/vite.config.ts`: `API_TARGET` = `http://127.0.0.1:8081` (was `localhost`) | Node may resolve `localhost` to `::1`, and Docker now listens on IPv4 loopback only | through Vite on :5190: `/ready` 200, `GET /api/v1/categories` 200, `POST /api/v1/auth/login` with a same-origin `Origin` 200 (CSRF Origin/Host check still passes because `changeOrigin` stays false) |
+| Root `.gitignore`: `/node_modules/` | an accidental `npm install` at the repo root produced ~860 untracked files on 2026-11-13 | `git status` clean apart from the files listed here |
+
+DB password: the developer set a 19-character `POSTGRES_PASSWORD` in `.env` (length checked, value never read). The existing volume still had the old password, so the API failed with `password authentication failed` until the role was updated from inside the container (`ALTER USER … PASSWORD :'pw'` over the local socket, with the value taken from the container's own environment). Afterwards `/ready` 200, 30 products and 35 users intact. Lesson in §11.
+
+Suggested commit:
 
 ```bash
-git add -A -- frontend
-git commit -m "Migrate frontend components to shadcn/ui" -m "- shadcn init (radix-nova), @ alias, theme tokens with the emerald brand colour" -m "- Shared fields, state views, cards, pagination, tables and badges use shadcn components" -m "- Category and sort pickers use Radix Select (CategorySelect via RHF Controller)" -m "- Account actions moved into a DropdownMenu; logout navigates with flushSync" -m "- Remove the unrelated npm package cn and the Geist font added by shadcn init" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-
-git add -- CLAUDE.md docs/PROJECT_STATE.md
-git commit -m "Update project docs for the shadcn/ui migration" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add -- docker-compose.yml frontend/vite.config.ts .gitignore CLAUDE.md docs/PROJECT_STATE.md SESSION_HANDOFF.md
+git commit -m "Bind dev ports to loopback and refresh handoff docs" -m "- Compose publishes Postgres and the API on 127.0.0.1 only" -m "- Vite proxies to 127.0.0.1:8081 so it does not depend on how localhost resolves" -m "- Ignore a stray root node_modules" -m "- SESSION_HANDOFF and PROJECT_STATE reflect the committed Phase 4 and shadcn/ui migration" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -282,7 +291,7 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Frontend has no automated tests | regressions caught manually | Phase 7 |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
 | Money display converts strings to JS numbers | fine for display; never sum client-side for charging | rule for Phase 4–5 |
-| **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **before Phase 5 / deploy**; sign-up-heavy E2E runs can hit it |
+| **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **Phase 7 / deploy**. A `TRUSTED_PROXIES` setting would not help in dev: the Vite proxy sends no `X-Forwarded-For`, and every dev request comes from the same machine anyway |
 | Expired sessions are deleted only when *the same user* logs in again | `user_sessions` grows for users who never return | cleanup job in Phase 7 |
 | Cookie `Secure` flag is set only when `APP_ENV=production`; that path has **no test** | a production misconfiguration would go unnoticed | Phase 7 |
 | No `EXPLAIN` / load check of `ListPublicProducts` (LATERAL joins + window count) | indexes exist but are unproven at scale | Phase 7 |
@@ -292,10 +301,7 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
 | `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
 | No CI | nothing runs tests on push | Phase 7 |
-| CP-UI uncommitted | verified work exists only in the working tree | commit (§1c) |
 | JS bundle grew from 522 kB to 672 kB (gzip 160 → 208 kB) with Radix; Vite warns about chunks over 500 kB | slower first load | route-level code splitting (`React.lazy`) in Phase 7 |
-| **Compose publishes Postgres (`0.0.0.0:5433`) and the API (`0.0.0.0:8081`) on all interfaces, and the developer's `.env` DB password is only 4 characters** (length checked; value not recorded) | anyone on the same network can attempt to log in to the dev database | developer decision: use `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432` in compose and a longer password; **not changed** at handoff |
-| Root `.gitignore` ignores only `/frontend/node_modules/`. The stray root `package.json`, `package-lock.json` and `node_modules/` of 2026-11-13 are gone | an `npm install` at the repo root would again show about 860 untracked files | add `/node_modules/` to the root `.gitignore` |
 
 ---
 
@@ -303,8 +309,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews CP-4 and commits it (§1).
-2. Before Phase 5: decide the rate-limiter/trusted-proxy question (§9) and the dev DB exposure (compose binds `0.0.0.0`).
+1. Developer commits the housekeeping in §1d.
+2. **Phase 5 plan** is drafted in PLAN.md (decisions Q1–Q12, slices 5a–5e). It needs the developer's approval before any code. The trusted-proxy question moved to Phase 7 (§9).
 3. **Phase 5 — Checkout & orders**: write the plan first (PLAN.md lists the open questions), get approval, then: `user_addresses`, shipping simulation, one-transaction checkout (lock inventory rows, `available → reserved` + ledger, per-store orders, price/name/SKU snapshots, idempotency key), order lifecycle + status history, payment simulation (consume / release reservations), cancellation and expiry. Concurrency test for overselling is mandatory.
 
 ---
@@ -317,6 +323,7 @@ The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF
 | `go`, `docker`, `make` "not found" in the agent shell | not on PATH (Go not installed at all) | Go/sqlc/migrate run in containers; Docker CLI path is in CLAUDE.md; `make` via scoop |
 | `seed-admin` test created an admin in the **dev** DB | a `sed` rewrote `…/marketplace_dev?` but the dev DB is called `main` | never assume the dev DB name; check `.env` keys, not values; test accounts were left behind |
 | A process on port 5173 was killed and turned out to be the developer's Laravel app | killed by port without reading its command line | always inspect `CommandLine` first; use port 5190 for agent-run Vite |
+| After changing `POSTGRES_PASSWORD` in `.env`, the API crash-looped with `password authentication failed` | the postgres image applies `POSTGRES_PASSWORD` only when it initialises an **empty** volume | also run `ALTER USER` inside the container (§1d shows how without printing the value), then restart `api` |
 | sqlc generated `pgtype.UUID` / `pgtype.Numeric` | default driver types | `overrides` in `sqlc.yaml` (uuid → google/uuid, nullable uuid → pointer, numeric → decimal) |
 | sqlc typed a LEFT JOIN LATERAL image column as non-null `string` | cannot infer nullability through LATERAL | `COALESCE(...)::text` in the query; read generated code for every new join |
 | `@id` used twice in a query generated `*uuid.UUID` params | untyped parameter inference | cast: `@id::uuid` |

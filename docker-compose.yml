@@ -11,8 +11,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB}
 
+    # Loopback only: reachable from this machine, not from the local network.
     ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
 
     volumes:
       - pgdata:/var/lib/postgresql
@@ -44,7 +45,7 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marketplace_dev}?sslmode=disable"
 
     ports:
-      - "${API_HOST_PORT:-8081}:8081"
+      - "127.0.0.1:${API_HOST_PORT:-8081}:8081"
 
   # One-off tool, not a long-running service. Run it with
   #   docker compose run --rm migrate up      (or: make migrate-up)
