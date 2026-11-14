@@ -28,8 +28,11 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/checkout"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/orders"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/shipping"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/password"
@@ -90,6 +93,10 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		Stores:     stores.NewHandler(stores.NewService(pool)),
 		Products:   products.NewHandler(products.NewService(pool)),
 		Cart:       cart.NewHandler(cart.NewService(pool)),
+		Checkout: checkout.NewHandler(checkout.NewService(pool, checkout.Config{
+			TTL: 30 * time.Minute, Rates: shipping.DefaultRates(),
+		})),
+		Orders: orders.NewHandler(orders.NewService(pool)),
 	}
 	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool, auth: authSvc}
 }

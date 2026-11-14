@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type Config struct {
@@ -31,6 +33,9 @@ type Config struct {
 	SessionTTL time.Duration // how long a login stays valid
 	Argon2     Argon2Config
 
+	CheckoutTTL time.Duration // how long an unpaid checkout holds its stock
+	Shipping    ShippingFees
+
 	DB DBConfig
 }
 
@@ -39,6 +44,14 @@ type Argon2Config struct {
 	MemoryKiB   uint32
 	Iterations  uint32
 	Parallelism uint8
+}
+
+// ShippingFees are the flat fees per store order (simulated courier, Phase 5).
+// Money is parsed as an exact decimal, never a float.
+type ShippingFees struct {
+	Regular decimal.Decimal
+	Express decimal.Decimal
+	SameDay decimal.Decimal
 }
 
 // DBConfig controls the pgx connection pool. See internal/database.
@@ -68,6 +81,12 @@ func Load() (Config, error) {
 			MemoryKiB:   uint32(getInt32("ARGON2_MEMORY_KIB", 19*1024, &errs)),
 			Iterations:  uint32(getInt32("ARGON2_ITERATIONS", 2, &errs)),
 			Parallelism: uint8(min(getInt32("ARGON2_PARALLELISM", 1, &errs), 255)),
+		},
+		CheckoutTTL: getDuration("CHECKOUT_TTL", 30*time.Minute, &errs),
+		Shipping: ShippingFees{
+			Regular: getMoney("SHIPPING_FEE_REGULAR", 15_000, &errs),
+			Express: getMoney("SHIPPING_FEE_EXPRESS", 30_000, &errs),
+			SameDay: getMoney("SHIPPING_FEE_SAME_DAY", 45_000, &errs),
 		},
 		DB: DBConfig{
 			URL:               os.Getenv("DATABASE_URL"),
@@ -160,6 +179,20 @@ func getDuration(key string, fallback time.Duration, errs *[]error) time.Duratio
 	if err != nil || d <= 0 {
 		*errs = append(*errs, fmt.Errorf("%s must be a positive duration like 30s or 5m, got %q", key, v))
 		return fallback
+	}
+	return d
+}
+
+// getMoney parses a non-negative amount with at most 2 decimals, e.g. "15000".
+func getMoney(key string, fallback int64, errs *[]error) decimal.Decimal {
+	v := os.Getenv(key)
+	if v == "" {
+		return decimal.NewFromInt(fallback)
+	}
+	d, err := decimal.NewFromString(v)
+	if err != nil || d.IsNegative() || d.Exponent() < -2 {
+		*errs = append(*errs, fmt.Errorf("%s must be a non-negative amount with at most 2 decimals, got %q", key, v))
+		return decimal.NewFromInt(fallback)
 	}
 	return d
 }

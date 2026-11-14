@@ -76,6 +76,70 @@ func (q *Queries) LockInventory(ctx context.Context, variantID uuid.UUID) (LockI
 	return i, err
 }
 
+const lockInventoryRows = `-- name: LockInventoryRows :many
+SELECT variant_id, available_quantity, reserved_quantity
+FROM inventory
+WHERE variant_id = ANY($1::uuid[])
+ORDER BY variant_id
+FOR UPDATE
+`
+
+type LockInventoryRowsRow struct {
+	VariantID         uuid.UUID
+	AvailableQuantity int32
+	ReservedQuantity  int32
+}
+
+// Locks the stock rows of several variants at once (checkout).
+//
+// ORDER BY variant_id is the deadlock guard: every checkout takes its locks
+// in the same global order, so two checkouts that share variants can never
+// each hold one row while waiting for the other's.
+func (q *Queries) LockInventoryRows(ctx context.Context, variantIds []uuid.UUID) ([]LockInventoryRowsRow, error) {
+	rows, err := q.db.Query(ctx, lockInventoryRows, variantIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockInventoryRowsRow{}
+	for rows.Next() {
+		var i LockInventoryRowsRow
+		if err := rows.Scan(&i.VariantID, &i.AvailableQuantity, &i.ReservedQuantity); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reserveInventory = `-- name: ReserveInventory :execrows
+UPDATE inventory
+SET available_quantity = available_quantity - $1::int,
+    reserved_quantity  = reserved_quantity + $1::int
+WHERE variant_id = $2
+  AND available_quantity >= $1::int
+`
+
+type ReserveInventoryParams struct {
+	Quantity  int32
+	VariantID uuid.UUID
+}
+
+// Moves q units from available to reserved. The WHERE clause makes it a
+// conditional update: 0 rows changed = not enough stock, and nothing happens.
+// Together with the CHECK (available_quantity >= 0) constraint this is the
+// last guard against overselling, even if a caller forgot to lock first.
+func (q *Queries) ReserveInventory(ctx context.Context, arg ReserveInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reserveInventory, arg.Quantity, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setAvailableQuantity = `-- name: SetAvailableQuantity :exec
 UPDATE inventory SET available_quantity = $1 WHERE variant_id = $2
 `

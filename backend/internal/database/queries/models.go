@@ -37,6 +37,22 @@ type Category struct {
 	UpdatedAt time.Time
 }
 
+type Checkout struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	IdempotencyKey uuid.UUID
+	RequestHash    []byte
+	Status         string
+	ItemsTotal     decimal.Decimal
+	ShippingTotal  decimal.Decimal
+	GrandTotal     decimal.Decimal
+	ExpiresAt      time.Time
+	PaidAt         *time.Time
+	CancelledAt    *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type Inventory struct {
 	VariantID         uuid.UUID
 	AvailableQuantity int32
@@ -55,6 +71,74 @@ type InventoryMovement struct {
 	ReferenceID    *uuid.UUID
 	ActorID        *uuid.UUID
 	CreatedAt      time.Time
+}
+
+type Order struct {
+	ID                uuid.UUID
+	CheckoutID        uuid.UUID
+	StoreID           uuid.UUID
+	BuyerID           uuid.UUID
+	OrderNumber       string
+	Status            string
+	ShippingMethod    string
+	ShippingFee       decimal.Decimal
+	ItemsSubtotal     decimal.Decimal
+	Total             decimal.Decimal
+	StoreName         string
+	ShipRecipientName string
+	ShipPhone         string
+	ShipAddressLine   string
+	ShipCity          string
+	ShipProvince      string
+	ShipPostalCode    string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type OrderItem struct {
+	ID          uuid.UUID
+	OrderID     uuid.UUID
+	VariantID   uuid.UUID
+	ProductID   uuid.UUID
+	ProductName string
+	VariantName string
+	Sku         string
+	UnitPrice   decimal.Decimal
+	Quantity    int32
+	LineTotal   decimal.Decimal
+	CreatedAt   time.Time
+}
+
+type OrderStatusHistory struct {
+	ID         uuid.UUID
+	OrderID    uuid.UUID
+	FromStatus *string
+	ToStatus   string
+	ActorID    *uuid.UUID
+	Note       string
+	CreatedAt  time.Time
+}
+
+type Payment struct {
+	ID         uuid.UUID
+	CheckoutID uuid.UUID
+	Reference  string
+	Provider   string
+	Amount     decimal.Decimal
+	Status     string
+	ExpiresAt  time.Time
+	PaidAt     *time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type PaymentEvent struct {
+	ID        uuid.UUID
+	PaymentID uuid.UUID
+	EventID   uuid.UUID
+	EventType string
+	Payload   []byte
+	CreatedAt time.Time
 }
 
 type Product struct {

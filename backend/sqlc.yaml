@@ -35,6 +35,11 @@ sql:
               pointer: true
           - db_type: "timestamptz"
             go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
           # Money: exact decimal arithmetic, never float64. The pgx codec for it
           # is registered in internal/database/postgres.go.
           - db_type: "pg_catalog.numeric"

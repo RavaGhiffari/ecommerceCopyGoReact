@@ -20,3 +20,26 @@ INSERT INTO inventory_movements
     (variant_id, movement_type, available_delta, reserved_delta, reason, reference_type, reference_id, actor_id)
 VALUES
     (@variant_id, @movement_type, @available_delta, @reserved_delta, @reason, @reference_type, @reference_id, @actor_id);
+
+-- name: LockInventoryRows :many
+-- Locks the stock rows of several variants at once (checkout).
+--
+-- ORDER BY variant_id is the deadlock guard: every checkout takes its locks
+-- in the same global order, so two checkouts that share variants can never
+-- each hold one row while waiting for the other's.
+SELECT variant_id, available_quantity, reserved_quantity
+FROM inventory
+WHERE variant_id = ANY(@variant_ids::uuid[])
+ORDER BY variant_id
+FOR UPDATE;
+
+-- name: ReserveInventory :execrows
+-- Moves q units from available to reserved. The WHERE clause makes it a
+-- conditional update: 0 rows changed = not enough stock, and nothing happens.
+-- Together with the CHECK (available_quantity >= 0) constraint this is the
+-- last guard against overselling, even if a caller forgot to lock first.
+UPDATE inventory
+SET available_quantity = available_quantity - @quantity::int,
+    reserved_quantity  = reserved_quantity + @quantity::int
+WHERE variant_id = @variant_id
+  AND available_quantity >= @quantity::int;

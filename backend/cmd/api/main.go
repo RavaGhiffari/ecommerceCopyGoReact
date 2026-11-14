@@ -22,8 +22,11 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/checkout"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/orders"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/shipping"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/logger"
@@ -78,6 +81,11 @@ func run() error {
 		Stores:     stores.NewHandler(stores.NewService(pool)),
 		Products:   products.NewHandler(products.NewService(pool)),
 		Cart:       cart.NewHandler(cart.NewService(pool)),
+		Checkout: checkout.NewHandler(checkout.NewService(pool, checkout.Config{
+			TTL:   cfg.CheckoutTTL,
+			Rates: shipping.Rates{Regular: cfg.Shipping.Regular, Express: cfg.Shipping.Express, SameDay: cfg.Shipping.SameDay},
+		})),
+		Orders: orders.NewHandler(orders.NewService(pool)),
 	}
 
 	srv := &http.Server{

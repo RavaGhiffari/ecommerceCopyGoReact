@@ -20,6 +20,7 @@ func clearEnv(t *testing.T) {
 		"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_MAX_CONN_LIFETIME",
 		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD", "DB_CONNECT_TIMEOUT",
 		"SESSION_TTL", "ARGON2_MEMORY_KIB", "ARGON2_ITERATIONS", "ARGON2_PARALLELISM",
+		"CHECKOUT_TTL", "SHIPPING_FEE_REGULAR", "SHIPPING_FEE_EXPRESS", "SHIPPING_FEE_SAME_DAY",
 	} {
 		t.Setenv(k, "")
 	}
@@ -106,5 +107,27 @@ func TestLoad_CORSOrigins(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, cfg.CORSAllowedOrigins)
 		})
+	}
+}
+
+func TestLoad_CheckoutAndShipping(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, 30*time.Minute, cfg.CheckoutTTL)
+	assert.Equal(t, "15000", cfg.Shipping.Regular.String())
+	assert.Equal(t, "45000", cfg.Shipping.SameDay.String())
+
+	t.Setenv("SHIPPING_FEE_EXPRESS", "25000.50")
+	cfg, err = Load()
+	require.NoError(t, err)
+	assert.Equal(t, "25000.5", cfg.Shipping.Express.String())
+
+	for _, bad := range []string{"-1", "abc", "1.005"} {
+		t.Setenv("SHIPPING_FEE_EXPRESS", bad)
+		_, err = Load()
+		assert.ErrorContains(t, err, "SHIPPING_FEE_EXPRESS", bad)
 	}
 }

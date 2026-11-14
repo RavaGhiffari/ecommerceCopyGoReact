@@ -6,9 +6,9 @@
 // called with a pgx.Tx: the caller's transaction covers the quantity AND the
 // ledger row, so one can never be saved without the other.
 //
-// Phase 2 only has manual adjustments by the seller. Reservations (checkout),
-// releases (cancel/expiry) and consumption (payment) arrive in later phases
-// and will use the same Lock -> update -> record pattern.
+// Movements: manual adjustments by the seller (Phase 2) and reservations by
+// checkout (Phase 5b). Releases (cancel/expiry), consumption (payment) and
+// restock (refund) follow in 5c with the same lock -> update -> record pattern.
 package inventory
 
 import (
@@ -23,12 +23,16 @@ import (
 )
 
 const (
-	TypeAdjustment = "adjustment"
+	TypeAdjustment  = "adjustment"
+	TypeReservation = "reservation"
 	// MaxQuantity keeps typos like 1000000000 out; also well inside INTEGER.
 	MaxQuantity = 1_000_000
 )
 
-var ErrNotFound = errors.New("inventory row not found")
+var (
+	ErrNotFound          = errors.New("inventory row not found")
+	ErrInsufficientStock = errors.New("not enough available stock")
+)
 
 // Create adds the stock row for a new variant and sets its initial quantity
 // through SetAvailable, so even the first stock gets a ledger entry.
@@ -83,4 +87,67 @@ func SetAvailable(ctx context.Context, db queries.DBTX, variantID uuid.UUID, qua
 		return 0, fmt.Errorf("record inventory movement: %w", err)
 	}
 	return quantity, nil
+}
+
+// Stock is one locked inventory row.
+type Stock struct {
+	Available int32
+	Reserved  int32
+}
+
+// LockMany locks the stock rows of several variants in one statement and in
+// variant_id order (the deadlock guard, see inventory.sql). Variants without
+// a stock row are simply absent from the map. Must run inside a transaction:
+// the locks last until it commits or rolls back.
+func LockMany(ctx context.Context, tx queries.DBTX, variantIDs []uuid.UUID) (map[uuid.UUID]Stock, error) {
+	rows, err := queries.New(tx).LockInventoryRows(ctx, variantIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lock inventory rows: %w", err)
+	}
+	out := make(map[uuid.UUID]Stock, len(rows))
+	for _, r := range rows {
+		out[r.VariantID] = Stock{Available: r.AvailableQuantity, Reserved: r.ReservedQuantity}
+	}
+	return out, nil
+}
+
+// Reference says what caused a movement, e.g. {"checkout", <id>}.
+type Reference struct {
+	Type string
+	ID   uuid.UUID
+}
+
+// Reserve moves quantity units of a variant from available to reserved for an
+// unpaid checkout, and records it in the ledger (available -q, reserved +q).
+//
+// The UPDATE is conditional (WHERE available_quantity >= q), so even without
+// a prior lock it can never oversell: 0 rows changed means ErrInsufficientStock
+// and nothing was written. Callers in a checkout still lock first (LockMany),
+// so they can report every short line at once instead of failing on the first.
+func Reserve(ctx context.Context, tx queries.DBTX, variantID uuid.UUID, quantity int32, ref Reference, actor *uuid.UUID) error {
+	if quantity <= 0 {
+		return fmt.Errorf("reserve: quantity must be positive, got %d", quantity)
+	}
+	q := queries.New(tx)
+	n, err := q.ReserveInventory(ctx, queries.ReserveInventoryParams{VariantID: variantID, Quantity: quantity})
+	if err != nil {
+		return fmt.Errorf("reserve inventory: %w", err)
+	}
+	if n == 0 {
+		return ErrInsufficientStock
+	}
+	refType := ref.Type
+	if err := q.InsertInventoryMovement(ctx, queries.InsertInventoryMovementParams{
+		VariantID:      variantID,
+		MovementType:   TypeReservation,
+		AvailableDelta: -quantity,
+		ReservedDelta:  quantity,
+		Reason:         "checkout",
+		ReferenceType:  &refType,
+		ReferenceID:    &ref.ID,
+		ActorID:        actor,
+	}); err != nil {
+		return fmt.Errorf("record reservation: %w", err)
+	}
+	return nil
 }

@@ -13,7 +13,9 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/checkout"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/orders"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
@@ -30,6 +32,8 @@ type Handlers struct {
 	Stores     *stores.Handler
 	Products   *products.Handler
 	Cart       *cart.Handler
+	Checkout   *checkout.Handler
+	Orders     *orders.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -98,6 +102,12 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn.POST("/cart/items", h.Cart.AddItem)
 	signedIn.PATCH("/cart/items/:id", h.Cart.UpdateItem)
 	signedIn.DELETE("/cart/items/:id", h.Cart.RemoveItem)
+	// Checkout and orders: filtered by the session user in every query.
+	signedIn.POST("/checkout/quote", h.Checkout.Quote)
+	signedIn.POST("/checkout", h.Checkout.Place)
+	signedIn.GET("/checkout/:id", h.Checkout.Get)
+	signedIn.GET("/orders", h.Orders.List)
+	signedIn.GET("/orders/:id", h.Orders.Get)
 	// Opening a store is how a customer becomes a seller.
 	signedIn.POST("/seller/store", h.Stores.Open)
 
