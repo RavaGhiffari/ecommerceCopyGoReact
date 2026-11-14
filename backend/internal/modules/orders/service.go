@@ -33,18 +33,7 @@ func NewService(pool *pgxpool.Pool) *Service {
 // page and pageSize 0 mean "use the default".
 func (s *Service) ListForBuyer(ctx context.Context, buyerID uuid.UUID, page, pageSize int) (Page, error) {
 	errs := validation.Errors{}
-	if page == 0 {
-		page = 1
-	}
-	if pageSize == 0 {
-		pageSize = DefaultPageSize
-	}
-	if page < 1 {
-		errs.Add("page", "must be 1 or more")
-	}
-	if pageSize < 1 || pageSize > MaxPageSize {
-		errs.Add("pageSize", fmt.Sprintf("must be between 1 and %d", MaxPageSize))
-	}
+	page, pageSize = paging(errs, page, pageSize)
 	if err := errs.Err(); err != nil {
 		return Page{}, err
 	}
@@ -58,10 +47,31 @@ func (s *Service) ListForBuyer(ctx context.Context, buyerID uuid.UUID, page, pag
 	if err != nil {
 		return Page{}, err
 	}
+	return newPage(items, page, pageSize, total), nil
+}
+
+// paging applies the defaults (0 = default) and records invalid values.
+func paging(errs validation.Errors, page, pageSize int) (int, int) {
+	if page == 0 {
+		page = 1
+	}
+	if pageSize == 0 {
+		pageSize = DefaultPageSize
+	}
+	if page < 1 {
+		errs.Add("page", "must be 1 or more")
+	}
+	if pageSize < 1 || pageSize > MaxPageSize {
+		errs.Add("pageSize", fmt.Sprintf("must be between 1 and %d", MaxPageSize))
+	}
+	return page, pageSize
+}
+
+func newPage(items []Order, page, pageSize int, total int64) Page {
 	return Page{
 		Items: items, Page: page, PageSize: pageSize, Total: total,
 		TotalPages: int((total + int64(pageSize) - 1) / int64(pageSize)),
-	}, nil
+	}
 }
 
 // GetForBuyer returns ErrNotFound for an order of another buyer: the caller

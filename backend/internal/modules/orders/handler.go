@@ -16,6 +16,7 @@ import (
 const (
 	CodeNotFound          = "ORDER_NOT_FOUND"
 	CodeInvalidTransition = "INVALID_STATUS_TRANSITION"
+	CodeStoreRequired     = "STORE_REQUIRED" // same code as the products module
 )
 
 type Handler struct {
@@ -110,6 +111,8 @@ func (h *Handler) fail(c *gin.Context, err error) {
 			map[string]any{"from": StatusPendingPayment, "checkoutId": unpaid.CheckoutID})
 	case errors.Is(err, ErrNotFound):
 		response.Fail(c, http.StatusNotFound, CodeNotFound, "Order not found", nil)
+	case errors.Is(err, ErrNoStore):
+		response.Fail(c, http.StatusConflict, CodeStoreRequired, "Create your store first", nil)
 	default:
 		response.Internal(c, err)
 	}

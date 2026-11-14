@@ -30,7 +30,16 @@ const (
 	StatusRefunded       = "refunded"
 )
 
-var ErrNotFound = errors.New("order not found")
+// Statuses lists every order status (for validating filters and requests).
+var Statuses = []string{
+	StatusPendingPayment, StatusPaid, StatusProcessing, StatusShipped,
+	StatusDelivered, StatusCancelled, StatusRefunded,
+}
+
+var (
+	ErrNotFound = errors.New("order not found")
+	ErrNoStore  = errors.New("seller has no store")
+)
 
 // ShippingAddress is the address snapshot stored on the order.
 type ShippingAddress struct {

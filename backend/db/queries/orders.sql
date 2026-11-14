@@ -123,3 +123,44 @@ ORDER BY variant_id;
 -- Denormalised counter for "popular" sorting: + on payment, - on refund.
 -- CHECK (sold_count >= 0) guards against going below zero.
 UPDATE products SET sold_count = sold_count + @delta::int WHERE id = @id;
+
+-- ---- seller (5d) -----------------------------------------------------------------
+-- Every seller query filters by store_id, which the service takes from the
+-- session (the caller's own store). Another store's order id finds nothing.
+-- status is optional: NULL lists every status.
+
+-- name: CountStoreOrders :one
+SELECT count(*)
+FROM orders o
+WHERE o.store_id = @store_id
+  AND (sqlc.narg('status')::text IS NULL OR o.status = sqlc.narg('status')::text);
+
+-- name: ListStoreOrders :many
+-- Newest first; served by orders_store_status_created_idx.
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.store_id = @store_id
+  AND (sqlc.narg('status')::text IS NULL OR o.status = sqlc.narg('status')::text)
+ORDER BY o.created_at DESC, o.id
+LIMIT @page_limit OFFSET @page_offset;
+
+-- name: GetStoreOrder :one
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.id = @id AND o.store_id = @store_id;
+
+-- name: LockStoreOrder :one
+-- The same row lock as LockBuyerOrder: "seller starts processing" and
+-- "buyer cancels" for one order run one after the other.
+SELECT id, checkout_id, status
+FROM orders
+WHERE id = @id AND store_id = @store_id
+FOR UPDATE;

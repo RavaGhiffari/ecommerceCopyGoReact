@@ -256,13 +256,66 @@ func (r *Repository) GetForBuyer(ctx context.Context, buyerID, orderID uuid.UUID
 	if err != nil {
 		return Order{}, fmt.Errorf("get buyer order: %w", err)
 	}
-	list := []Order{toOrder(row)}
+	return r.detail(ctx, toOrder(row))
+}
+
+// ---- seller (5d): every method takes the caller's store id -------------------
+
+func (r *Repository) CountForStore(ctx context.Context, storeID uuid.UUID, status *string) (int64, error) {
+	n, err := r.q.CountStoreOrders(ctx, queries.CountStoreOrdersParams{StoreID: storeID, Status: status})
+	if err != nil {
+		return 0, fmt.Errorf("count store orders: %w", err)
+	}
+	return n, nil
+}
+
+func (r *Repository) ListForStore(ctx context.Context, storeID uuid.UUID, status *string, limit, offset int32) ([]Order, error) {
+	rows, err := r.q.ListStoreOrders(ctx, queries.ListStoreOrdersParams{
+		StoreID: storeID, Status: status, PageLimit: limit, PageOffset: offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list store orders: %w", err)
+	}
+	out := make([]Order, len(rows))
+	for i, row := range rows {
+		out[i] = toOrder(queries.GetBuyerOrderRow(row))
+	}
+	return out, r.attachItems(ctx, out)
+}
+
+// GetForStore returns one order of the store with items and history
+// (another store's order -> ErrNotFound).
+func (r *Repository) GetForStore(ctx context.Context, storeID, orderID uuid.UUID) (Order, error) {
+	row, err := r.q.GetStoreOrder(ctx, queries.GetStoreOrderParams{ID: orderID, StoreID: storeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Order{}, ErrNotFound
+	}
+	if err != nil {
+		return Order{}, fmt.Errorf("get store order: %w", err)
+	}
+	return r.detail(ctx, toOrder(queries.GetBuyerOrderRow(row)))
+}
+
+// LockForStore locks one order of the store (another store's -> ErrNotFound).
+func (r *Repository) LockForStore(ctx context.Context, storeID, orderID uuid.UUID) (Locked, error) {
+	row, err := r.q.LockStoreOrder(ctx, queries.LockStoreOrderParams{ID: orderID, StoreID: storeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Locked{}, ErrNotFound
+	}
+	if err != nil {
+		return Locked{}, fmt.Errorf("lock store order: %w", err)
+	}
+	return Locked{ID: row.ID, CheckoutID: row.CheckoutID, Status: row.Status}, nil
+}
+
+// detail adds the items and the status history to one order.
+func (r *Repository) detail(ctx context.Context, o Order) (Order, error) {
+	list := []Order{o}
 	if err := r.attachItems(ctx, list); err != nil {
 		return Order{}, err
 	}
-	o := list[0]
-
-	hist, err := r.q.ListOrderHistory(ctx, orderID)
+	o = list[0]
+	hist, err := r.q.ListOrderHistory(ctx, o.ID)
 	if err != nil {
 		return Order{}, fmt.Errorf("list order history: %w", err)
 	}

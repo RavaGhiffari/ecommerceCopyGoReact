@@ -40,6 +40,30 @@ func (q *Queries) CountBuyerOrders(ctx context.Context, buyerID uuid.UUID) (int6
 	return count, err
 }
 
+const countStoreOrders = `-- name: CountStoreOrders :one
+
+SELECT count(*)
+FROM orders o
+WHERE o.store_id = $1
+  AND ($2::text IS NULL OR o.status = $2::text)
+`
+
+type CountStoreOrdersParams struct {
+	StoreID uuid.UUID
+	Status  *string
+}
+
+// ---- seller (5d) -----------------------------------------------------------------
+// Every seller query filters by store_id, which the service takes from the
+// session (the caller's own store). Another store's order id finds nothing.
+// status is optional: NULL lists every status.
+func (q *Queries) CountStoreOrders(ctx context.Context, arg CountStoreOrdersParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countStoreOrders, arg.StoreID, arg.Status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getBuyerOrder = `-- name: GetBuyerOrder :one
 SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
        o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
@@ -81,6 +105,70 @@ type GetBuyerOrderRow struct {
 func (q *Queries) GetBuyerOrder(ctx context.Context, arg GetBuyerOrderParams) (GetBuyerOrderRow, error) {
 	row := q.db.QueryRow(ctx, getBuyerOrder, arg.ID, arg.BuyerID)
 	var i GetBuyerOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.CheckoutID,
+		&i.OrderNumber,
+		&i.Status,
+		&i.ShippingMethod,
+		&i.ShippingFee,
+		&i.ItemsSubtotal,
+		&i.Total,
+		&i.StoreID,
+		&i.StoreSlug,
+		&i.StoreName,
+		&i.ShipRecipientName,
+		&i.ShipPhone,
+		&i.ShipAddressLine,
+		&i.ShipCity,
+		&i.ShipProvince,
+		&i.ShipPostalCode,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStoreOrder = `-- name: GetStoreOrder :one
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.id = $1 AND o.store_id = $2
+`
+
+type GetStoreOrderParams struct {
+	ID      uuid.UUID
+	StoreID uuid.UUID
+}
+
+type GetStoreOrderRow struct {
+	ID                uuid.UUID
+	CheckoutID        uuid.UUID
+	OrderNumber       string
+	Status            string
+	ShippingMethod    string
+	ShippingFee       decimal.Decimal
+	ItemsSubtotal     decimal.Decimal
+	Total             decimal.Decimal
+	StoreID           uuid.UUID
+	StoreSlug         string
+	StoreName         string
+	ShipRecipientName string
+	ShipPhone         string
+	ShipAddressLine   string
+	ShipCity          string
+	ShipProvince      string
+	ShipPostalCode    string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (q *Queries) GetStoreOrder(ctx context.Context, arg GetStoreOrderParams) (GetStoreOrderRow, error) {
+	row := q.db.QueryRow(ctx, getStoreOrder, arg.ID, arg.StoreID)
+	var i GetStoreOrderRow
 	err := row.Scan(
 		&i.ID,
 		&i.CheckoutID,
@@ -551,6 +639,94 @@ func (q *Queries) ListOrdersByCheckout(ctx context.Context, checkoutID uuid.UUID
 	return items, nil
 }
 
+const listStoreOrders = `-- name: ListStoreOrders :many
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.store_id = $1
+  AND ($2::text IS NULL OR o.status = $2::text)
+ORDER BY o.created_at DESC, o.id
+LIMIT $4 OFFSET $3
+`
+
+type ListStoreOrdersParams struct {
+	StoreID    uuid.UUID
+	Status     *string
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListStoreOrdersRow struct {
+	ID                uuid.UUID
+	CheckoutID        uuid.UUID
+	OrderNumber       string
+	Status            string
+	ShippingMethod    string
+	ShippingFee       decimal.Decimal
+	ItemsSubtotal     decimal.Decimal
+	Total             decimal.Decimal
+	StoreID           uuid.UUID
+	StoreSlug         string
+	StoreName         string
+	ShipRecipientName string
+	ShipPhone         string
+	ShipAddressLine   string
+	ShipCity          string
+	ShipProvince      string
+	ShipPostalCode    string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+// Newest first; served by orders_store_status_created_idx.
+func (q *Queries) ListStoreOrders(ctx context.Context, arg ListStoreOrdersParams) ([]ListStoreOrdersRow, error) {
+	rows, err := q.db.Query(ctx, listStoreOrders,
+		arg.StoreID,
+		arg.Status,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStoreOrdersRow{}
+	for rows.Next() {
+		var i ListStoreOrdersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CheckoutID,
+			&i.OrderNumber,
+			&i.Status,
+			&i.ShippingMethod,
+			&i.ShippingFee,
+			&i.ItemsSubtotal,
+			&i.Total,
+			&i.StoreID,
+			&i.StoreSlug,
+			&i.StoreName,
+			&i.ShipRecipientName,
+			&i.ShipPhone,
+			&i.ShipAddressLine,
+			&i.ShipCity,
+			&i.ShipProvince,
+			&i.ShipPostalCode,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockBuyerOrder = `-- name: LockBuyerOrder :one
 SELECT id, checkout_id, status
 FROM orders
@@ -611,6 +787,33 @@ func (q *Queries) LockCheckoutOrders(ctx context.Context, checkoutID uuid.UUID) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockStoreOrder = `-- name: LockStoreOrder :one
+SELECT id, checkout_id, status
+FROM orders
+WHERE id = $1 AND store_id = $2
+FOR UPDATE
+`
+
+type LockStoreOrderParams struct {
+	ID      uuid.UUID
+	StoreID uuid.UUID
+}
+
+type LockStoreOrderRow struct {
+	ID         uuid.UUID
+	CheckoutID uuid.UUID
+	Status     string
+}
+
+// The same row lock as LockBuyerOrder: "seller starts processing" and
+// "buyer cancels" for one order run one after the other.
+func (q *Queries) LockStoreOrder(ctx context.Context, arg LockStoreOrderParams) (LockStoreOrderRow, error) {
+	row := q.db.QueryRow(ctx, lockStoreOrder, arg.ID, arg.StoreID)
+	var i LockStoreOrderRow
+	err := row.Scan(&i.ID, &i.CheckoutID, &i.Status)
+	return i, err
 }
 
 const setOrderStatus = `-- name: SetOrderStatus :execrows

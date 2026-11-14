@@ -126,6 +126,10 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	seller.POST("/products/:id/variants", h.Products.AddVariant)
 	seller.PATCH("/products/:id/variants/:variantId", h.Products.UpdateVariant)
 	seller.PUT("/products/:id/variants/:variantId/stock", h.Products.SetStock)
+	// Orders of the caller's store (one order per store per checkout).
+	seller.GET("/orders", h.Orders.SellerList)
+	seller.GET("/orders/:id", h.Orders.SellerGet)
+	seller.PATCH("/orders/:id/status", h.Orders.SellerUpdateStatus)
 
 	// ---- Admins ----------------------------------------------------------------
 	admin := api.Group("/admin", middleware.RequireRole(authctx.RoleAdmin))
