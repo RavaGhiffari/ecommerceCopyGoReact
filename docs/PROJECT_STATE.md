@@ -7,8 +7,8 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |---|---|
 | Snapshot date | 2026-11-14 |
 | Last commit | `83b34a7` (shadcn/ui migration = `db15fef`, docs `83b34a7`; Phase 4 = `7e57829`, `f312b0b`, `0d63dfc`) |
-| Uncommitted | dev housekeeping (Compose loopback ports, Vite proxy target, root `.gitignore`) + doc updates — see §1d |
-| Current phase | between phases: Phase 4 and the shadcn/ui migration are committed |
+| Uncommitted | **Phase 5a — addresses** (backend + frontend) + doc updates — see §1e |
+| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); slice 5a done and verified, awaiting review |
 | Next phase | Phase 5 — Checkout & orders (needs a plan and answers to its open questions first; see §10) |
 
 ---
@@ -25,6 +25,7 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-2 | Catalog | `2838782` (backend), `d0c2a54` (frontend), docs `41679b9` | ✅ committed by the developer, who then approved Phase 4 | migrate up→down(4)→up; 13 unit packages; 12 catalog integration tests; concurrency test **fails without `FOR UPDATE`** (proved) and passes with it; ledger invariant = 0 mismatches; 17-step seller/catalog browser E2E + auth E2E re-run (no regression) |
 | CP-4 | Cart | `7e57829`, `f312b0b`, docs `0d63dfc` | ✅ committed by the developer | see §1b |
 | CP-UI | shadcn/ui migration (frontend only) | `db15fef`, docs `83b34a7` | ✅ committed by the developer | see §1c |
+| CP-5a | Phase 5a addresses | **uncommitted** | 🟡 awaiting review | see §1e |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -78,7 +79,7 @@ Not checked: mobile widths, dark mode (tokens exist, no toggle; not a goal), key
 
 Committed by the developer as `db15fef` (frontend) and `83b34a7` (docs).
 
-### 1d. Dev housekeeping, 2026-11-14 (uncommitted)
+### 1d. Dev housekeeping, 2026-11-14 (committed `ac4e163`)
 
 | Change | Why | Verified |
 |---|---|---|
@@ -93,6 +94,33 @@ Suggested commit:
 ```bash
 git add -- docker-compose.yml frontend/vite.config.ts .gitignore CLAUDE.md docs/PROJECT_STATE.md SESSION_HANDOFF.md
 git commit -m "Bind dev ports to loopback and refresh handoff docs" -m "- Compose publishes Postgres and the API on 127.0.0.1 only" -m "- Vite proxies to 127.0.0.1:8081 so it does not depend on how localhost resolves" -m "- Ignore a stray root node_modules" -m "- SESSION_HANDOFF and PROJECT_STATE reflect the committed Phase 4 and shadcn/ui migration" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 1e. Verified at CP-5a (addresses), 2026-11-14
+
+| Check | Result |
+|---|---|
+| Migration `000010_create_user_addresses` | dev DB up → down → up (version 10); `marketplace_test` migrated by `make test-integration` |
+| `make fmt` / `make vet` / `make test` | clean; new unit package `modules/addresses` (phone normalisation, field rules) |
+| `make test-integration` | all packages ok; 10 new address tests: login required, default rules, validation + normalisation + strict JSON, partial update (PATCH cannot touch `isDefault`), delete promotes newest, limit 10 → 409, other user → 404 on every route, the DB refuses a 2nd default and a bad phone without the service, 2 concurrency tests |
+| Lock proven necessary | with `LockUser` stubbed out, both concurrency tests failed in 3 of 3 runs: concurrent creates gave **500** (the partial unique index rejected a second default) instead of 409, and concurrent default switches gave 500 instead of 200. Restored afterwards |
+| curl against the rebuilt API | create (phone normalised), list, 422 with every field, delete 204, empty list |
+| Frontend | `npm run build` clean (JS 691 kB, +19 kB for Radix Dialog/AlertDialog), `oxlint` exit 0; shadcn `dialog` + `alert-dialog` added (declined overwriting `button.tsx`; `cn` import fixed) |
+| Browser E2E | new `address-flow.mjs` 11/11 (empty state, client validation, first = default, new default, switch default, edit prefilled, AlertDialog cancel/confirm, promote on delete, reload, cleanup, no page errors); `auth-flow.mjs` 15/15 re-run (ran twice by accident: 2 extra throw-away accounts); screenshots checked by eye |
+
+Not checked: mobile widths of the dialog; keyboard-only walkthrough beyond the Radix defaults.
+
+**Commit CP-5a** (the developer commits):
+
+```bash
+git add -- backend/db/migrations/000010_create_user_addresses.up.sql backend/db/migrations/000010_create_user_addresses.down.sql backend/db/queries/addresses.sql backend/internal/database/queries backend/internal/modules/addresses backend/internal/router backend/cmd/api/main.go
+git commit -m "Add Phase 5a address book API" -m "- user_addresses with a partial unique index (one default per user)" -m "- /me/addresses CRUD + set default; per-user row lock keeps the limit of 10 and the default switch race-free" -m "- Integration tests incl. ownership 404s and concurrency" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- frontend
+git commit -m "Add address book to the account page" -m "- shadcn Dialog form and AlertDialog delete confirmation" -m "- Types, service and zod schema mirroring the API rules" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 5a" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -138,7 +166,7 @@ Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/dec
 
 ---
 
-## 4. API surface (as of CP-4)
+## 4. API surface (as of CP-5a)
 
 Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{code,message,details}}`.
 
@@ -146,17 +174,17 @@ Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{c
 |---|---|
 | Infra (no prefix) | `GET /health` (no DB), `GET /ready` (DB query) |
 | Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` · `GET /products/:id/related` · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
-| Signed in | `GET`/`PATCH /me` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart |
+| Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart |
 | Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` |
 | Admin (`admin` role) | `POST /admin/categories` · `PUT /admin/categories/:id` |
 
-Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422.
+Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204.
 
 Cart response: `{ stores: [{ store, items: [{ id, quantity, variantId, variantName, sku, productId, productSlug, productName, image|null, unitPrice, lineTotal, availableQuantity, issue|null }], subtotal }], itemCount, subtotal, hasIssues }`. `issue` ∈ `unavailable` (archived product / suspended store), `out_of_stock`, `insufficient_stock`; flagged lines are excluded from both subtotals. `itemCount` = total units.
 
 ---
 
-## 5. Data model (migrations 000001–000009)
+## 5. Data model (migrations 000001–000010)
 
 | Table | Notes |
 |---|---|
@@ -172,6 +200,7 @@ Cart response: `{ stores: [{ store, items: [{ id, quantity, variantId, variantNa
 | `inventory_movements` | append-only ledger; deltas, type, reason, reference, actor |
 | `carts` | one per user (`user_id` UNIQUE, cascade on user delete); created on the first add |
 | `cart_items` | `quantity` CHECK 1..99; `UNIQUE(cart_id, variant_id)`; variant FK RESTRICT |
+| `user_addresses` | cascade on user delete (orders will keep a copy); phone CHECK `^\+?[0-9]{8,15}$`, postal code 5 digits; partial unique index `(user_id) WHERE is_default` = at most one default; the service keeps exactly one while addresses exist; max 10 per user |
 
 **Invariants worth re-checking after any inventory change**
 
@@ -184,7 +213,7 @@ WHERE COALESCE(m.s,0) <> i.available_quantity;
 
 Until Phase 5 also: `SELECT SUM(reserved_quantity) FROM inventory` must be 0 — nothing reserves stock yet (the cart must not).
 
-Not yet created (planned): `user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`, `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
+Not yet created (planned): `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`, `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
 
 ---
 
@@ -243,9 +272,9 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 ## 7. Test inventory
 
-- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`.
-- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds).
-- **Browser E2E**: three `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
+- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`. Since CP-5a also the `modules/addresses` unit package.
+- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e).
+- **Browser E2E**: four `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16, `address-flow.mjs` 11, which uses the demo login `penjual3@contoh.id` and deletes what it creates) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
 - **Frontend unit tests (Vitest)**: none yet.
 
 ---
@@ -323,6 +352,8 @@ The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF
 | `go`, `docker`, `make` "not found" in the agent shell | not on PATH (Go not installed at all) | Go/sqlc/migrate run in containers; Docker CLI path is in CLAUDE.md; `make` via scoop |
 | `seed-admin` test created an admin in the **dev** DB | a `sed` rewrote `…/marketplace_dev?` but the dev DB is called `main` | never assume the dev DB name; check `.env` keys, not values; test accounts were left behind |
 | A process on port 5173 was killed and turned out to be the developer's Laravel app | killed by port without reading its command line | always inspect `CommandLine` first; use port 5190 for agent-run Vite |
+| Running the E2E scripts from the agent's Git Bash: Edge exited at launch (`Target page, context or browser has been closed`) | the Bash tool's sandbox | run `node <script>.mjs` from the PowerShell tool instead |
+| `npx shadcn add dialog alert-dialog --yes` wrote nothing | it stopped at an overwrite prompt for the existing `button.tsx` (stdin closed = abort) | pipe `n` answers (`printf 'n\n' | npx shadcn add …`), then fix the `from "cn"` imports |
 | After changing `POSTGRES_PASSWORD` in `.env`, the API crash-looped with `password authentication failed` | the postgres image applies `POSTGRES_PASSWORD` only when it initialises an **empty** volume | also run `ALTER USER` inside the container (§1d shows how without printing the value), then restart `api` |
 | sqlc generated `pgtype.UUID` / `pgtype.Numeric` | default driver types | `overrides` in `sqlc.yaml` (uuid → google/uuid, nullable uuid → pointer, numeric → decimal) |
 | sqlc typed a LEFT JOIN LATERAL image column as non-null `string` | cannot infer nullability through LATERAL | `COALESCE(...)::text` in the query; read generated code for every new join |

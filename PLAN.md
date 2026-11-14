@@ -24,9 +24,9 @@ Deviations from the proposal:
 
 ---
 
-## Phase 5 — Checkout & orders: PLAN (draft, awaiting developer approval)
+## Phase 5 — Checkout & orders: PLAN (approved 2026-11-14 with the proposed answers to Q1–Q12)
 
-Nothing below is implemented. **No code is written until the developer approves this plan**, including the answers to the decisions in §5.0.
+Progress: **5a done and verified, awaiting review** (evidence: PROJECT_STATE §1e). Next: 5b.
 
 ### 5.0 Decisions
 
@@ -53,7 +53,7 @@ Each slice ends with its tests green and a short review; the developer commits.
 
 | Slice | Content |
 |---|---|
-| **5a Addresses** | Migration `000010_create_user_addresses`, module `addresses`, routes under `/me/addresses`, address management on `/account` |
+| **5a Addresses** ✅ | Migration `000010_create_user_addresses`, module `addresses`, routes under `/me/addresses`, address management on `/account`. As built: create 201 / update 200 / set default 200 return the address, delete 204; PATCH has no `isDefault`; deleting the default promotes the newest; every write takes `SELECT … FROM users … FOR NO KEY UPDATE` |
 | **5b Checkout core** | Migration `000011_create_checkout_tables` (checkouts, orders, order_items, order_status_histories, payments, payment_events, new ledger type); module `shipping` (pure functions); module `checkout` (quote and place); inventory `Reserve`; buyer `GET /orders`, `GET /orders/:id`, `GET /checkout/:id` |
 | **5c Payment & lifecycle** | `POST /payments/:id/simulate`; inventory `Consume` / `Release` / `Restock`; `sold_count`; expiry sweeper; `POST /checkout/:id/cancel`; `POST /orders/:id/cancel`; status-transition table |
 | **5d Seller orders** | `GET /seller/orders`, `GET /seller/orders/:id`, `PATCH /seller/orders/:id/status` (processing → shipped → delivered) |
