@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
-import { AlertTriangle, PackageSearch } from 'lucide-react'
+import { AlertTriangle, PackageSearch, RotateCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { ApiError } from '../../lib/api'
 
 export function EmptyState({
@@ -12,10 +15,10 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-      <PackageSearch className="size-10 text-slate-400" aria-hidden="true" />
-      <h2 className="mt-3 text-lg font-semibold text-slate-900">{title}</h2>
-      {description && <p className="mt-1 max-w-md text-sm text-slate-600">{description}</p>}
+    <div className="flex flex-col items-center rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+      <PackageSearch className="size-10 text-muted-foreground" aria-hidden="true" />
+      <h2 className="mt-3 text-lg font-semibold">{title}</h2>
+      {description && <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   )
@@ -33,20 +36,16 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center rounded-xl border border-red-200 bg-red-50 px-6 py-12 text-center"
+      className="flex flex-col items-center rounded-xl border border-destructive/30 bg-destructive/5 px-6 py-12 text-center"
     >
-      <AlertTriangle className="size-10 text-red-500" aria-hidden="true" />
-      <h2 className="mt-3 text-lg font-semibold text-red-900">{title}</h2>
-      <p className="mt-1 max-w-md text-sm text-red-800">{error.message}</p>
-      <p className="mt-1 font-mono text-xs text-red-700">{error.code}</p>
+      <AlertTriangle className="size-10 text-destructive" aria-hidden="true" />
+      <h2 className="mt-3 text-lg font-semibold text-destructive">{title}</h2>
+      <p className="mt-1 max-w-md text-sm text-foreground/80">{error.message}</p>
+      <p className="mt-1 font-mono text-xs text-muted-foreground">{error.code}</p>
       {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
-        >
-          Coba lagi
-        </button>
+        <Button variant="destructive" size="lg" className="mt-5" onClick={onRetry}>
+          <RotateCw aria-hidden="true" /> Coba lagi
+        </Button>
       )}
     </div>
   )
@@ -60,14 +59,14 @@ export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
       aria-label="Memuat produk"
     >
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div className="aspect-square bg-slate-200" />
+        <Card key={i} className="gap-0 py-0">
+          <Skeleton className="aspect-square rounded-none" />
           <div className="space-y-2 p-3">
-            <div className="h-3 w-5/6 rounded bg-slate-200" />
-            <div className="h-3 w-2/3 rounded bg-slate-200" />
-            <div className="h-4 w-1/2 rounded bg-slate-200" />
+            <Skeleton className="h-3 w-5/6" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   )

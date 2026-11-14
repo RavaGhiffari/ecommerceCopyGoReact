@@ -1,8 +1,13 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useParams } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { TextAreaField } from '../components/shared/TextAreaField'
 import { FormAlert, TextField } from '../components/shared/TextField'
@@ -34,14 +39,14 @@ export function SellerEditProductPage() {
   usePageTitle(product.state.status === 'success' ? product.state.data.name : 'Produk')
 
   if (product.state.status === 'loading') {
-    return <div className="mx-auto h-96 max-w-3xl animate-pulse rounded-xl bg-slate-200" role="status" aria-label="Memuat produk" />
+    return <Skeleton className="mx-auto h-96 max-w-3xl rounded-xl" role="status" aria-label="Memuat produk" />
   }
   if (product.state.status === 'error') {
     return product.state.error.status === 404 ? (
       <EmptyState
         title="Produk tidak ditemukan"
         description="Produk ini tidak ada di toko kamu."
-        action={<Link to="/seller" className="text-sm font-medium text-emerald-700 hover:underline">Kembali ke toko</Link>}
+        action={<Button variant="link" asChild><Link to="/seller">Kembali ke toko</Link></Button>}
       />
     ) : (
       <ErrorState error={product.state.error} onRetry={product.reload} title="Gagal memuat produk" />
@@ -54,13 +59,13 @@ export function SellerEditProductPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <Link to="/seller" className="text-sm text-slate-500 hover:text-emerald-700">← Kembali ke toko</Link>
+        <Link to="/seller" className="text-sm text-muted-foreground hover:text-primary">← Kembali ke toko</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">{p.name}</h1>
+          <h1 className="text-2xl font-semibold">{p.name}</h1>
           <StatusControl product={p} onChanged={product.reload} />
         </div>
         {p.status === 'active' && storeSlug && (
-          <Link to={`/stores/${storeSlug}/products/${p.slug}`} className="mt-1 inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline">
+          <Link to={`/stores/${storeSlug}/products/${p.slug}`} className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline">
             Lihat di katalog <ExternalLink className="size-3.5" aria-hidden="true" />
           </Link>
         )}
@@ -69,18 +74,18 @@ export function SellerEditProductPage() {
       {/* key: remount the form with fresh defaults after the product changes */}
       <DetailsForm key={p.updatedAt} product={p} onSaved={product.reload} />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">Varian, harga & stok</h2>
-        <p className="mb-4 text-sm text-slate-600">
+      <Card className="gap-0 p-5">
+        <h2 className="mb-1 text-lg font-semibold">Varian, harga & stok</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
           Perubahan stok tercatat di riwayat stok. Mengubah harga tidak mengubah pesanan yang sudah ada.
         </p>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y">
           {p.variants.map((v) => (
             <VariantRow key={`${v.id}:${v.price}:${v.stock}`} productId={p.id} variant={v} onSaved={product.reload} />
           ))}
         </div>
         <AddVariantForm productId={p.id} disabled={p.variants.length >= 20} onAdded={product.reload} />
-      </section>
+      </Card>
     </div>
   )
 }
@@ -106,18 +111,13 @@ function StatusControl({ product, onChanged }: { product: SellerProduct; onChang
 
   return (
     <div className="flex items-center gap-3">
-      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${archived ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-800'}`}>
+      <Badge variant={archived ? 'secondary' : 'default'} className={archived ? '' : 'bg-primary/15 text-primary'}>
         {archived ? 'Diarsipkan' : 'Aktif'}
-      </span>
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={busy}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-      >
+      </Badge>
+      <Button variant="outline" onClick={toggle} disabled={busy}>
         {archived ? 'Aktifkan lagi' : 'Arsipkan'}
-      </button>
-      {error && <span className="text-sm text-red-600" role="alert">{error}</span>}
+      </Button>
+      {error && <span className="text-sm text-destructive" role="alert">{error}</span>}
     </div>
   )
 }
@@ -126,6 +126,7 @@ function DetailsForm({ product, onSaved }: { product: SellerProduct; onSaved: ()
   const [formError, setFormError] = useState<string | null>(null)
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting, isDirty },
@@ -155,17 +156,31 @@ function DetailsForm({ product, onSaved }: { product: SellerProduct; onSaved: ()
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Detail produk</h2>
+    <Card className="p-5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+      <h2 className="text-lg font-semibold">Detail produk</h2>
       <FormAlert message={formError} />
       <TextField label="Nama produk" registration={register('name')} error={errors.name?.message} />
-      <CategorySelect registration={register('categoryId')} error={errors.categoryId?.message} />
+      <Controller
+        name="categoryId"
+        control={control}
+        render={({ field }) => (
+          <CategorySelect
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            ref={field.ref}
+            error={errors.categoryId?.message}
+          />
+        )}
+      />
       <TextAreaField label="Deskripsi" rows={4} registration={register('description')} error={errors.description?.message} />
       <TextAreaField label="URL gambar" rows={3} hint="Satu URL per baris, maksimal 8." registration={register('images')} error={errors.images?.message} />
       <div className="max-w-40">
         <SubmitButton busy={isSubmitting}>{isDirty ? 'Simpan' : 'Tersimpan'}</SubmitButton>
       </div>
-    </form>
+      </form>
+    </Card>
   )
 }
 
@@ -210,25 +225,26 @@ function VariantRow({ productId, variant, onSaved }: { productId: string; varian
   return (
     <div className="grid gap-3 py-3 sm:grid-cols-[1.5fr_2fr_2fr] sm:items-end">
       <div>
-        <p className="font-medium text-slate-900">{variant.name}</p>
-        <p className="text-xs text-slate-500">SKU {variant.sku} · {formatRupiah(variant.price)} · stok {variant.stock}</p>
+        <p className="font-medium">{variant.name}</p>
+        <p className="text-xs text-muted-foreground">SKU {variant.sku} · {formatRupiah(variant.price)} · stok {variant.stock}</p>
       </div>
-      <label className="text-sm text-slate-700">
+      {/* Native <label> wrapping input + button keeps "Harga (Rp)" / "Stok" as the input's accessible name. */}
+      <label className="text-sm font-medium">
         Harga (Rp)
-        <span className="mt-1 flex gap-2">
-          <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="w-full min-w-0 rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
-          <button type="button" onClick={savePrice} disabled={busy} className="rounded-md border border-slate-300 px-2 text-sm hover:bg-slate-50 disabled:opacity-50">Simpan</button>
+        <span className="mt-1.5 flex gap-2">
+          <Input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="h-9" />
+          <Button variant="outline" size="lg" onClick={savePrice} disabled={busy}>Simpan</Button>
         </span>
       </label>
-      <label className="text-sm text-slate-700">
+      <label className="text-sm font-medium">
         Stok
-        <span className="mt-1 flex gap-2">
-          <input value={stock} onChange={(e) => setStockValue(e.target.value)} inputMode="numeric" className="w-full min-w-0 rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
-          <button type="button" onClick={saveStock} disabled={busy} className="rounded-md border border-slate-300 px-2 text-sm hover:bg-slate-50 disabled:opacity-50">Simpan</button>
+        <span className="mt-1.5 flex gap-2">
+          <Input value={stock} onChange={(e) => setStockValue(e.target.value)} inputMode="numeric" className="h-9" />
+          <Button variant="outline" size="lg" onClick={saveStock} disabled={busy}>Simpan</Button>
         </span>
       </label>
       {message && (
-        <p role={message.kind === 'error' ? 'alert' : 'status'} className={`text-sm sm:col-span-3 ${message.kind === 'error' ? 'text-red-600' : 'text-emerald-700'}`}>
+        <p role={message.kind === 'error' ? 'alert' : 'status'} className={`text-sm sm:col-span-3 ${message.kind === 'error' ? 'text-destructive' : 'text-primary'}`}>
           {message.text}
         </p>
       )}
@@ -258,21 +274,17 @@ function AddVariantForm({ productId, disabled, onAdded }: { productId: string; d
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-4 border-t border-slate-200 pt-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-900">Tambah varian</h3>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-4 border-t pt-4">
+      <h3 className="mb-3 text-sm font-semibold">Tambah varian</h3>
       <FormAlert message={formError} />
       <div className="grid gap-3 sm:grid-cols-[2fr_1.5fr_1.5fr_1fr_auto] sm:items-start">
         <TextField label="Nama" registration={register('name')} error={errors.name?.message} />
         <TextField label="SKU" registration={register('sku')} error={errors.sku?.message} />
         <TextField label="Harga (Rp)" inputMode="decimal" registration={register('price')} error={errors.price?.message} />
         <TextField label="Stok" inputMode="numeric" registration={register('stock')} error={errors.stock?.message} />
-        <button
-          type="submit"
-          disabled={disabled || isSubmitting}
-          className="self-end rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
+        <Button type="submit" size="lg" disabled={disabled || isSubmitting} className="self-end sm:mt-6">
           Tambah
-        </button>
+        </Button>
       </div>
     </form>
   )

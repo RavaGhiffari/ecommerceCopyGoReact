@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Info, Minus, Plus, Store, Trash2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ProductImage } from '../components/product/ProductImage'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { messageFor } from '../features/auth/serverErrors'
@@ -15,7 +19,7 @@ export function CartPage() {
   const { status, cart, error, reload } = useCart()
 
   if (status === 'loading' || status === 'anonymous') {
-    return <div className="h-64 animate-pulse rounded-xl bg-slate-200" role="status" aria-label="Memuat keranjang" />
+    return <Skeleton className="h-64 rounded-xl" role="status" aria-label="Memuat keranjang" />
   }
   if (status === 'error' && error) {
     return <ErrorState error={error} onRetry={reload} title="Gagal memuat keranjang" />
@@ -26,9 +30,9 @@ export function CartPage() {
         title="Keranjangmu masih kosong"
         description="Cari produk yang kamu suka, lalu tekan Tambah ke keranjang."
         action={
-          <Link to="/products" className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            Mulai belanja
-          </Link>
+          <Button size="lg" asChild>
+            <Link to="/products">Mulai belanja</Link>
+          </Button>
         }
       />
     )
@@ -37,39 +41,39 @@ export function CartPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Keranjang</h1>
+        <h1 className="text-2xl font-semibold">Keranjang</h1>
         {cart.stores.map((group) => (
           <StoreSection key={group.store.id} group={group} />
         ))}
       </div>
 
-      <aside className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 lg:sticky lg:top-32" aria-label="Ringkasan belanja">
-        <h2 className="text-lg font-semibold text-slate-900">Ringkasan belanja</h2>
-        <dl className="flex justify-between text-sm text-slate-600">
+      <aside className="lg:sticky lg:top-32" aria-label="Ringkasan belanja">
+       <Card className="gap-3 p-5">
+        <h2 className="text-lg font-semibold">Ringkasan belanja</h2>
+        <dl className="flex justify-between text-sm text-muted-foreground">
           <dt>Jumlah barang</dt>
           <dd>{cart.itemCount}</dd>
         </dl>
-        <dl className="flex justify-between border-t border-slate-100 pt-3 text-base font-semibold text-slate-900">
+        <dl className="flex justify-between border-t pt-3 text-base font-semibold">
           <dt>Subtotal</dt>
           <dd>{formatRupiah(cart.subtotal)}</dd>
         </dl>
         {cart.hasIssues && (
-          <p className="flex gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Beberapa barang tidak bisa dibeli saat ini dan tidak dihitung di subtotal.
-          </p>
+          <Alert role="note" className="border-amber-200 bg-amber-50 text-amber-900">
+            <AlertTriangle aria-hidden="true" />
+            <AlertDescription className="text-amber-900">
+              Beberapa barang tidak bisa dibeli saat ini dan tidak dihitung di subtotal.
+            </AlertDescription>
+          </Alert>
         )}
-        <button
-          type="button"
-          disabled
-          className="w-full rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white opacity-50"
-        >
+        <Button size="lg" disabled className="h-10 w-full font-semibold">
           Lanjut ke checkout
-        </button>
-        <p className="flex gap-2 text-xs text-slate-500">
+        </Button>
+        <p className="flex gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           Checkout tersedia di tahap berikutnya. Harga dan stok dicek ulang saat checkout.
         </p>
+       </Card>
       </aside>
     </div>
   )
@@ -77,26 +81,28 @@ export function CartPage() {
 
 function StoreSection({ group }: { group: CartStoreGroup }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white" aria-labelledby={`store-${group.store.id}`}>
-      <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+    <Card className="gap-0 py-0">
+     <section aria-labelledby={`store-${group.store.id}`}>
+      <header className="flex items-center justify-between border-b px-5 py-3">
         <Link
           id={`store-${group.store.id}`}
           to={`/stores/${group.store.slug}`}
-          className="inline-flex items-center gap-2 font-medium text-slate-900 hover:text-emerald-700"
+          className="inline-flex items-center gap-2 font-medium hover:text-primary"
         >
           <Store className="size-4" aria-hidden="true" /> {group.store.name}
-          <span className="text-sm font-normal text-slate-500">· {group.store.location}</span>
+          <span className="text-sm font-normal text-muted-foreground">· {group.store.location}</span>
         </Link>
-        <span className="text-sm text-slate-600">{formatRupiah(group.subtotal)}</span>
+        <span className="text-sm text-muted-foreground">{formatRupiah(group.subtotal)}</span>
       </header>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y">
         {group.items.map((line) => (
           <li key={line.id}>
             <LineRow line={line} storeSlug={group.store.slug} />
           </li>
         ))}
       </ul>
-    </section>
+     </section>
+    </Card>
   )
 }
 
@@ -139,69 +145,70 @@ function LineRow({ line, storeSlug }: { line: CartLine; storeSlug: string }) {
       </Link>
 
       <div className="min-w-0 flex-1 space-y-1">
-        <Link to={href} className="line-clamp-2 text-sm font-medium text-slate-900 hover:text-emerald-700">
+        <Link to={href} className="line-clamp-2 text-sm font-medium hover:text-primary">
           {line.productName}
         </Link>
-        <p className="text-xs text-slate-500">Varian: {line.variantName}</p>
-        <p className="text-sm font-semibold text-slate-900">{formatRupiah(line.unitPrice)}</p>
+        <p className="text-xs text-muted-foreground">Varian: {line.variantName}</p>
+        <p className="text-sm font-semibold">{formatRupiah(line.unitPrice)}</p>
 
         {line.issue && (
           <p role="status" className="flex items-start gap-1 text-sm text-amber-800">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             {ISSUE_TEXT[line.issue](line.availableQuantity)}
             {line.issue === 'insufficient_stock' && (
-              <button
-                type="button"
+              <Button
+                variant="link"
                 disabled={busy}
                 onClick={() => run(() => update(line.id, line.availableQuantity))}
-                className="ml-1 font-medium underline"
+                className="ml-1 h-auto p-0 font-medium text-amber-900 underline"
               >
                 Ubah ke {line.availableQuantity}
-              </button>
+              </Button>
             )}
           </p>
         )}
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
       </div>
 
       <div className="flex flex-col items-end justify-between gap-2">
-        <span className="text-sm font-semibold text-slate-900">{formatRupiah(line.lineTotal)}</span>
+        <span className="text-sm font-semibold">{formatRupiah(line.lineTotal)}</span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => run(() => remove(line.id))}
             disabled={busy}
             aria-label={`Hapus ${line.productName} dari keranjang`}
-            className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </button>
-          <div role="group" aria-label={`Jumlah ${line.productName}`} className="inline-flex items-center rounded-md border border-slate-300">
-            <button
-              type="button"
+            <Trash2 aria-hidden="true" />
+          </Button>
+          <div role="group" aria-label={`Jumlah ${line.productName}`} className="inline-flex items-center rounded-lg border">
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label="Kurangi jumlah"
               disabled={busy || !canChange || line.quantity <= 1}
               onClick={() => run(() => update(line.id, line.quantity - 1))}
-              className="p-1.5 text-slate-700 disabled:opacity-40"
             >
-              <Minus className="size-4" aria-hidden="true" />
-            </button>
+              <Minus aria-hidden="true" />
+            </Button>
             <output aria-live="polite" className="min-w-8 text-center text-sm">
               {line.quantity}
             </output>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label="Tambah jumlah"
               disabled={busy || !canChange || line.quantity >= maxQuantity}
               onClick={() => run(() => update(line.id, line.quantity + 1))}
-              className="p-1.5 text-slate-700 disabled:opacity-40"
             >
-              <Plus className="size-4" aria-hidden="true" />
-            </button>
+              <Plus aria-hidden="true" />
+            </Button>
           </div>
         </div>
       </div>

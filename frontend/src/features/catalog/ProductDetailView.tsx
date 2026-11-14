@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Info, MapPin, Minus, Plus, Store } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { ProductImage } from '../../components/product/ProductImage'
 import { RatingBadge } from '../../components/shared/RatingBadge'
 import { formatCompactCount, formatPriceRange, formatRupiah } from '../../lib/format'
@@ -59,10 +62,10 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
 
   return (
     <article>
-      <nav aria-label="Navigasi halaman" className="mb-4 text-sm text-slate-500">
-        <Link to="/products" className="hover:text-emerald-700">Produk</Link>
+      <nav aria-label="Navigasi halaman" className="mb-4 text-sm text-muted-foreground">
+        <Link to="/products" className="hover:text-primary">Produk</Link>
         {' / '}
-        <Link to={`/categories/${product.category.slug}`} className="hover:text-emerald-700">
+        <Link to={`/categories/${product.category.slug}`} className="hover:text-primary">
           {product.category.name}
         </Link>
       </nav>
@@ -73,13 +76,13 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
             id={product.id}
             name={product.name}
             image={product.images[0]}
-            className="rounded-xl border border-slate-200"
+            className="rounded-xl border"
           />
           {product.images.length > 1 && (
             <ul className="grid grid-cols-5 gap-2">
               {product.images.slice(1).map((img) => (
                 <li key={img.url}>
-                  <img src={img.url} alt={img.alt} loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover" />
+                  <img src={img.url} alt={img.alt} loading="lazy" className="aspect-square w-full rounded-md border object-cover" />
                 </li>
               ))}
             </ul>
@@ -88,29 +91,31 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
 
         <div className="space-y-5">
           <header>
-            <h1 className="text-2xl font-semibold text-slate-900">{product.name}</h1>
-            <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+            <h1 className="text-2xl font-semibold">{product.name}</h1>
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
               <RatingBadge rating={product.rating} />
               <span>· {formatCompactCount(product.soldCount)} terjual</span>
             </div>
           </header>
 
-          <p className="text-3xl font-bold text-slate-900">
+          <p className="text-3xl font-bold">
             {hasChoices ? formatRupiah(variant.price) : formatPriceRange(product.lowestPrice, product.highestPrice)}
           </p>
 
           {hasChoices && (
             <fieldset>
-              <legend className="mb-2 text-sm font-medium text-slate-700">Pilih varian</legend>
+              <legend className="mb-2 text-sm font-medium">Pilih varian</legend>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((v) => (
                   <label
                     key={v.id}
-                    className={`cursor-pointer rounded-md border px-3 py-1.5 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-600 ${
+                    className={cn(
+                      'cursor-pointer rounded-lg border px-3 py-1.5 text-sm transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
                       v.id === variantId
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
-                    } ${v.stock === 0 ? 'opacity-50' : ''}`}
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'bg-card text-foreground/80 hover:border-foreground/30',
+                      v.stock === 0 && 'opacity-50',
+                    )}
                   >
                     <input
                       type="radio"
@@ -128,81 +133,81 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
             </fieldset>
           )}
 
-          <p className={`text-sm ${available ? 'text-slate-600' : 'font-medium text-red-600'}`}>
+          <p className={`text-sm ${available ? 'text-muted-foreground' : 'font-medium text-destructive'}`}>
             {available ? `Stok tersedia: ${variant.stock}` : 'Stok habis'}
           </p>
 
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-700" id="qty-label">Jumlah</span>
-            <div role="group" aria-labelledby="qty-label" className="inline-flex items-center rounded-md border border-slate-300 bg-white">
-              <button
-                type="button"
+            <span className="text-sm font-medium" id="qty-label">Jumlah</span>
+            <div role="group" aria-labelledby="qty-label" className="inline-flex items-center rounded-lg border bg-card">
+              <Button
+                variant="ghost"
+                size="icon-lg"
                 aria-label="Kurangi jumlah"
                 disabled={!available || quantity <= 1}
                 onClick={() => setQuantity((q) => q - 1)}
-                className="p-2 text-slate-700 disabled:opacity-40"
               >
-                <Minus className="size-4" aria-hidden="true" />
-              </button>
+                <Minus aria-hidden="true" />
+              </Button>
               <output aria-live="polite" className="min-w-10 text-center text-sm">{quantity}</output>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-lg"
                 aria-label="Tambah jumlah"
                 disabled={!available || quantity >= variant.stock}
                 onClick={() => setQuantity((q) => q + 1)}
-                className="p-2 text-slate-700 disabled:opacity-40"
               >
-                <Plus className="size-4" aria-hidden="true" />
-              </button>
+                <Plus aria-hidden="true" />
+              </Button>
             </div>
             {available && (
-              <span className="text-sm text-slate-500">Subtotal {formatRupiah(Number(variant.price) * quantity)}</span>
+              <span className="text-sm text-muted-foreground">Subtotal {formatRupiah(Number(variant.price) * quantity)}</span>
             )}
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={addToCart}
-              disabled={!available || adding}
-              className="rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-50"
-            >
+            <Button size="lg" onClick={addToCart} disabled={!available || adding} className="h-10 px-5 font-semibold">
               {adding ? 'Menambahkan…' : 'Tambah ke keranjang'}
-            </button>
-            <button type="button" disabled className="rounded-md border border-emerald-600 px-5 py-2.5 text-sm font-semibold text-emerald-700 opacity-50">
+            </Button>
+            <Button variant="outline" size="lg" disabled className="h-10 border-primary px-5 font-semibold text-primary">
               Beli sekarang
-            </button>
+            </Button>
           </div>
           {cartMessage && (
-            <p
+            <Alert
               role={cartMessage.kind === 'error' ? 'alert' : 'status'}
-              className={`rounded-md px-3 py-2 text-sm ${
-                cartMessage.kind === 'error' ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'
-              }`}
+              variant={cartMessage.kind === 'error' ? 'destructive' : 'default'}
+              className={cartMessage.kind === 'error' ? 'border-destructive/30 bg-destructive/5' : 'border-primary/30 bg-primary/5'}
             >
-              {cartMessage.text}{' '}
-              {cartMessage.kind === 'ok' && (
-                <Link to="/cart" className="font-medium underline">
-                  Lihat keranjang
-                </Link>
-              )}
-            </p>
+              <AlertDescription className={cartMessage.kind === 'ok' ? 'text-foreground' : undefined}>
+                <p>
+                  {cartMessage.text}{' '}
+                  {cartMessage.kind === 'ok' && (
+                    <Link to="/cart" className="font-medium text-primary underline">
+                      Lihat keranjang
+                    </Link>
+                  )}
+                </p>
+              </AlertDescription>
+            </Alert>
           )}
-          <p className="flex items-start gap-2 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
-            <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Checkout ("Beli sekarang") tersedia di tahap berikutnya. Menambahkan ke keranjang tidak memesan stok.
-          </p>
+          <Alert role="note" className="border-transparent bg-muted">
+            <Info aria-hidden="true" />
+            <AlertDescription>
+              Checkout ("Beli sekarang") tersedia di tahap berikutnya. Menambahkan ke keranjang tidak memesan stok.
+            </AlertDescription>
+          </Alert>
 
           <Link
             to={`/stores/${product.store.slug}`}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+            className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition hover:ring-primary/50 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <span className="flex size-11 items-center justify-center rounded-full bg-primary/15 text-primary">
               <Store className="size-5" aria-hidden="true" />
             </span>
             <span>
-              <span className="block font-medium text-slate-900">{product.store.name}</span>
-              <span className="flex items-center gap-1 text-sm text-slate-500">
+              <span className="block font-medium">{product.store.name}</span>
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <MapPin className="size-3.5" aria-hidden="true" /> {product.store.location}
               </span>
             </span>
@@ -211,11 +216,11 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
       </div>
 
       <section className="mt-10" aria-labelledby="product-description">
-        <h2 id="product-description" className="mb-2 text-lg font-semibold text-slate-900">
+        <h2 id="product-description" className="mb-2 text-lg font-semibold">
           Deskripsi produk
         </h2>
-        <p className="max-w-3xl whitespace-pre-line text-slate-700">{product.description}</p>
-        <p className="mt-3 text-xs text-slate-500">SKU: {variant.sku}</p>
+        <p className="max-w-3xl whitespace-pre-line text-foreground/85">{product.description}</p>
+        <p className="mt-3 text-xs text-muted-foreground">SKU: {variant.sku}</p>
       </section>
     </article>
   )

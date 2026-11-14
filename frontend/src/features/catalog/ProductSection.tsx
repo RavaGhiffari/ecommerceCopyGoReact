@@ -19,12 +19,12 @@ export function ProductSection({
   return (
     <section aria-labelledby={`section-${query.sort}`}>
       <div className="mb-3 flex items-end justify-between">
-        <h2 id={`section-${query.sort}`} className="text-xl font-semibold text-slate-900">
+        <h2 id={`section-${query.sort}`} className="text-xl font-semibold">
           {title}
         </h2>
         <Link
           to={seeAllTo}
-          className="inline-flex items-center text-sm font-medium text-emerald-700 hover:text-emerald-800"
+          className="inline-flex items-center text-sm font-medium text-primary hover:underline"
         >
           Lihat semua <ChevronRight className="size-4" aria-hidden="true" />
         </Link>

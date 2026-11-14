@@ -1,22 +1,23 @@
 import type { ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mx-auto max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">{title}</h1>
-      {children}
-    </div>
+    <Card className="mx-auto max-w-md gap-6 py-6 shadow-sm sm:py-8">
+      <CardHeader className="sm:px-8">
+        {/* A real <h1>, not CardTitle (a <div>): pages are found by their heading. */}
+        <h1 className="text-2xl font-semibold">{title}</h1>
+      </CardHeader>
+      <CardContent className="sm:px-8">{children}</CardContent>
+    </Card>
   )
 }
 
 export function SubmitButton({ busy, children }: { busy: boolean; children: ReactNode }) {
   return (
-    <button
-      type="submit"
-      disabled={busy}
-      className="w-full rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
-    >
+    <Button type="submit" size="lg" disabled={busy} className="h-10 w-full font-semibold">
       {busy ? 'Memproses…' : children}
-    </button>
+    </Button>
   )
 }

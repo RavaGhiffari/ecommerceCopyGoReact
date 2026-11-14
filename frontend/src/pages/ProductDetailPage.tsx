@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { Link, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { useProduct, useRelatedProducts } from '../features/catalog/hooks'
@@ -16,13 +17,13 @@ export function ProductDetailPage() {
   switch (product.state.status) {
     case 'loading':
       return (
-        <div className="grid animate-pulse gap-8 md:grid-cols-2" role="status" aria-label="Memuat produk">
-          <div className="aspect-square rounded-xl bg-slate-200" />
+        <div className="grid gap-8 md:grid-cols-2" role="status" aria-label="Memuat produk">
+          <Skeleton className="aspect-square rounded-xl" />
           <div className="space-y-4">
-            <div className="h-8 w-3/4 rounded bg-slate-200" />
-            <div className="h-5 w-1/3 rounded bg-slate-200" />
-            <div className="h-10 w-1/2 rounded bg-slate-200" />
-            <div className="h-24 rounded bg-slate-200" />
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-5 w-1/3" />
+            <Skeleton className="h-10 w-1/2" />
+            <Skeleton className="h-24" />
           </div>
         </div>
       )
@@ -32,7 +33,7 @@ export function ProductDetailPage() {
           title="Produk tidak ditemukan"
           description="Produk ini tidak ada, sudah diarsipkan, atau alamatnya salah."
           action={
-            <Link to="/products" className="text-sm font-medium text-emerald-700 hover:underline">
+            <Link to="/products" className="text-sm font-medium text-primary hover:underline">
               Lihat semua produk
             </Link>
           }
@@ -71,7 +72,7 @@ function RelatedProducts({ productId }: { productId: string }) {
 
   return (
     <section aria-labelledby="related-products">
-      <h2 id="related-products" className="mb-3 text-xl font-semibold text-slate-900">
+      <h2 id="related-products" className="mb-3 text-xl font-semibold">
         Produk terkait
       </h2>
       <ProductResults

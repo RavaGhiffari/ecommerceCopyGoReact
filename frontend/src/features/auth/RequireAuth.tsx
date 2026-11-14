@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { ErrorState } from '../../components/shared/StateViews'
@@ -16,7 +17,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (status === 'loading') {
-    return <div className="h-40 animate-pulse rounded-xl bg-slate-200" role="status" aria-label="Memeriksa sesi" />
+    return <Skeleton className="h-40 rounded-xl" role="status" aria-label="Memeriksa sesi" />
   }
   if (status === 'error') {
     return (

@@ -1,6 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { LogOut, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useAuth } from '../../features/auth/authContext'
 import { useCart } from '../../features/cart/cartContext'
 import { useCategories } from '../../features/catalog/hooks'
@@ -10,17 +22,19 @@ function CartLink() {
   const { itemCount } = useCart()
   const label = itemCount > 0 ? `Keranjang, ${itemCount} barang` : 'Keranjang'
   return (
-    <Link to="/cart" aria-label={label} title={label} className="relative rounded-md p-2 text-slate-600 hover:bg-slate-100 hover:text-emerald-700">
-      <ShoppingCart className="size-5" aria-hidden="true" />
-      {itemCount > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-semibold leading-5 text-white"
-        >
-          {itemCount > 99 ? '99+' : itemCount}
-        </span>
-      )}
-    </Link>
+    <Button variant="ghost" size="icon-lg" asChild className="relative text-muted-foreground hover:text-primary">
+      <Link to="/cart" aria-label={label} title={label}>
+        <ShoppingCart className="size-5" aria-hidden="true" />
+        {itemCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-semibold leading-5 text-white"
+          >
+            {itemCount > 99 ? '99+' : itemCount}
+          </span>
+        )}
+      </Link>
+    </Button>
   )
 }
 
@@ -31,13 +45,13 @@ export function Header() {
   const urlQuery = params.get('q') ?? ''
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-30 border-b bg-background">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link
           to="/"
-          className="shrink-0 text-xl font-bold text-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+          className="shrink-0 rounded-md text-xl font-bold text-primary outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          Pasar<span className="text-slate-900">Kita</span>
+          Pasar<span className="text-foreground">Kita</span>
         </Link>
 
         <SearchForm key={urlQuery} initial={urlQuery} onSearch={(q) => navigate(q ? `/products?q=${encodeURIComponent(q)}` : '/products')} />
@@ -54,29 +68,37 @@ export function Header() {
   )
 }
 
+function useIsSeller() {
+  const { user } = useAuth()
+  return user?.roles.includes('seller') ?? false
+}
+
 /** "Toko saya" for sellers, "Buka toko" for everyone else (/seller decides what to show). */
 function SellerLink() {
-  const { user } = useAuth()
-  const isSeller = user?.roles.includes('seller') ?? false
+  const isSeller = useIsSeller()
   return (
-    <Link
-      to="/seller"
-      className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-emerald-700 md:flex"
-    >
-      <Store className="size-4" aria-hidden="true" /> {isSeller ? 'Toko saya' : 'Buka toko'}
-    </Link>
+    <Button variant="ghost" asChild className="hidden text-muted-foreground hover:text-primary md:inline-flex">
+      <Link to="/seller">
+        <Store aria-hidden="true" /> {isSeller ? 'Toko saya' : 'Buka toko'}
+      </Link>
+    </Button>
   )
 }
 
-/** Login / register links, or the signed-in user's name and a logout button. */
+/**
+ * Signed out: "Masuk" / "Daftar". Signed in: an account menu (Radix
+ * DropdownMenu: keyboard navigation, focus return and Escape come with it)
+ * holding the profile link, the seller entry on small screens, and "Keluar".
+ */
 function AccountActions() {
   const { status, user, logout } = useAuth()
+  const isSeller = useIsSeller()
   const navigate = useNavigate()
   const location = useLocation()
   const [busy, setBusy] = useState(false)
 
   if (status === 'loading') {
-    return <span className="h-8 w-28 animate-pulse rounded-md bg-slate-100" aria-hidden="true" />
+    return <Skeleton className="h-8 w-28" aria-hidden="true" />
   }
 
   if (user) {
@@ -85,7 +107,14 @@ function AccountActions() {
       // Leave the current page FIRST. If we cleared the user while still on a
       // protected page (e.g. /account), its RequireAuth guard would redirect
       // to /login?next=/account and override this navigation.
-      navigate('/')
+      //
+      // flushSync: React Router normally commits a navigation inside
+      // startTransition (low priority). setUser(null) after logout is an
+      // urgent update, so if the logout request returned first, React
+      // rendered the OLD page without a user and the guard redirected to
+      // /login. That race showed up in E2E once logout moved into the Radix
+      // menu. flushSync commits "/" synchronously, so the order is guaranteed.
+      await navigate('/', { flushSync: true })
       try {
         await logout()
       } finally {
@@ -93,25 +122,37 @@ function AccountActions() {
       }
     }
     return (
-      <div className="flex items-center gap-1">
-        <Link
-          to="/account"
-          className="flex max-w-40 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-        >
-          <UserRound className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{user.name}</span>
-        </Link>
-        <button
-          type="button"
-          onClick={signOut}
-          disabled={busy}
-          aria-label="Keluar"
-          title="Keluar"
-          className="rounded-md p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-        >
-          <LogOut className="size-4" aria-hidden="true" />
-        </button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="max-w-44 text-foreground/80">
+            <UserRound aria-hidden="true" />
+            <span className="truncate">{user.name}</span>
+            <ChevronDown className="text-muted-foreground" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-normal">
+            <p className="truncate font-medium text-foreground">{user.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to="/account">
+              <UserRound aria-hidden="true" /> Akun saya
+            </Link>
+          </DropdownMenuItem>
+          {/* The header shows the seller link from md up; below that it lives here. */}
+          <DropdownMenuItem asChild className="md:hidden">
+            <Link to="/seller">
+              <Store aria-hidden="true" /> {isSeller ? 'Toko saya' : 'Buka toko'}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" disabled={busy} onSelect={() => void signOut()}>
+            <LogOut aria-hidden="true" /> Keluar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     )
   }
 
@@ -123,18 +164,12 @@ function AccountActions() {
 
   return (
     <>
-      <Link
-        to={`/login${next}`}
-        className="rounded-md border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
-      >
-        Masuk
-      </Link>
-      <Link
-        to={`/register${next}`}
-        className="hidden rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 sm:block"
-      >
-        Daftar
-      </Link>
+      <Button variant="outline" asChild className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
+        <Link to={`/login${next}`}>Masuk</Link>
+      </Button>
+      <Button asChild className="hidden sm:inline-flex">
+        <Link to={`/register${next}`}>Daftar</Link>
+      </Button>
     </>
   )
 }
@@ -152,36 +187,33 @@ function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: stri
       <label htmlFor="site-search" className="sr-only">
         Cari produk
       </label>
-      <input
+      <Input
         id="site-search"
         type="search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Cari produk di PasarKita"
-        className="min-w-0 flex-1 rounded-l-md border border-r-0 border-slate-300 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+        className="h-9 min-w-0 flex-1 rounded-r-none border-r-0"
       />
-      <button
-        type="submit"
-        aria-label="Cari"
-        className="rounded-r-md bg-emerald-600 px-3 text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
-      >
-        <Search className="size-4" aria-hidden="true" />
-      </button>
+      <Button type="submit" aria-label="Cari" className="h-9 rounded-l-none px-3">
+        <Search aria-hidden="true" />
+      </Button>
     </form>
   )
 }
 
 function CategoryNav() {
   const { state } = useCategories()
-  if (state.status !== 'success') return <div className="h-10 border-t border-slate-100" />
+  if (state.status !== 'success') return <div className="h-10 border-t border-border/60" />
 
   const link = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-full px-3 py-1 text-sm ${
-      isActive ? 'bg-emerald-100 font-medium text-emerald-800' : 'text-slate-600 hover:bg-slate-100'
-    }`
+    cn(
+      'whitespace-nowrap rounded-full px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+      isActive ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+    )
 
   return (
-    <nav aria-label="Kategori" className="border-t border-slate-100">
+    <nav aria-label="Kategori" className="border-t border-border/60">
       <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-1.5">
         <li>
           <NavLink to="/products" end className={link}>

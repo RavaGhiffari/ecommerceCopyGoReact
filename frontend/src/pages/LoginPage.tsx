@@ -51,9 +51,9 @@ export function LoginPage() {
         />
         <SubmitButton busy={isSubmitting}>Masuk</SubmitButton>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Belum punya akun?{' '}
-        <Link to={`/register${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-medium text-emerald-700 hover:underline">
+        <Link to={`/register${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-medium text-primary hover:underline">
           Daftar
         </Link>
       </p>

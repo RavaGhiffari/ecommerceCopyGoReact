@@ -1,3 +1,5 @@
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Link, useParams } from 'react-router-dom'
 import { CalendarDays, MapPin } from 'lucide-react'
 import { Pagination } from '../components/shared/Pagination'
@@ -26,7 +28,7 @@ export function StorePage() {
         title="Toko tidak ditemukan"
         description="Toko ini tidak ada atau sudah tidak aktif."
         action={
-          <Link to="/products" className="text-sm font-medium text-emerald-700 hover:underline">
+          <Link to="/products" className="text-sm font-medium text-primary hover:underline">
             Lihat semua produk
           </Link>
         }
@@ -39,20 +41,20 @@ export function StorePage() {
   return (
     <div className="space-y-6">
       {store.state.status === 'loading' ? (
-        <div className="h-36 animate-pulse rounded-xl bg-slate-200" role="status" aria-label="Memuat toko" />
+        <Skeleton className="h-36 rounded-xl" role="status" aria-label="Memuat toko" />
       ) : (
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <Card className="p-5">
           <div className="flex items-start gap-4">
             <div
               aria-hidden="true"
-              className="flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-2xl font-bold text-emerald-700"
+              className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/15 text-2xl font-bold text-primary"
             >
               {store.state.data.name[0]}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold text-slate-900">{store.state.data.name}</h1>
-              <p className="mt-1 text-sm text-slate-600">{store.state.data.description}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-600">
+              <h1 className="text-2xl font-semibold">{store.state.data.name}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{store.state.data.description}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="size-4" aria-hidden="true" /> {store.state.data.location}
                 </span>
@@ -65,12 +67,12 @@ export function StorePage() {
               </div>
             </div>
           </div>
-        </section>
+        </Card>
       )}
 
       <section aria-labelledby="store-products">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="store-products" className="text-xl font-semibold text-slate-900">
+          <h2 id="store-products" className="text-xl font-semibold">
             Produk
           </h2>
           <SortSelect value={sort} onChange={setSort} />

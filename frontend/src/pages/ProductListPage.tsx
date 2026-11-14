@@ -32,7 +32,7 @@ export function ProductListPage() {
         title="Kategori tidak ditemukan"
         description="Kategori ini tidak ada. Pilih kategori lain dari menu di atas."
         action={
-          <Link to="/products" className="text-sm font-medium text-emerald-700 hover:underline">
+          <Link to="/products" className="text-sm font-medium text-primary hover:underline">
             Lihat semua produk
           </Link>
         }
@@ -51,8 +51,8 @@ export function ProductListPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
-          <p className="min-h-5 text-sm text-slate-600" aria-live="polite">
+          <h1 className="text-2xl font-semibold">{heading}</h1>
+          <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">
             {countText}
           </p>
         </div>
@@ -71,7 +71,7 @@ export function ProductListPage() {
         emptyDescription={q ? 'Periksa ejaan atau coba kata kunci yang lebih umum.' : 'Produk akan muncul di sini.'}
         emptyAction={
           q ? (
-            <Link to="/products" className="text-sm font-medium text-emerald-700 hover:underline">
+            <Link to="/products" className="text-sm font-medium text-primary hover:underline">
               Hapus pencarian
             </Link>
           ) : undefined
@@ -101,10 +101,10 @@ function SubcategoryChips({ current, all }: { current: Category; all: Category[]
   if (children.length === 0) return null
 
   const chip = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
+    `whitespace-nowrap rounded-full border px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
       isActive
-        ? 'border-emerald-600 bg-emerald-50 font-medium text-emerald-800'
-        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
+        ? 'border-primary bg-primary/10 font-medium text-primary'
+        : 'bg-card text-foreground/80 hover:border-foreground/30'
     }`
 
   return (

@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { TextAreaField } from '../components/shared/TextAreaField'
 import { FormAlert, TextField } from '../components/shared/TextField'
 import { SubmitButton } from '../features/auth/AuthCard'
@@ -52,17 +54,29 @@ export function SellerNewProductPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link to="/seller" className="text-sm text-slate-500 hover:text-emerald-700">
+      <Link to="/seller" className="text-sm text-muted-foreground hover:text-primary">
         ← Kembali ke toko
       </Link>
-      <h1 className="mb-6 mt-2 text-2xl font-semibold text-slate-900">Tambah produk</h1>
+      <h1 className="mb-6 mt-2 text-2xl font-semibold">Tambah produk</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
         <FormAlert message={formError} />
 
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+        <Card className="space-y-4 p-5">
           <TextField label="Nama produk" registration={register('name')} error={errors.name?.message} />
-          <CategorySelect registration={register('categoryId')} error={errors.categoryId?.message} />
+          <Controller
+            name="categoryId"
+            control={control}
+            render={({ field }) => (
+              <CategorySelect
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                error={errors.categoryId?.message}
+              />
+            )}
+          />
           <TextAreaField label="Deskripsi" rows={4} registration={register('description')} error={errors.description?.message} />
           <TextAreaField
             label="URL gambar (opsional)"
@@ -72,44 +86,41 @@ export function SellerNewProductPage() {
             registration={register('images')}
             error={errors.images?.message}
           />
-        </section>
+        </Card>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <Card className="gap-0 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Varian</h2>
-            <button
-              type="button"
-              onClick={() => append(emptyVariant)}
-              disabled={fields.length >= 20}
-              className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline disabled:opacity-40"
-            >
-              <Plus className="size-4" aria-hidden="true" /> Tambah varian
-            </button>
+            <h2 className="text-lg font-semibold">Varian</h2>
+            <Button type="button" variant="ghost" className="text-primary" onClick={() => append(emptyVariant)} disabled={fields.length >= 20}>
+              <Plus aria-hidden="true" /> Tambah varian
+            </Button>
           </div>
-          <p className="mb-4 text-sm text-slate-600">Setiap varian punya harga dan stok sendiri, misalnya ukuran atau warna.</p>
-          {variantsError && <p className="mb-3 text-sm text-red-600" role="alert">{variantsError}</p>}
+          <p className="mb-4 text-sm text-muted-foreground">Setiap varian punya harga dan stok sendiri, misalnya ukuran atau warna.</p>
+          {variantsError && <p className="mb-3 text-sm text-destructive" role="alert">{variantsError}</p>}
 
           <div className="space-y-4">
             {fields.map((field, i) => (
-              <fieldset key={field.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[2fr_1.5fr_1.5fr_1fr_auto] sm:items-start">
+              <fieldset key={field.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[2fr_1.5fr_1.5fr_1fr_auto] sm:items-start">
                 <legend className="sr-only">Varian {i + 1}</legend>
                 <TextField label="Nama" placeholder="Hitam / M" registration={register(`variants.${i}.name`)} error={errors.variants?.[i]?.name?.message} />
                 <TextField label="SKU" placeholder="KMJ-01" registration={register(`variants.${i}.sku`)} error={errors.variants?.[i]?.sku?.message} />
                 <TextField label="Harga (Rp)" inputMode="decimal" registration={register(`variants.${i}.price`)} error={errors.variants?.[i]?.price?.message} />
                 <TextField label="Stok" inputMode="numeric" registration={register(`variants.${i}.stock`)} error={errors.variants?.[i]?.stock?.message} />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-lg"
                   onClick={() => remove(i)}
                   disabled={fields.length === 1}
                   aria-label={`Hapus varian ${i + 1}`}
-                  className="self-end rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 sm:mb-0.5"
+                  className="self-end text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:mt-6"
                 >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </button>
+                  <Trash2 aria-hidden="true" />
+                </Button>
               </fieldset>
             ))}
           </div>
-        </section>
+        </Card>
 
         <div className="max-w-48">
           <SubmitButton busy={isSubmitting}>Simpan produk</SubmitButton>

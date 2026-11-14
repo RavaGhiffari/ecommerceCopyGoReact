@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from 'react-router-dom'
 import { Boxes, Dumbbell, Home, Laptop, Shirt, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { useCategories } from '../features/catalog/hooks'
@@ -27,16 +29,13 @@ export function HomePage() {
         <p className="mt-3 max-w-xl text-emerald-50">
           Jelajahi produk dari berbagai penjual. Keranjang dan checkout segera hadir.
         </p>
-        <Link
-          to="/products"
-          className="mt-6 inline-block rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-600"
-        >
-          Lihat semua produk
-        </Link>
+        <Button size="lg" asChild className="mt-6 h-10 bg-white px-5 font-semibold text-primary hover:bg-white/90 focus-visible:ring-white/60">
+          <Link to="/products">Lihat semua produk</Link>
+        </Button>
       </section>
 
       <section aria-labelledby="home-categories">
-        <h2 id="home-categories" className="mb-3 text-xl font-semibold text-slate-900">
+        <h2 id="home-categories" className="mb-3 text-xl font-semibold">
           Kategori
         </h2>
         {categories.status === 'success' ? (
@@ -47,9 +46,9 @@ export function HomePage() {
                 <li key={c.id}>
                   <Link
                     to={`/categories/${c.slug}`}
-                    className="flex h-full flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-center text-sm text-slate-700 hover:border-emerald-400 hover:text-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                    className="flex h-full flex-col items-center gap-2 rounded-xl bg-card p-3 text-center text-sm text-foreground/80 ring-1 ring-foreground/10 transition outline-none hover:text-primary hover:ring-primary/50 focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <span className="rounded-full bg-emerald-50 p-3 text-emerald-600">
+                    <span className="rounded-full bg-primary/10 p-3 text-primary">
                       <Icon className="size-5" aria-hidden="true" />
                     </span>
                     {c.name}
@@ -59,9 +58,9 @@ export function HomePage() {
             })}
           </ul>
         ) : (
-          <div className="grid animate-pulse grid-cols-3 gap-3 sm:grid-cols-6" role="status" aria-label="Memuat kategori">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6" role="status" aria-label="Memuat kategori">
             {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="h-24 rounded-xl bg-slate-200" />
+              <Skeleton key={i} className="h-24 rounded-xl" />
             ))}
           </div>
         )}

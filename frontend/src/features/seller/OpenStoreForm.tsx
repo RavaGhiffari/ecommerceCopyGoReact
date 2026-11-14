@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -35,9 +36,9 @@ export function OpenStoreForm() {
   }
 
   return (
-    <div className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
-      <h1 className="text-2xl font-semibold text-slate-900">Buka toko</h1>
-      <p className="mt-1 text-sm text-slate-600">
+    <Card className="mx-auto block max-w-lg p-6 sm:p-8">
+      <h1 className="text-2xl font-semibold">Buka toko</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
         Satu akun bisa memiliki satu toko. Alamat toko dibuat dari namanya dan tidak bisa diubah nanti.
       </p>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
@@ -47,6 +48,6 @@ export function OpenStoreForm() {
         <TextAreaField label="Deskripsi (opsional)" rows={3} registration={register('description')} error={errors.description?.message} />
         <SubmitButton busy={isSubmitting}>Buka toko</SubmitButton>
       </form>
-    </div>
+    </Card>
   )
 }

@@ -1,5 +1,10 @@
 import { useId, type InputHTMLAttributes } from 'react'
 import type { UseFormRegisterReturn } from 'react-hook-form'
+import { AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { FieldMessage } from './FieldMessage'
 
 interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'name'> {
   label: string
@@ -8,48 +13,39 @@ interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'na
   hint?: string
 }
 
-/** Label + input + error message, wired for screen readers. */
+/**
+ * Label + shadcn Input + error/hint, wired for screen readers.
+ * `registration` is react-hook-form's register(...) result; spreading it
+ * passes the ref, so RHF reads the real <input> element (React 19 passes
+ * ref as a normal prop to function components).
+ */
 export function TextField({ label, registration, error, hint, ...inputProps }: TextFieldProps) {
   const id = useId()
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
 
   return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
-        {label}
-      </label>
-      <input
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
-        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 ${
-          error
-            ? 'border-red-400 focus-visible:ring-red-500'
-            : 'border-slate-300 focus-visible:ring-emerald-600'
-        }`}
+        className="h-9"
         {...inputProps}
         {...registration}
       />
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      ) : (
-        hint && (
-          <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
-            {hint}
-          </p>
-        )
-      )}
+      <FieldMessage id={id} error={error} hint={hint} />
     </div>
   )
 }
 
+/** Form-level error (e.g. "Email atau kata sandi salah."); role="alert" is set by Alert. */
 export function FormAlert({ message }: { message: string | null }) {
   if (!message) return null
   return (
-    <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-      {message}
-    </p>
+    <Alert variant="destructive" className="border-destructive/30 bg-destructive/5">
+      <AlertCircle aria-hidden="true" />
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
   )
 }

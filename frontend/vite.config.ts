@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -9,6 +10,10 @@ const API_TARGET = 'http://localhost:8081'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // "@/components/ui/button" → src/components/ui/button (same alias as tsconfig).
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   server: {
     proxy: {
       // changeOrigin: false keeps the browser's Host header (e.g. localhost:5174).

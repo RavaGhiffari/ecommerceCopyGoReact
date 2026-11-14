@@ -53,9 +53,9 @@ export function RegisterPage() {
         />
         <SubmitButton busy={isSubmitting}>Daftar</SubmitButton>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Sudah punya akun?{' '}
-        <Link to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-medium text-emerald-700 hover:underline">
+        <Link to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-medium text-primary hover:underline">
           Masuk
         </Link>
       </p>
