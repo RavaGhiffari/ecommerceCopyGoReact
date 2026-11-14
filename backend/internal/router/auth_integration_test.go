@@ -24,6 +24,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/addresses"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
@@ -82,6 +83,7 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 	}
 	h := router.Handlers{
 		Health:     health.NewHandler(health.NewRepository(pool)),
+		Addresses:  addresses.NewHandler(addresses.NewService(pool)),
 		Auth:       auth.NewHandler(authSvc, false, limits),
 		Users:      users.NewHandler(users.NewService(pool)),
 		Categories: categories.NewHandler(categories.NewService(pool)),

@@ -119,6 +119,21 @@ type User struct {
 	UpdatedAt    time.Time
 }
 
+type UserAddress struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Label         string
+	RecipientName string
+	Phone         string
+	AddressLine   string
+	City          string
+	Province      string
+	PostalCode    string
+	IsDefault     bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type UserRole struct {
 	UserID    uuid.UUID
 	RoleID    uuid.UUID

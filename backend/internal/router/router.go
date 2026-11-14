@@ -9,6 +9,7 @@ import (
 
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/addresses"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
@@ -22,6 +23,7 @@ import (
 
 type Handlers struct {
 	Health     *health.Handler
+	Addresses  *addresses.Handler
 	Auth       *auth.Handler
 	Users      *users.Handler
 	Categories *categories.Handler
@@ -85,6 +87,12 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn := api.Group("", middleware.RequireAuth())
 	signedIn.GET("/me", h.Users.GetMe)
 	signedIn.PATCH("/me", h.Users.UpdateMe)
+
+	signedIn.GET("/me/addresses", h.Addresses.List)
+	signedIn.POST("/me/addresses", h.Addresses.Create)
+	signedIn.PATCH("/me/addresses/:id", h.Addresses.Update)
+	signedIn.DELETE("/me/addresses/:id", h.Addresses.Delete)
+	signedIn.POST("/me/addresses/:id/default", h.Addresses.SetDefault)
 	// The cart always belongs to the session user (no IDs from the client).
 	signedIn.GET("/cart", h.Cart.Get)
 	signedIn.POST("/cart/items", h.Cart.AddItem)
