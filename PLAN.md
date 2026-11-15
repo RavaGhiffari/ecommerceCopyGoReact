@@ -230,9 +230,9 @@ Preconditions: this plan is approved, and the housekeeping commit (PROJECT_STATE
 
 ---
 
-## Phase 6 — Reviews & dashboards: PLAN (draft 2026-11-15, awaiting approval)
+## Phase 6 — Reviews & dashboards: PLAN (approved 2026-11-15 with the proposed answers to Q1–Q15)
 
-Phase 5 is committed (`33e046e`, `6f10765`). Nothing in this section is built yet.
+Phase 5 is committed (`33e046e`, `6f10765`). Progress: **6a done and verified, awaiting review** (evidence: PROJECT_STATE §1j). 6b–6e not started.
 
 ### 6.0 Decisions
 
@@ -260,7 +260,7 @@ Each slice ends with its tests green and a review; the developer commits.
 
 | Slice | Content |
 |---|---|
-| **6a Reviews API** | Migration `000012_create_reviews` (reviews table + `products.rating_count/rating_total`); module `reviews`; `POST /reviews`, `PATCH /reviews/:id`, `GET /products/:id/reviews?page=` (public, with summary + distribution), `GET /me/reviews/pending` (eligible items without a review), `GET /me/reviews`; real ratings in product list/detail and store page; `sort=rating`; Q15 |
+| **6a Reviews API** ✅ | Migration `000012_create_reviews` (reviews table + `products.rating_count/rating_total`); module `reviews`; `POST /reviews`, `PATCH /reviews/:id`, `GET /products/:id/reviews?page=` (public, with summary + distribution), `GET /me/reviews/pending` (eligible items without a review), `GET /me/reviews`; real ratings in product list/detail and store page; `sort=rating`; Q15. As built: buyer order items carry `review: {id, rating} \| null` (one query, for the 6b buttons); the average is rounded to one decimal in `platform/rating`; `REVIEW_NOT_ALLOWED` details carry `orderStatus`; no lock on the order (delivered is final); the store rating includes archived products |
 | **6b Reviews UI** | Star rating component, review dialog (RHF + zod) from order detail and the account page, reviews section on product detail, stars on product cards, rating sort option |
 | **6c Seller dashboard** | `GET /seller/stats` + dashboard tiles on `/seller` |
 | **6d Admin API** | Migration `000013_create_audit_logs`; module `admin`: `GET /admin/users?q=&status=&page=`, `PATCH /admin/users/:id/status`, `GET /admin/stores?q=&status=&page=`, `PATCH /admin/stores/:id/status`, `GET /admin/orders?status=&page=`, `GET /admin/orders/:id`, `GET /admin/stats`, `PATCH /admin/reviews/:id/status`, `GET /admin/audit-logs?page=`; category create/update start writing audit rows |

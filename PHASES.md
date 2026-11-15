@@ -12,8 +12,8 @@ Status legend: ✅ implemented **and verified** · 🟡 implemented, awaiting de
 | 2 Catalog | categories (2 levels), stores, products, variants, image URLs, inventory + ledger, public listing/search, seller dashboard, `seed-dev` | ✅ |
 | 3 Marketplace UI on real APIs | homepage, nav, cards, detail, store page, search | 🟡 mostly delivered by Phase 2 wiring; remaining: polish, 390 px mobile check, banner/"recommended" refinement |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ (as built: [PLAN.md](PLAN.md)) |
-| 5 Checkout & orders | addresses, shipping simulation, one-transaction multi-store checkout (checkout → per-store orders), `available → reserved`, snapshots, idempotency key, order lifecycle, payment simulation, cancel/expiry release | 🟡 **last slice in review** — 5a–5d committed; 5e (checkout, payment and order UI) done, awaiting review; Phase 5 ends with it ([PLAN.md](PLAN.md)) |
-| 6 Reviews & dashboards | reviews (purchased only, one per purchase), rating aggregates, buyer/seller/admin dashboards, category admin UI | ⬜ |
+| 5 Checkout & orders | addresses, shipping simulation, one-transaction multi-store checkout (checkout → per-store orders), `available → reserved`, snapshots, idempotency key, order lifecycle, payment simulation, cancel/expiry release | ✅ 5a–5e committed |
+| 6 Reviews & dashboards | reviews (purchased only, one per purchase), rating aggregates, buyer/seller/admin dashboards, category admin UI | 🟡 plan approved; 6a (reviews API) done, awaiting review; 6b–6e not started ([PLAN.md](PLAN.md)) |
 | 7 Hardening | Playwright + Vitest suites, security review, `EXPLAIN` / index review, OpenAPI, CI, pinned images, session cleanup, deploy prep | ⬜ |
 
 ## Rules for moving between phases
@@ -30,6 +30,6 @@ Status legend: ✅ implemented **and verified** · 🟡 implemented, awaiting de
 - Opening a store is `POST /api/v1/seller/store` (singular) and is open to any signed-in user; it grants the `seller` role.
 - Product detail is addressed by store: `GET /api/v1/stores/:slug/products/:productSlug` (not `/products/:id`).
 - Money travels as decimal strings (`"349000.00"`).
-- Rating sort was dropped until reviews exist (Phase 6).
+- Rating sort was dropped until reviews existed; it is back since Phase 6a (`sort=rating`).
 - Mock data was a Phase 0.5 device only; it no longer exists.
 - Cart `DELETE` returns the updated cart with 200 (not 204), like every other cart route.

@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-14, after **Phase 4 (cart)** and the **shadcn/ui migration** were committed, for a fresh Claude Code session.
+Updated 2026-11-15, after **Phase 6a (reviews API)** was built (uncommitted), for a fresh Claude Code session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -26,7 +26,8 @@ Updated 2026-11-14, after **Phase 4 (cart)** and the **shadcn/ui migration** wer
 | 4 Cart | committed (`7e57829`, `f312b0b`; docs `0d63dfc`) |
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
-| **5 Checkout & orders** | plan approved (Q1–Q12 defaults); 5a committed (`f7ef72f`, `7c1d441`, `5efc212`); 5b committed (`9eec081`, `98bff00`); 5c committed (`870bcbe`, `c9caf97`); 5d committed (`2cf29fb`, `1dde9e0`); **5e frontend done and verified, uncommitted** (PROJECT_STATE §1i); Phase 5 ends with it |
+| 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
+| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); **6a reviews API done and verified, uncommitted** (PROJECT_STATE §1j); next slice 6b (reviews UI) |
 
 ---
 
@@ -102,8 +103,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 5e** (PROJECT_STATE §1i has the commands). That closes Phase 5.
-2. **Exact next task — plan Phase 6** (only after the developer approves starting it): reviews (rating 1–5 for delivered purchases, one per eligible purchase, average rating), buyer/seller/admin dashboards, admin category UI. Write the plan in PLAN.md with open questions and defaults, then **stop for approval before writing code**. E2E scripts (5 now, incl. `checkout-flow.mjs`) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
+1. **Developer reviews and commits 6a** (PROJECT_STATE §1j has the commands).
+2. **Exact next task — 6b reviews UI** (PLAN.md §6.1, Q14): star component, review dialog from `/orders/:id` (items carry `review`) and a "Menunggu ulasan" section on `/account` (`GET /me/reviews/pending`), reviews block on product detail (`GET /products/:id/reviews`), stars on cards, "Rating tertinggi" sort option; mirror the new DTOs in `src/types/`. Then stop for review. E2E scripts (5 now, incl. `checkout-flow.mjs`) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
 
 **First 10 minutes in a new session**
 

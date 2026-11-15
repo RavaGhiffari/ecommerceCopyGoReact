@@ -5,11 +5,11 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 
 |  |  |
 |---|---|
-| Snapshot date | 2026-11-14 |
-| Last commit | `1dde9e0` (Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 5e — checkout, payment and order UI** (frontend only) + doc updates — see §1i |
-| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); 5a–5d committed; slice 5e (the last slice) done and verified, awaiting review |
-| Next | review + commit 5e, which closes Phase 5; then Phase 6 (reviews, dashboards) after approval |
+| Snapshot date | 2026-11-15 |
+| Last commit | `932065a` (homepage carousel; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Phase 6a — reviews API** (backend only) + doc updates — see §1j |
+| Current phase | **Phase 6 in progress**: plan approved (PLAN.md, Q1–Q15 defaults); Phase 5 complete and committed; slice 6a done and verified, awaiting review |
+| Next | review + commit 6a; then 6b (reviews UI) |
 
 ---
 
@@ -29,7 +29,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-5b | Phase 5b checkout core | `9eec081`, docs `98bff00` | ✅ committed by the developer | see §1f |
 | CP-5c | Phase 5c payment & lifecycle | `870bcbe`, docs `c9caf97` | ✅ committed by the developer | see §1g |
 | CP-5d | Phase 5d seller orders | `2cf29fb`, docs `1dde9e0` | ✅ committed by the developer | see §1h |
-| CP-5e | Phase 5e checkout & order UI | **uncommitted** | 🟡 awaiting review | see §1i |
+| CP-5e | Phase 5e checkout & order UI | `33e046e`, docs `6f10765` | ✅ committed by the developer | see §1i |
+| CP-6a | Phase 6a reviews API | **uncommitted** | 🟡 awaiting review | see §1j |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -212,7 +213,7 @@ git commit -m "Update project docs for Phase 5d" -m "Co-Authored-By: Claude Opus
 
 **Left in the dev DB:** the E2E orders of `penjual3` (one shipped order from Gadget Nusantara per run, refunded Batik Kita orders, cancelled checkouts). Two paid orders left by the first, failed run were refunded through the API so their stock returned.
 
-**Commit CP-5e** (the developer commits):
+**Committed** as `33e046e` + `6f10765` with:
 
 ```bash
 git add -- frontend
@@ -220,6 +221,30 @@ git commit -m "Add Phase 5e checkout and order UI" -m "- /checkout: address pick
 
 git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 5e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 1j. Verified at CP-6a (reviews API), 2026-11-15
+
+| Check | Result |
+|---|---|
+| Migration `000012_create_reviews` | dev DB (`main`) 11 → up 12 → down 11 → up 12; `marketplace_test` migrated by `make test-integration`. By hand in psql (rolled back): `rating = 6` refused by `reviews_rating_check`, `rating_total > rating_count × 5` refused by `products_rating_check`, a second review of an item refused by `reviews_order_item_key` |
+| `make fmt` / `make vet` / `make test` | clean (`fmt` re-aligned two struct literals); new unit packages `platform/rating` (rounding) and `modules/reviews` (rating range, trimmed comment, 1000 runes not bytes, name masking incl. multi-byte and blank names) |
+| `make test-integration` | all packages ok; 5 new tests: only the buyer's **delivered** items (paid and refunded → 409 with `orderStatus`; other buyer, the seller → 404; anonymous 401; 422 lists `orderItemId` + `rating`; unknown `productId` field 400; comment trimmed; product taken from the order; second review 409; pending list, my reviews, `review` on the order item, product and store ratings); public list + summary + edits (average 3.7, distribution, newest first, masked name, no email / user id in the body, pagination, edit moves the counters by the delta, comment-only edit keeps them, 6 refused edits change nothing, a hidden review leaves list and aggregate and its edit does not touch the counters, archived product → 404); `sort=rating` (best average first, unreviewed last); **20 concurrent reviews of one product → count 20, total 60**; **the same item reviewed twice at once → one 201 + one 409, 5 rounds**; rating invariant 0 in every test. The catalog test that expected `sort=rating` → 422 now checks an unknown value instead |
+| Concurrency tests repeated | both new race tests passed 5 runs in a row (`-count=5`) |
+| Atomic counter update proven necessary | with `AdjustProductRating` replaced by read-then-write in Go, the 20-review race ended with **count 6 / total 15–23** instead of 20 / 60 in 3 of 3 runs. Restored afterwards; the review tests pass again |
+| Rebuilt API on the dev DB (`penjual3`) | `GET /me/reviews/pending` → 1 item (the delivered "Kabel USB-C Braided" from 5d); review 201, again 409 `REVIEW_EXISTS`; public list shows "Agus W***", summary 5.0 / 1 with distribution; `sort=rating` puts it first; Gadget Nusantara store rating 5.0 / 1; pending 0 afterwards. Rating invariant 0, stock ledger invariant 0 |
+| Frontend | unchanged in 6a; new response fields (`rating` values, `review` on order items) are additive |
+
+**Left in the dev DB on purpose:** one 5-star review by `penjual3@contoh.id` of "Kabel USB-C Braided" (Gadget Nusantara), as data for 6b.
+
+**Commit CP-6a** (the developer commits):
+
+```bash
+git add -- backend
+git commit -m "Add Phase 6a reviews API" -m "- Migration 000012: reviews (one per order item, rating 1-5, visible/hidden) and products.rating_count / rating_total with a CHECK" -m "- POST /reviews (only items of the caller's delivered orders), PATCH /reviews/:id, GET /products/:id/reviews (summary, distribution, masked names), GET /me/reviews, GET /me/reviews/pending" -m "- Counters updated atomically in the review transaction; real ratings on product list/detail and store page; sort=rating; order items carry their review" -m "- Seller product list sorted by created_at so counter updates no longer reorder it" -m "- Integration tests incl. ownership, invariant checks and two race tests" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 6a" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -234,8 +259,8 @@ git commit -m "Update project docs for Phase 5e" -m "Co-Authored-By: Claude Opus
 | 2 Catalog | categories (2 levels), stores, products, variants, images (URLs), inventory + ledger, public listing/search, seller dashboard, `seed-dev` | ✅ |
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
-| 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim | ⬜ |
-| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ⬜ |
+| 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
+| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a (reviews API) done, awaiting review; 6b–6e not started |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
 
 ---
@@ -265,19 +290,21 @@ Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/dec
 
 ---
 
-## 4. API surface (as of CP-5d)
+## 4. API surface (as of CP-6a)
 
 Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{code,message,details}}`.
 
 | Group | Routes |
 |---|---|
 | Infra (no prefix) | `GET /health` (no DB), `GET /ready` (DB query) |
-| Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` · `GET /products/:id/related` · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
-| Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart · `POST /checkout/quote` `{addressId, shipping:{<storeId>: regular\|express\|same_day}}` (read-only; missing store = regular) · `POST /checkout` (same body + header `Idempotency-Key: <uuid>`; 201 new, 200 repeat) · `GET /checkout/:id` · `POST /checkout/:id/cancel` (only while `pending_payment`; returns the checkout) · `POST /payments/:id/simulate` `{outcome: success\|failure, eventId: uuid}` (plays the gateway webhook; the same `eventId` again is a no-op 200; returns the checkout) · `GET /orders?page&pageSize` · `GET /orders/:id` (with `history`) · `POST /orders/:id/cancel` (a `paid` order → `refunded`, stock restocked; returns the order) |
+| Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` (sort `popular\|newest\|price_asc\|price_desc\|rating`) · `GET /products/:id/related` · `GET /products/:id/reviews?page&pageSize` (6a: `{summary: {average, count, distribution: {"1".."5"}}, items: [{id, rating, comment, reviewerName (masked), variantName, edited, createdAt}], page…}`; non-public product → 404 `PRODUCT_NOT_FOUND`) · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
+| Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart · `POST /checkout/quote` `{addressId, shipping:{<storeId>: regular\|express\|same_day}}` (read-only; missing store = regular) · `POST /checkout` (same body + header `Idempotency-Key: <uuid>`; 201 new, 200 repeat) · `GET /checkout/:id` · `POST /checkout/:id/cancel` (only while `pending_payment`; returns the checkout) · `POST /payments/:id/simulate` `{outcome: success\|failure, eventId: uuid}` (plays the gateway webhook; the same `eventId` again is a no-op 200; returns the checkout) · `GET /orders?page&pageSize` · `GET /orders/:id` (with `history`) · `POST /orders/:id/cancel` (a `paid` order → `refunded`, stock restocked; returns the order) · `POST /reviews` `{orderItemId, rating 1..5, comment? ≤ 1000}` (6a; 201) · `PATCH /reviews/:id` `{rating?, comment?}` · `GET /me/reviews?page&pageSize` (own, hidden included, with `item` ref) · `GET /me/reviews/pending?page&pageSize` (delivered items without a review) |
 | Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` · `GET /seller/orders?status&page&pageSize` (own store only, newest first) · `GET /seller/orders/:id` (with `history`) · `PATCH /seller/orders/:id/status` `{status, note?}` (paid → processing → shipped → delivered; returns the order) |
 | Admin (`admin` role) | `POST /admin/categories` · `PUT /admin/categories/:id` |
 
 Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204. Checkout: `IDEMPOTENCY_KEY_REQUIRED` 400 (missing or not a UUID), `CART_HAS_ISSUES` 409 (details `items[]` with `itemId, variantId, productName, variantName, quantity, availableQuantity, issue`; issue adds `own_product`), `IDEMPOTENCY_KEY_REUSED` 409, `CART_EMPTY` 422, `SHIPPING_METHOD_NOT_ALLOWED` 422 (details keyed `shipping.<storeId>`), `ADDRESS_NOT_FOUND` 404, `CHECKOUT_NOT_FOUND` 404, `ORDER_NOT_FOUND` 404 (also another buyer's order or a malformed id). Lifecycle (5c): `CHECKOUT_NOT_PENDING` 409, `CHECKOUT_EXPIRED` 409 (the checkout was closed as expired by this request), `PAYMENT_NOT_FOUND` 404, `PAYMENT_EVENT_CONFLICT` 409 (event id already used for another payment or outcome), `INVALID_STATUS_TRANSITION` 409 (details `{from, to}`, or `{from: "pending_payment", checkoutId}` when an unpaid order is cancelled on its own). Seller orders (5d): `ORDER_NOT_FOUND` 404 for another store's order, `STORE_REQUIRED` 409 without a store, `INVALID_STATUS_TRANSITION` 409 for any change the table does not allow the seller, 422 for an unknown status or a note over 500 characters.
+
+Reviews (6a): `ORDER_ITEM_NOT_FOUND` 404 (also another buyer's item or a seller asking), `REVIEW_NOT_ALLOWED` 409 (details `{orderStatus}`; only `delivered` qualifies), `REVIEW_EXISTS` 409, `REVIEW_NOT_FOUND` 404 (another user's or malformed id), `PRODUCT_NOT_FOUND` 404, 422 for rating / comment / ids / paging. Ratings in product summaries, product detail and the store page are real since 6a (`average` rounded to one decimal, `count`); buyer and seller order items carry `review: {id, rating} | null`.
 
 Lifecycle states: checkout `pending_payment → paid | cancelled | expired`; payment `pending → succeeded | failed | cancelled | expired`; on failure, cancel or expiry every order becomes `cancelled`.
 
@@ -287,7 +314,7 @@ Cart response: `{ stores: [{ store, items: [{ id, quantity, variantId, variantNa
 
 ---
 
-## 5. Data model (migrations 000001–000011)
+## 5. Data model (migrations 000001–000012)
 
 | Table | Notes |
 |---|---|
@@ -310,6 +337,8 @@ Cart response: `{ stores: [{ store, items: [{ id, quantity, variantId, variantNa
 | `order_status_histories` | append-only; `from_status` NULL at creation; `actor_id` NULL = system |
 | `payments` | one per checkout; `reference` UNIQUE; provider `simulated`; status pending/succeeded/failed/expired/cancelled |
 | `payment_events` | `event_id` UNIQUE (duplicate deliveries are no-ops); created in 5b, used from 5c |
+| `reviews` (000012) | `order_item_id` UNIQUE (one per purchase); `product_id`, `store_id`, `user_id` copied from the order; rating 1..5 CHECK; comment ≤ 1000 chars; status visible/hidden; all FKs RESTRICT; partial index `(product_id, created_at DESC) WHERE visible`, index `(user_id, created_at DESC)` |
+| `products.rating_count`, `rating_total` (000012) | denormalised counters of VISIBLE reviews; CHECK `rating_count ≥ 0 AND rating_total BETWEEN rating_count AND rating_count × 5` |
 
 All FKs of the checkout tables are `ON DELETE RESTRICT` (history). `inventory_movements.movement_type` also allows `restock` since 000011.
 
@@ -324,7 +353,9 @@ WHERE COALESCE(m.s,0) <> i.available_quantity;
 
 Since 5b the same must hold for `reserved_quantity` vs `SUM(reserved_delta)` (the integration helper `ledgerMismatches` checks both). `SUM(reserved_quantity)` equals the units held by `pending_payment` checkouts. Since 5c every ledger type is written: `reservation` (place), `consumption` (paid), `release` (failure, cancel, expiry; reference = checkout) and `restock` (refund; reference = order).
 
-Not yet created (planned): `reviews`, `shipping_methods`, `shipments`, `audit_logs`.
+Since 6a also: for every product, `rating_count = COUNT(*)` and `rating_total = SUM(rating)` of its `visible` reviews (integration helper `ratingMismatches`).
+
+Not yet created (planned): `audit_logs` (6d), `shipping_methods`, `shipments`.
 
 ---
 
@@ -334,6 +365,13 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 | Decision | Why |
 |---|---|
+| (6a) One review per **order item** of a delivered order (`order_item_id UNIQUE`); the author may edit, nobody deletes; no review window | developer approved Q1–Q3; buying twice gives two reviews |
+| (6a) Product rating = denormalised `rating_count` / `rating_total`, changed in the review transaction with `UPDATE … SET x = x + delta` | listings need the rating on every card without a join; proven: a read-then-write in Go lost 14 of 20 concurrent reviews |
+| (6a) No lock on the order when reviewing | `delivered` is final in the transition table, so the checked status cannot change; the unique index handles concurrent duplicates (`ON CONFLICT DO NOTHING` → 409) |
+| (6a) Store rating = sum over all of its products, archived included, computed on read | archived products were real purchases; no second counter to keep in sync |
+| (6a) Public review list returns the name masked ("Agus W***"), never email or user id | reviews are public, identity is not |
+| (6a) Seller product list sorted by `created_at DESC` (Q15) | counter updates (sales, ratings) fire the `updated_at` trigger and used to move a product to the top of the seller's list |
+| (6a) Buyer/seller order items carry `review: {id, rating} \| null` (LEFT JOIN in `ListOrderItems`) | the 6b order page can show "Beri ulasan" / "Ubah ulasan" without one request per item |
 | (5e) `/checkout` sends exactly the shipping methods of the last quote it displayed, not the raw radio state | the order the buyer confirms is the quote they saw; `POST /checkout` requires a method for every store, the quote defaults missing ones to regular |
 | (5e) `Idempotency-Key` = `useState(() => crypto.randomUUID())`, once per visit of /checkout | double click / retry reuses it (server returns the same checkout); a new visit is a new attempt |
 | (5e) Changing the address resets the shipping choices to regular | Same Day depends on the destination city; avoids a 422 from a stale choice |
@@ -400,8 +438,8 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 ## 7. Test inventory
 
-- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`, `router/checkout_integration_test.go`. Since CP-5a also the `modules/addresses` unit package; since CP-5b `modules/shipping`, `modules/orders`, `modules/checkout`; since CP-5c the order transition table (`orders/transitions_test.go`) and `router/lifecycle_integration_test.go`; since CP-5d `orders/service_seller_test.go` and `router/seller_orders_integration_test.go`.
-- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e); 12 checkout flows incl. rollback, idempotency and two concurrency tests (see §1f); 9 lifecycle flows incl. idempotent payment events, expiry, refund and two race tests (see §1g); 4 seller order flows incl. ownership, transition rules and the processing-vs-cancel race (see §1h).
+- **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`, `router/checkout_integration_test.go`. Since CP-5a also the `modules/addresses` unit package; since CP-5b `modules/shipping`, `modules/orders`, `modules/checkout`; since CP-5c the order transition table (`orders/transitions_test.go`) and `router/lifecycle_integration_test.go`; since CP-5d `orders/service_seller_test.go` and `router/seller_orders_integration_test.go`; since CP-6a `platform/rating`, `modules/reviews/model_test.go` and `router/reviews_integration_test.go`. 165 test functions in source at CP-6a.
+- **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e); 12 checkout flows incl. rollback, idempotency and two concurrency tests (see §1f); 9 lifecycle flows incl. idempotent payment events, expiry, refund and two race tests (see §1g); 4 seller order flows incl. ownership, transition rules and the processing-vs-cancel race (see §1h); 5 review flows incl. ownership, the rating invariant and two race tests (see §1j).
 - **Browser E2E**: four `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16, `address-flow.mjs` 11, which uses the demo login `penjual3@contoh.id` and deletes what it creates) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
 - **Frontend unit tests (Vitest)**: none yet.
 
@@ -437,8 +475,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Dev DB contains leftover test accounts/stores (`seller-…@contoh.id`, `admin@contoh.id`, `e2e-…`) | clutter only | cleanup offered, not done |
 | Categories manageable only via admin API (no UI) | admin must use curl | Phase 6 |
 | Images are URLs only; no upload, no hotlink protection | seller can point at any host | decide with storage plan |
-| `sold_count` changes with real payments and refunds since 5c, but the demo values are seeded; ratings are 0 | "popular" is mostly demo data | Phase 6 (ratings) |
-| Updating `sold_count` fires the `products` `updated_at` trigger, and the seller product list sorts by `updated_at DESC` | a sale moves the product to the top of the seller's own list | accept, or sort that list by `created_at` / skip the trigger for counter-only updates |
+| `sold_count` changes with real payments and refunds since 5c, but the demo values are seeded; ratings are real since 6a but `seed-dev` creates no reviews | "popular" is mostly demo data; almost every product shows 0 ratings | seed reviews later if wanted |
+| Updating `sold_count` or the rating counters fires the `products` `updated_at` trigger | `updated_at` means "last change of anything", not "last edit by the seller"; the seller list no longer sorts by it (6a) | accept, or skip the trigger for counter-only updates |
+| No index for `sort=rating` (computed `rating_total / rating_count`) | full sort of the matching products | Phase 7 `EXPLAIN` |
 | `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | handled in the UI: at 0:00 the pay buttons are disabled and "Muat ulang status" is offered |
 | The countdown uses the browser clock | a skewed client clock shows the wrong remaining time | server decides anyway (`CHECKOUT_EXPIRED`); could send server time with the response |
 | No frontend unit tests (Vitest/RTL) yet; UI verified by hand-run E2E scripts | regressions caught only when a script is run | Phase 7 |
@@ -475,8 +514,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 5e (§1i). That closes Phase 5.
-2. **Phase 6** (needs approval first): reviews (rating 1–5 for delivered purchases, one per eligible purchase, average on products/stores), buyer/seller/admin dashboards, admin category UI. Plan it in PLAN.md before coding.
+1. Developer reviews and commits 6a (§1j).
+2. 6b reviews UI, then 6c seller dashboard, 6d admin API, 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
 3. Then Phase 7. The trusted-proxy question stays in Phase 7 (§9).
 
 ---
