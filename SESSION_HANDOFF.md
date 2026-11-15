@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-15, after **Phase 6a (reviews API)** was built (uncommitted), for a fresh Claude Code session.
+Updated 2026-11-15, after **Phase 6b (reviews UI)** was built (uncommitted; 6a committed), for a fresh Claude Code session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -27,7 +27,7 @@ Updated 2026-11-15, after **Phase 6a (reviews API)** was built (uncommitted), fo
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
-| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); **6a reviews API done and verified, uncommitted** (PROJECT_STATE §1j); next slice 6b (reviews UI) |
+| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); **6b reviews UI done and verified, uncommitted** (PROJECT_STATE §1k); next slice 6c (seller dashboard) |
 
 ---
 
@@ -103,8 +103,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 6a** (PROJECT_STATE §1j has the commands).
-2. **Exact next task — 6b reviews UI** (PLAN.md §6.1, Q14): star component, review dialog from `/orders/:id` (items carry `review`) and a "Menunggu ulasan" section on `/account` (`GET /me/reviews/pending`), reviews block on product detail (`GET /products/:id/reviews`), stars on cards, "Rating tertinggi" sort option; mirror the new DTOs in `src/types/`. Then stop for review. E2E scripts (5 now, incl. `checkout-flow.mjs`) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
+1. **Developer reviews and commits 6b** (PROJECT_STATE §1k has the commands).
+2. **Exact next task — 6c seller dashboard** (PLAN.md §6.1, Q12): `GET /seller/stats` (order counts per status, revenue = `items_subtotal` of paid/processing/shipped/delivered orders for the last 30 days and all time, units sold, top 5 products by units in 30 days, store rating), integration tests with hand-computed fixtures and another store's orders never counted, then stat tiles + a small table on `/seller` (no chart library). Then stop for review. E2E scripts (6 now, incl. `review-flow.mjs`; `playwright-core` installs in a scratch folder, run them from PowerShell) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
 
 **First 10 minutes in a new session**
 

@@ -7,9 +7,9 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |---|---|
 | Snapshot date | 2026-11-15 |
 | Last commit | `932065a` (homepage carousel; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 6a — reviews API** (backend only) + doc updates — see §1j |
-| Current phase | **Phase 6 in progress**: plan approved (PLAN.md, Q1–Q15 defaults); Phase 5 complete and committed; slice 6a done and verified, awaiting review |
-| Next | review + commit 6a; then 6b (reviews UI) |
+| Uncommitted | **Phase 6b — reviews UI** (frontend + one additive backend field) + doc updates — see §1k |
+| Current phase | **Phase 6 in progress**: plan approved (PLAN.md, Q1–Q15 defaults); 6a committed; slice 6b done and verified, awaiting review |
+| Next | review + commit 6b; then 6c (seller dashboard) |
 
 ---
 
@@ -30,7 +30,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-5c | Phase 5c payment & lifecycle | `870bcbe`, docs `c9caf97` | ✅ committed by the developer | see §1g |
 | CP-5d | Phase 5d seller orders | `2cf29fb`, docs `1dde9e0` | ✅ committed by the developer | see §1h |
 | CP-5e | Phase 5e checkout & order UI | `33e046e`, docs `6f10765` | ✅ committed by the developer | see §1i |
-| CP-6a | Phase 6a reviews API | **uncommitted** | 🟡 awaiting review | see §1j |
+| CP-6a | Phase 6a reviews API | `491953f`, docs `f8ab642` | ✅ committed by the developer | see §1j |
+| CP-6b | Phase 6b reviews UI | **uncommitted** | 🟡 awaiting review | see §1k |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -237,7 +238,7 @@ git commit -m "Update project docs for Phase 5e" -m "Co-Authored-By: Claude Opus
 
 **Left in the dev DB on purpose:** one 5-star review by `penjual3@contoh.id` of "Kabel USB-C Braided" (Gadget Nusantara), as data for 6b.
 
-**Commit CP-6a** (the developer commits):
+**Committed** as `491953f` + `f8ab642` with:
 
 ```bash
 git add -- backend
@@ -245,6 +246,30 @@ git commit -m "Add Phase 6a reviews API" -m "- Migration 000012: reviews (one pe
 
 git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 6a" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 1k. Verified at CP-6b (reviews UI), 2026-11-15
+
+| Check | Result |
+|---|---|
+| Backend (additive) | `ListOrderItems` also returns `r.comment`; order items carry `review: {id, rating, comment}`; `make fmt` / `make vet` / `make test-integration` all ok (the 6a test asserts the new field) |
+| `npm run build` / `npm run lint` | clean (Vite's existing "chunk > 500 kB" warning only); two oxlint warnings from the first draft fixed (`STAR_LABELS` no longer exported from a component file, `watch` → `useWatch`) |
+| Browser E2E `review-flow.mjs` (Edge headless, Vite :5190, real API + dev DB; buyer `penjual3`, seller `penjual1`) | **11/11**, 0 page errors: pending item on `/account`; the dialog refuses 0 stars; 4 stars + comment → toast, the item moves to "Ulasan saya"; product page shows it with "Agus W***", summary +1, no `@` in the section; the title rating jumps to `#ulasan`; `/orders/:id` "Ubah ulasan" opens prefilled (4 stars + comment), edit to 2 stars → toast, stars updated without a page reload; product page shows "· diubah" and the new text; an undelivered order has no review button; "Rating tertinggi" sort; a second review via the API → 409 |
+| Bug found by the E2E | the visually hidden radio (`sr-only` = `position: absolute`) sat outside its star because the `<label>` was not `relative`; focusing it could scroll the page. Fixed (`relative` on the label); positions checked in the browser (each input inside its star). Two other failures were selector bugs in the script (clicking the hidden input during the dialog animation instead of the star; `/diubah/` also matching the comment) |
+| Regression E2E | `address-flow` 11/11 (account page), `checkout-flow` 16/16 (order pages) |
+| Visual check (screenshots) | product review block (summary, distribution bars, list), `/account` review cards, order page with stars + "Ubah ulasan" |
+| Dev DB | rating invariant 0, stock ledger invariant 0 |
+
+**Left in the dev DB:** 4 E2E reviews of "Kabel USB-C Braided" by `penjual3` (one per run; texts start with "Ulasan E2E"), on orders delivered for the purpose, plus the orders from `checkout-flow`. Reviews cannot be deleted by design; hiding them is a 6d admin action.
+
+**Commit CP-6b** (the developer commits):
+
+```bash
+git add -- backend frontend
+git commit -m "Add Phase 6b reviews UI" -m "- Review dialog (star picker on native radios, RHF + zod, 1000-character counter) from /orders/:id and /account" -m "- /account: 'Menunggu ulasan' and 'Ulasan saya' (hidden-by-admin note); product page: summary, distribution and paginated reviews" -m "- 'Rating tertinggi' sort option; rating next to the title links to the reviews" -m "- Order items carry the review comment so editing starts from the saved text" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 6b" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -260,7 +285,7 @@ git commit -m "Update project docs for Phase 6a" -m "Co-Authored-By: Claude Opus
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
-| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a (reviews API) done, awaiting review; 6b–6e not started |
+| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a committed; 6b (reviews UI) done, awaiting review; 6c–6e not started |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
 
 ---
@@ -304,7 +329,7 @@ Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{c
 
 Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204. Checkout: `IDEMPOTENCY_KEY_REQUIRED` 400 (missing or not a UUID), `CART_HAS_ISSUES` 409 (details `items[]` with `itemId, variantId, productName, variantName, quantity, availableQuantity, issue`; issue adds `own_product`), `IDEMPOTENCY_KEY_REUSED` 409, `CART_EMPTY` 422, `SHIPPING_METHOD_NOT_ALLOWED` 422 (details keyed `shipping.<storeId>`), `ADDRESS_NOT_FOUND` 404, `CHECKOUT_NOT_FOUND` 404, `ORDER_NOT_FOUND` 404 (also another buyer's order or a malformed id). Lifecycle (5c): `CHECKOUT_NOT_PENDING` 409, `CHECKOUT_EXPIRED` 409 (the checkout was closed as expired by this request), `PAYMENT_NOT_FOUND` 404, `PAYMENT_EVENT_CONFLICT` 409 (event id already used for another payment or outcome), `INVALID_STATUS_TRANSITION` 409 (details `{from, to}`, or `{from: "pending_payment", checkoutId}` when an unpaid order is cancelled on its own). Seller orders (5d): `ORDER_NOT_FOUND` 404 for another store's order, `STORE_REQUIRED` 409 without a store, `INVALID_STATUS_TRANSITION` 409 for any change the table does not allow the seller, 422 for an unknown status or a note over 500 characters.
 
-Reviews (6a): `ORDER_ITEM_NOT_FOUND` 404 (also another buyer's item or a seller asking), `REVIEW_NOT_ALLOWED` 409 (details `{orderStatus}`; only `delivered` qualifies), `REVIEW_EXISTS` 409, `REVIEW_NOT_FOUND` 404 (another user's or malformed id), `PRODUCT_NOT_FOUND` 404, 422 for rating / comment / ids / paging. Ratings in product summaries, product detail and the store page are real since 6a (`average` rounded to one decimal, `count`); buyer and seller order items carry `review: {id, rating} | null`.
+Reviews (6a): `ORDER_ITEM_NOT_FOUND` 404 (also another buyer's item or a seller asking), `REVIEW_NOT_ALLOWED` 409 (details `{orderStatus}`; only `delivered` qualifies), `REVIEW_EXISTS` 409, `REVIEW_NOT_FOUND` 404 (another user's or malformed id), `PRODUCT_NOT_FOUND` 404, 422 for rating / comment / ids / paging. Ratings in product summaries, product detail and the store page are real since 6a (`average` rounded to one decimal, `count`); buyer and seller order items carry `review: {id, rating, comment} | null` (`comment` since 6b).
 
 Lifecycle states: checkout `pending_payment → paid | cancelled | expired`; payment `pending → succeeded | failed | cancelled | expired`; on failure, cancel or expiry every order becomes `cancelled`.
 
@@ -365,6 +390,9 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 | Decision | Why |
 |---|---|
+| (6b) The review dialog always sends rating **and** comment, starting from the saved review (order items carry its comment) | a dialog that started empty would have overwritten the old comment with "" on a rating-only change |
+| (6b) Star picker = visually hidden native radios inside `relative` labels | keyboard (Tab + arrows) and screen readers for free; proven: without `relative` the hidden input sat outside its star |
+| (6b) After saving a review, the order page refetches quietly (`getMyOrder` → `replace`) instead of `reload()` | no skeleton flash; the items then carry the new review |
 | (6a) One review per **order item** of a delivered order (`order_item_id UNIQUE`); the author may edit, nobody deletes; no review window | developer approved Q1–Q3; buying twice gives two reviews |
 | (6a) Product rating = denormalised `rating_count` / `rating_total`, changed in the review transaction with `UPDATE … SET x = x + delta` | listings need the rating on every card without a join; proven: a read-then-write in Go lost 14 of 20 concurrent reviews |
 | (6a) No lock on the order when reviewing | `delivered` is final in the transition table, so the checked status cannot change; the unique index handles concurrent duplicates (`ON CONFLICT DO NOTHING` → 409) |
@@ -514,8 +542,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 6a (§1j).
-2. 6b reviews UI, then 6c seller dashboard, 6d admin API, 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
+1. Developer reviews and commits 6b (§1k).
+2. 6c seller dashboard, then 6d admin API, 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
 3. Then Phase 7. The trusted-proxy question stays in Phase 7 (§9).
 
 ---

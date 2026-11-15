@@ -13,7 +13,7 @@ Status legend: ✅ implemented **and verified** · 🟡 implemented, awaiting de
 | 3 Marketplace UI on real APIs | homepage, nav, cards, detail, store page, search | 🟡 mostly delivered by Phase 2 wiring; remaining: polish, 390 px mobile check, banner/"recommended" refinement |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ (as built: [PLAN.md](PLAN.md)) |
 | 5 Checkout & orders | addresses, shipping simulation, one-transaction multi-store checkout (checkout → per-store orders), `available → reserved`, snapshots, idempotency key, order lifecycle, payment simulation, cancel/expiry release | ✅ 5a–5e committed |
-| 6 Reviews & dashboards | reviews (purchased only, one per purchase), rating aggregates, buyer/seller/admin dashboards, category admin UI | 🟡 plan approved; 6a (reviews API) done, awaiting review; 6b–6e not started ([PLAN.md](PLAN.md)) |
+| 6 Reviews & dashboards | reviews (purchased only, one per purchase), rating aggregates, buyer/seller/admin dashboards, category admin UI | 🟡 plan approved; 6a (reviews API) committed; 6b (reviews UI) done, awaiting review; 6c–6e not started ([PLAN.md](PLAN.md)) |
 | 7 Hardening | Playwright + Vitest suites, security review, `EXPLAIN` / index review, OpenAPI, CI, pinned images, session cleanup, deploy prep | ⬜ |
 
 ## Rules for moving between phases
