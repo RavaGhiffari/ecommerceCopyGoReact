@@ -1,6 +1,10 @@
 package stores
 
-import "time"
+import (
+	"time"
+
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/rating"
+)
 
 type ratingResponse struct {
 	Average float64 `json:"average"` // display value, not money
@@ -8,8 +12,8 @@ type ratingResponse struct {
 }
 
 // PublicStoreResponse is GET /api/v1/stores/:slug. Mirrors StoreDetail in
-// frontend/src/types/marketplace.ts. Ratings arrive with reviews (Phase 6);
-// until then they are 0.
+// frontend/src/types/marketplace.ts. The rating covers every review of every
+// product of the store (Phase 6a).
 type PublicStoreResponse struct {
 	ID                 string         `json:"id"`
 	Slug               string         `json:"slug"`
@@ -25,6 +29,7 @@ func NewPublicStoreResponse(s Store) PublicStoreResponse {
 	return PublicStoreResponse{
 		ID: s.ID.String(), Slug: s.Slug, Name: s.Name, Location: s.Location, Description: s.Description,
 		JoinedAt: s.CreatedAt, ActiveProductCount: s.ActiveProductCount,
+		Rating: ratingResponse{Average: rating.Average(s.RatingCount, s.RatingTotal), Count: int(s.RatingCount)},
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/rating"
 )
 
 // JSON contracts. Mirrored in frontend/src/types/marketplace.ts and
@@ -30,7 +31,7 @@ type StoreRefResponse struct {
 }
 
 type ratingResponse struct {
-	Average float64 `json:"average"` // reviews arrive in Phase 6; 0 until then
+	Average float64 `json:"average"` // one decimal, 0 without reviews (display value)
 	Count   int     `json:"count"`
 }
 
@@ -58,7 +59,8 @@ func NewSummaryResponse(s Summary) ProductSummaryResponse {
 		ID: s.ID.String(), Slug: s.Slug, Name: s.Name, CategoryID: s.CategoryID.String(),
 		Images: images, LowestPrice: money(s.LowestPrice), HighestPrice: money(s.HighestPrice),
 		SoldCount: s.SoldCount, InStock: s.InStock, CreatedAt: s.CreatedAt,
-		Store: StoreRefResponse{ID: s.Store.ID.String(), Slug: s.Store.Slug, Name: s.Store.Name, Location: s.Store.Location},
+		Rating: ratingResponse{Average: rating.Average(s.RatingCount, s.RatingTotal), Count: int(s.RatingCount)},
+		Store:  StoreRefResponse{ID: s.Store.ID.String(), Slug: s.Store.Slug, Name: s.Store.Name, Location: s.Store.Location},
 	}
 }
 

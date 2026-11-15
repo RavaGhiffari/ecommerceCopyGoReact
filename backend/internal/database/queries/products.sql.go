@@ -143,6 +143,7 @@ func (q *Queries) DeleteProductImages(ctx context.Context, productID uuid.UUID) 
 
 const getPublicProduct = `-- name: GetPublicProduct :one
 SELECT p.id, p.slug, p.name, p.description, p.category_id, p.sold_count, p.created_at,
+       p.rating_count, p.rating_total,
        s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.location AS store_location
 FROM products p
 JOIN stores s ON s.id = p.store_id
@@ -165,6 +166,8 @@ type GetPublicProductRow struct {
 	CategoryID    uuid.UUID
 	SoldCount     int32
 	CreatedAt     time.Time
+	RatingCount   int32
+	RatingTotal   int32
 	StoreID       uuid.UUID
 	StoreSlug     string
 	StoreName     string
@@ -183,6 +186,8 @@ func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductPara
 		&i.CategoryID,
 		&i.SoldCount,
 		&i.CreatedAt,
+		&i.RatingCount,
+		&i.RatingTotal,
 		&i.StoreID,
 		&i.StoreSlug,
 		&i.StoreName,
@@ -322,6 +327,7 @@ func (q *Queries) ListProductImages(ctx context.Context, productID uuid.UUID) ([
 const listPublicProducts = `-- name: ListPublicProducts :many
 
 SELECT p.id, p.slug, p.name, p.category_id, p.sold_count, p.created_at,
+       p.rating_count, p.rating_total,
        s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.location AS store_location,
        v.min_price, v.max_price, v.in_stock,
        -- LEFT JOIN: NULL when the product has no image. COALESCE makes that an
@@ -357,6 +363,10 @@ ORDER BY
   CASE WHEN $5::text = 'price_asc'  THEN v.min_price END ASC,
   CASE WHEN $5::text = 'price_desc' THEN v.min_price END DESC,
   CASE WHEN $5::text = 'popular'    THEN p.sold_count END DESC,
+  -- rating: highest average first; products without reviews (NULL average)
+  -- last; equal averages -> more reviews first.
+  CASE WHEN $5::text = 'rating'     THEN p.rating_total::numeric / NULLIF(p.rating_count, 0) END DESC NULLS LAST,
+  CASE WHEN $5::text = 'rating'     THEN p.rating_count END DESC,
   -- Ties (and sort=newest) fall back to newest first; id makes paging stable.
   p.created_at DESC,
   p.id
@@ -380,6 +390,8 @@ type ListPublicProductsRow struct {
 	CategoryID    uuid.UUID
 	SoldCount     int32
 	CreatedAt     time.Time
+	RatingCount   int32
+	RatingTotal   int32
 	StoreID       uuid.UUID
 	StoreSlug     string
 	StoreName     string
@@ -425,6 +437,8 @@ func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProducts
 			&i.CategoryID,
 			&i.SoldCount,
 			&i.CreatedAt,
+			&i.RatingCount,
+			&i.RatingTotal,
 			&i.StoreID,
 			&i.StoreSlug,
 			&i.StoreName,
@@ -457,7 +471,7 @@ LEFT JOIN product_variants pv ON pv.product_id = p.id
 LEFT JOIN inventory i ON i.variant_id = pv.id
 WHERE p.store_id = $1
 GROUP BY p.id
-ORDER BY p.updated_at DESC
+ORDER BY p.created_at DESC, p.id
 `
 
 type ListStoreProductsRow struct {
@@ -474,6 +488,8 @@ type ListStoreProductsRow struct {
 }
 
 // The seller's own products, archived ones included, with a stock summary.
+// created_at, not updated_at: counter updates (sold_count, ratings) fire the
+// updated_at trigger and would move a product to the top on every sale.
 func (q *Queries) ListStoreProducts(ctx context.Context, storeID uuid.UUID) ([]ListStoreProductsRow, error) {
 	rows, err := q.db.Query(ctx, listStoreProducts, storeID)
 	if err != nil {

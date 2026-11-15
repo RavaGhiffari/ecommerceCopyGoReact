@@ -10,6 +10,7 @@
 -- A product is public only when it is active, its store is active, and it has
 -- at least one variant (the inner LATERAL join drops products without one).
 SELECT p.id, p.slug, p.name, p.category_id, p.sold_count, p.created_at,
+       p.rating_count, p.rating_total,
        s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.location AS store_location,
        v.min_price, v.max_price, v.in_stock,
        -- LEFT JOIN: NULL when the product has no image. COALESCE makes that an
@@ -45,6 +46,10 @@ ORDER BY
   CASE WHEN @sort::text = 'price_asc'  THEN v.min_price END ASC,
   CASE WHEN @sort::text = 'price_desc' THEN v.min_price END DESC,
   CASE WHEN @sort::text = 'popular'    THEN p.sold_count END DESC,
+  -- rating: highest average first; products without reviews (NULL average)
+  -- last; equal averages -> more reviews first.
+  CASE WHEN @sort::text = 'rating'     THEN p.rating_total::numeric / NULLIF(p.rating_count, 0) END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'rating'     THEN p.rating_count END DESC,
   -- Ties (and sort=newest) fall back to newest first; id makes paging stable.
   p.created_at DESC,
   p.id
@@ -53,6 +58,7 @@ LIMIT @page_limit OFFSET @page_offset;
 -- name: GetPublicProduct :one
 -- Product detail by its store-scoped address /stores/{store}/products/{product}.
 SELECT p.id, p.slug, p.name, p.description, p.category_id, p.sold_count, p.created_at,
+       p.rating_count, p.rating_total,
        s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.location AS store_location
 FROM products p
 JOIN stores s ON s.id = p.store_id
@@ -109,7 +115,9 @@ LEFT JOIN product_variants pv ON pv.product_id = p.id
 LEFT JOIN inventory i ON i.variant_id = pv.id
 WHERE p.store_id = @store_id
 GROUP BY p.id
-ORDER BY p.updated_at DESC;
+-- created_at, not updated_at: counter updates (sold_count, ratings) fire the
+-- updated_at trigger and would move a product to the top on every sale.
+ORDER BY p.created_at DESC, p.id;
 
 -- name: UpdateStoreProduct :one
 UPDATE products

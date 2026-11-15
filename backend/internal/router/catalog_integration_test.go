@@ -376,7 +376,9 @@ func TestPublicListing_SortSearchFilterPaginate(t *testing.T) {
 	assert.Empty(t, listItems(past))
 	assert.Equal(t, float64(3), past.data()["total"], "total is still reported past the last page")
 
-	assert.Equal(t, http.StatusUnprocessableEntity, app.do("GET", "/api/v1/products?sort=rating", "", "").status)
+	// sort=rating exists since Phase 6a (reviews_integration_test.go); an
+	// unknown value is still refused.
+	assert.Equal(t, http.StatusUnprocessableEntity, app.do("GET", "/api/v1/products?sort=cheapest", "", "").status)
 	assert.Equal(t, http.StatusUnprocessableEntity, app.do("GET", "/api/v1/products?pageSize=1000", "", "").status)
 }
 

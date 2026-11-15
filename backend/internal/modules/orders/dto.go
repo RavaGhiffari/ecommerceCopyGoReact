@@ -22,6 +22,14 @@ type ItemResponse struct {
 	Quantity    int32          `json:"quantity"`
 	LineTotal   string         `json:"lineTotal"`
 	Image       *ImageResponse `json:"image"`
+	// The buyer's review of this item (null if none). Lets the order page
+	// show "Beri ulasan" / "Ubah ulasan" without one request per item.
+	Review *ItemReviewResponse `json:"review"`
+}
+
+type ItemReviewResponse struct {
+	ID     string `json:"id"`
+	Rating int16  `json:"rating"`
 }
 
 type StoreRefResponse struct {
@@ -74,6 +82,9 @@ func NewOrderResponse(o Order) OrderResponse {
 		}
 		if it.Image != nil {
 			items[i].Image = &ImageResponse{URL: it.Image.URL, Alt: it.Image.Alt}
+		}
+		if it.Review != nil {
+			items[i].Review = &ItemReviewResponse{ID: it.Review.ID.String(), Rating: it.Review.Rating}
 		}
 	}
 	var history []HistoryResponse

@@ -466,9 +466,12 @@ const listOrderItems = `-- name: ListOrderItems :many
 SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id, p.slug AS product_slug,
        oi.product_name, oi.variant_name, oi.sku, oi.unit_price, oi.quantity, oi.line_total,
        COALESCE(img.url, '')::text AS image_url,
-       COALESCE(img.alt, '')::text AS image_alt
+       COALESCE(img.alt, '')::text AS image_alt,
+       -- The buyer's review of this item, if any (6a; at most one per item).
+       r.id AS review_id, r.rating AS review_rating
 FROM order_items oi
 JOIN products p ON p.id = oi.product_id
+LEFT JOIN reviews r ON r.order_item_id = oi.id
 LEFT JOIN LATERAL (
     SELECT pi.url, pi.alt
     FROM product_images pi
@@ -481,19 +484,21 @@ ORDER BY oi.order_id, oi.created_at, oi.id
 `
 
 type ListOrderItemsRow struct {
-	ID          uuid.UUID
-	OrderID     uuid.UUID
-	VariantID   uuid.UUID
-	ProductID   uuid.UUID
-	ProductSlug string
-	ProductName string
-	VariantName string
-	Sku         string
-	UnitPrice   decimal.Decimal
-	Quantity    int32
-	LineTotal   decimal.Decimal
-	ImageUrl    string
-	ImageAlt    string
+	ID           uuid.UUID
+	OrderID      uuid.UUID
+	VariantID    uuid.UUID
+	ProductID    uuid.UUID
+	ProductSlug  string
+	ProductName  string
+	VariantName  string
+	Sku          string
+	UnitPrice    decimal.Decimal
+	Quantity     int32
+	LineTotal    decimal.Decimal
+	ImageUrl     string
+	ImageAlt     string
+	ReviewID     *uuid.UUID
+	ReviewRating *int16
 }
 
 // Items of several orders in one query (no N+1 when listing a page of
@@ -522,6 +527,8 @@ func (q *Queries) ListOrderItems(ctx context.Context, orderIds []uuid.UUID) ([]L
 			&i.LineTotal,
 			&i.ImageUrl,
 			&i.ImageAlt,
+			&i.ReviewID,
+			&i.ReviewRating,
 		); err != nil {
 			return nil, err
 		}

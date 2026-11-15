@@ -17,6 +17,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/orders"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/reviews"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/authctx"
@@ -34,6 +35,7 @@ type Handlers struct {
 	Cart       *cart.Handler
 	Checkout   *checkout.Handler
 	Orders     *orders.Handler
+	Reviews    *reviews.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -84,6 +86,7 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	api.GET("/categories", h.Categories.List)
 	api.GET("/products", h.Products.List)
 	api.GET("/products/:id/related", h.Products.Related)
+	api.GET("/products/:id/reviews", h.Reviews.ForProduct)
 	api.GET("/stores/:slug", h.Stores.Public)
 	api.GET("/stores/:slug/products/:productSlug", h.Products.Detail)
 
@@ -111,6 +114,11 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn.GET("/orders", h.Orders.List)
 	signedIn.GET("/orders/:id", h.Orders.Get)
 	signedIn.POST("/orders/:id/cancel", h.Orders.Cancel)
+	// Reviews: only items of the caller's own delivered orders (6a).
+	signedIn.POST("/reviews", h.Reviews.Create)
+	signedIn.PATCH("/reviews/:id", h.Reviews.Update)
+	signedIn.GET("/me/reviews", h.Reviews.Mine)
+	signedIn.GET("/me/reviews/pending", h.Reviews.Pending)
 	// Opening a store is how a customer becomes a seller.
 	signedIn.POST("/seller/store", h.Stores.Open)
 

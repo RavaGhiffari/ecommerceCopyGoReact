@@ -67,7 +67,13 @@ type Item struct {
 	UnitPrice   decimal.Decimal
 	Quantity    int32
 	LineTotal   decimal.Decimal
-	Image       *Image // current first image, for thumbnails only
+	Image       *Image      // current first image, for thumbnails only
+	Review      *ItemReview // the buyer's review of this item; nil if none (6a)
+}
+
+type ItemReview struct {
+	ID     uuid.UUID
+	Rating int16
 }
 
 type HistoryEntry struct {

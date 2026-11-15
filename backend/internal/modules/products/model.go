@@ -38,6 +38,7 @@ const (
 	SortNewest    = "newest"
 	SortPriceAsc  = "price_asc"
 	SortPriceDesc = "price_desc"
+	SortRating    = "rating"
 
 	DefaultPageSize = 12
 	MaxPageSize     = 48
@@ -75,6 +76,8 @@ type Summary struct {
 	LowestPrice  decimal.Decimal
 	HighestPrice decimal.Decimal
 	SoldCount    int32
+	RatingCount  int32 // visible reviews (denormalised, Phase 6a)
+	RatingTotal  int32 // sum of their stars
 	InStock      bool
 	CreatedAt    time.Time
 	Store        StoreRef

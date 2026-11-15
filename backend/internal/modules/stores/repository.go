@@ -72,6 +72,7 @@ func (r *Repository) GetActiveBySlug(ctx context.Context, slug string) (Store, e
 		Location: row.Location, Status: row.Status, CreatedAt: row.CreatedAt,
 	}
 	s.ActiveProductCount = row.ActiveProductCount
+	s.RatingCount, s.RatingTotal = row.RatingCount, row.RatingTotal
 	return s, nil
 }
 

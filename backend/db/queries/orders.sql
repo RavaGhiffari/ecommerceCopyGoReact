@@ -63,9 +63,12 @@ WHERE o.id = @id AND o.buyer_id = @buyer_id;
 SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id, p.slug AS product_slug,
        oi.product_name, oi.variant_name, oi.sku, oi.unit_price, oi.quantity, oi.line_total,
        COALESCE(img.url, '')::text AS image_url,
-       COALESCE(img.alt, '')::text AS image_alt
+       COALESCE(img.alt, '')::text AS image_alt,
+       -- The buyer's review of this item, if any (6a; at most one per item).
+       r.id AS review_id, r.rating AS review_rating
 FROM order_items oi
 JOIN products p ON p.id = oi.product_id
+LEFT JOIN reviews r ON r.order_item_id = oi.id
 LEFT JOIN LATERAL (
     SELECT pi.url, pi.alt
     FROM product_images pi

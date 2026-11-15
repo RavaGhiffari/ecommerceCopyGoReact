@@ -153,6 +153,8 @@ type Product struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Search      interface{}
+	RatingCount int32
+	RatingTotal int32
 }
 
 type ProductImage struct {
@@ -173,6 +175,19 @@ type ProductVariant struct {
 	SortOrder int32
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Review struct {
+	ID          uuid.UUID
+	OrderItemID uuid.UUID
+	ProductID   uuid.UUID
+	StoreID     uuid.UUID
+	UserID      uuid.UUID
+	Rating      int16
+	Comment     string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Role struct {

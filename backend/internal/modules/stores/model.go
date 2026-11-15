@@ -25,4 +25,6 @@ type Store struct {
 	CreatedAt   time.Time
 	// Only filled by the public lookup.
 	ActiveProductCount int32
+	RatingCount        int32 // sum over all of its products
+	RatingTotal        int32
 }

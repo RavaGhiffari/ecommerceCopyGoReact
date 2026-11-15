@@ -32,6 +32,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/health"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/orders"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/products"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/reviews"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/shipping"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
@@ -97,6 +98,7 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		Cart:       cart.NewHandler(cart.NewService(pool)),
 		Checkout:   checkout.NewHandler(checkoutSvc),
 		Orders:     orders.NewHandler(orders.NewService(pool)),
+		Reviews:    reviews.NewHandler(reviews.NewService(pool)),
 	}
 	return &testApp{t: t, r: router.New(cfg, h, authSvc.ResolveSession), pool: pool, auth: authSvc, checkout: checkoutSvc}
 }

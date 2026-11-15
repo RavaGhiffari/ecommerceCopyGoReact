@@ -72,6 +72,7 @@ func (r *Repository) ListPublic(ctx context.Context, p listParams) ([]Summary, i
 		items[i] = Summary{
 			ID: row.ID, Slug: row.Slug, Name: row.Name, CategoryID: row.CategoryID,
 			LowestPrice: row.MinPrice, HighestPrice: row.MaxPrice, SoldCount: row.SoldCount,
+			RatingCount: row.RatingCount, RatingTotal: row.RatingTotal,
 			InStock: row.InStock, CreatedAt: row.CreatedAt,
 			Store: StoreRef{ID: row.StoreID, Slug: row.StoreSlug, Name: row.StoreName, Location: row.StoreLocation},
 		}

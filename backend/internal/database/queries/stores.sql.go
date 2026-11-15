@@ -55,8 +55,17 @@ SELECT s.id, s.owner_id, s.name, s.slug, s.description, s.location, s.status, s.
         FROM products p
         WHERE p.store_id = s.id
           AND p.status = 'active'
-          AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id))::int AS active_product_count
+          AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id))::int AS active_product_count,
+       -- Store rating = all reviews of all its products (archived included:
+       -- they were real purchases). Average computed in Go.
+       r.rating_count, r.rating_total
 FROM stores s
+CROSS JOIN LATERAL (
+    SELECT COALESCE(SUM(p.rating_count), 0)::int AS rating_count,
+           COALESCE(SUM(p.rating_total), 0)::int AS rating_total
+    FROM products p
+    WHERE p.store_id = s.id
+) r
 WHERE s.slug = $1
   AND s.status = 'active'
 `
@@ -72,6 +81,8 @@ type GetActiveStoreBySlugRow struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	ActiveProductCount int32
+	RatingCount        int32
+	RatingTotal        int32
 }
 
 // Public store page. Only products that are active AND have a variant count
@@ -90,6 +101,8 @@ func (q *Queries) GetActiveStoreBySlug(ctx context.Context, slug string) (GetAct
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ActiveProductCount,
+		&i.RatingCount,
+		&i.RatingTotal,
 	)
 	return i, err
 }

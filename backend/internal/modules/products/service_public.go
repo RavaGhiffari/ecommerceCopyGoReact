@@ -54,9 +54,9 @@ func (s *Service) ListPublic(ctx context.Context, in PublicQuery) (Page, error) 
 
 	errs := validation.Errors{}
 	switch in.Sort {
-	case SortPopular, SortNewest, SortPriceAsc, SortPriceDesc:
+	case SortPopular, SortNewest, SortPriceAsc, SortPriceDesc, SortRating:
 	default:
-		errs.Add("sort", "must be one of popular, newest, price_asc, price_desc")
+		errs.Add("sort", "must be one of popular, newest, price_asc, price_desc, rating")
 	}
 	if in.Page < 1 || in.Page > 10_000 {
 		errs.Add("page", "must be between 1 and 10000")
@@ -146,6 +146,7 @@ func (s *Service) PublicDetail(ctx context.Context, storeSlug, productSlug strin
 		Summary: Summary{
 			ID: row.ID, Slug: row.Slug, Name: row.Name, CategoryID: row.CategoryID,
 			SoldCount: row.SoldCount, CreatedAt: row.CreatedAt,
+			RatingCount: row.RatingCount, RatingTotal: row.RatingTotal,
 			Store: StoreRef{ID: row.StoreID, Slug: row.StoreSlug, Name: row.StoreName, Location: row.StoreLocation},
 		},
 		Description: row.Description,

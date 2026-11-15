@@ -16,8 +16,17 @@ SELECT s.id, s.owner_id, s.name, s.slug, s.description, s.location, s.status, s.
         FROM products p
         WHERE p.store_id = s.id
           AND p.status = 'active'
-          AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id))::int AS active_product_count
+          AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id))::int AS active_product_count,
+       -- Store rating = all reviews of all its products (archived included:
+       -- they were real purchases). Average computed in Go.
+       r.rating_count, r.rating_total
 FROM stores s
+CROSS JOIN LATERAL (
+    SELECT COALESCE(SUM(p.rating_count), 0)::int AS rating_count,
+           COALESCE(SUM(p.rating_total), 0)::int AS rating_total
+    FROM products p
+    WHERE p.store_id = s.id
+) r
 WHERE s.slug = @slug
   AND s.status = 'active';
 
