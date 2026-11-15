@@ -26,7 +26,7 @@ Updated 2026-11-14, after **Phase 4 (cart)** and the **shadcn/ui migration** wer
 | 4 Cart | committed (`7e57829`, `f312b0b`; docs `0d63dfc`) |
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
-| **5 Checkout & orders** | plan approved (Q1–Q12 defaults); 5a committed (`f7ef72f`, `7c1d441`, `5efc212`); 5b committed (`9eec081`, `98bff00`); 5c committed (`870bcbe`, `c9caf97`); **5d seller orders done and verified, uncommitted** (PROJECT_STATE §1h); 5e next |
+| **5 Checkout & orders** | plan approved (Q1–Q12 defaults); 5a committed (`f7ef72f`, `7c1d441`, `5efc212`); 5b committed (`9eec081`, `98bff00`); 5c committed (`870bcbe`, `c9caf97`); 5d committed (`2cf29fb`, `1dde9e0`); **5e frontend done and verified, uncommitted** (PROJECT_STATE §1i); Phase 5 ends with it |
 
 ---
 
@@ -102,8 +102,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 5d** (PROJECT_STATE §1h has the commands).
-2. **Exact next task — slice 5e (frontend)** per PLAN.md §5.8: checkout page, payment page, buyer orders, seller orders, Sonner + AlertDialog, enable cart / "Beli sekarang" buttons, TS types mirrored from the Go DTOs (`checkout/dto.go`, `orders/dto.go`), hand-run E2E `checkout-flow.mjs` on Vite port 5190. Stop after 5e for review; Phase 5 then ends. Original planning brief: go through PLAN.md Q1–Q8 with the developer (defaults proposed there), then write the Phase 5 plan in PLAN.md as slices 5a addresses → 5b checkout core → 5c payment + lifecycle → 5d seller orders → 5e UI (with Sonner + AlertDialog): migrations (`user_addresses`, `checkouts`, `orders`, `order_items`, `order_status_histories`, `payments`, `payment_events`), the checkout transaction step by step, reservation/consume/release ledger types, endpoints, tests (overselling concurrency, idempotency, rollback, ownership). **Stop for approval before writing code.**
+1. **Developer reviews and commits 5e** (PROJECT_STATE §1i has the commands). That closes Phase 5.
+2. **Exact next task — plan Phase 6** (only after the developer approves starting it): reviews (rating 1–5 for delivered purchases, one per eligible purchase, average rating), buyer/seller/admin dashboards, admin category UI. Write the plan in PLAN.md with open questions and defaults, then **stop for approval before writing code**. E2E scripts (5 now, incl. `checkout-flow.mjs`) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
 
 **First 10 minutes in a new session**
 

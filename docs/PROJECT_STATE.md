@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-14 |
-| Last commit | `c9caf97` (Phase 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 5d — seller orders** (backend only) + doc updates — see §1h |
-| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); 5a, 5b and 5c committed; slice 5d done and verified, awaiting review |
-| Next | slice 5e — frontend for checkout, payment, orders and seller orders (PLAN.md §5.8) |
+| Last commit | `1dde9e0` (Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Phase 5e — checkout, payment and order UI** (frontend only) + doc updates — see §1i |
+| Current phase | **Phase 5 in progress**: plan approved (PLAN.md, Q1–Q12 defaults); 5a–5d committed; slice 5e (the last slice) done and verified, awaiting review |
+| Next | review + commit 5e, which closes Phase 5; then Phase 6 (reviews, dashboards) after approval |
 
 ---
 
@@ -28,7 +28,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-5a | Phase 5a addresses | `f7ef72f`, `7c1d441`, docs `5efc212` | ✅ committed by the developer | see §1e |
 | CP-5b | Phase 5b checkout core | `9eec081`, docs `98bff00` | ✅ committed by the developer | see §1f |
 | CP-5c | Phase 5c payment & lifecycle | `870bcbe`, docs `c9caf97` | ✅ committed by the developer | see §1g |
-| CP-5d | Phase 5d seller orders | **uncommitted** | 🟡 awaiting review | see §1h |
+| CP-5d | Phase 5d seller orders | `2cf29fb`, docs `1dde9e0` | ✅ committed by the developer | see §1h |
+| CP-5e | Phase 5e checkout & order UI | **uncommitted** | 🟡 awaiting review | see §1i |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -187,7 +188,7 @@ git commit -m "Update project docs for Phase 5c" -m "Co-Authored-By: Claude Opus
 
 **Left in the dev DB on purpose:** one delivered order (`penjual3` bought 1 × "Kabel USB-C Braided" from Gadget Nusantara), so the seller list has data for 5e. Its stock and `sold_count` changed by 1 like a real sale.
 
-**Commit CP-5d** (the developer commits):
+**Committed** as `2cf29fb` + `1dde9e0` with:
 
 ```bash
 git add -- backend
@@ -195,6 +196,30 @@ git commit -m "Add Phase 5d seller orders" -m "- GET /seller/orders?status=&page
 
 git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 5d" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 1i. Verified at CP-5e (checkout, payment and order UI), 2026-11-15
+
+| Check | Result |
+|---|---|
+| Backend | unchanged in 5e (no Go files, no migrations) |
+| `npm run build` (`tsc -b && vite build`) / `npm run lint` (oxlint) | clean (Vite's existing "chunk > 500 kB" warning only) |
+| New dependency | `sonner` (toast; the shadcn wrapper in `components/ui/sonner.tsx` is hand-written without `next-themes`, the app has no theme switch). shadcn `radio-group` added (uses the existing `radix-ui`) |
+| Browser E2E `checkout-flow.mjs` (Edge headless, Vite :5190, real API + dev DB; buyer `penjual3`, sellers `penjual1`/`penjual2`) | **16/16**, 0 page errors, 3 consecutive runs: add to cart + "Beli sekarang" → /checkout; add a Surabaya address from the checkout page (selected); two store groups, Same Day offered only by Batik Kita (Surabaya), not by Gadget Nusantara (Jakarta Barat); choosing Same Day re-quotes and the summary equals `POST /checkout/quote`; **double-clicking "Buat pesanan" creates exactly one checkout with 2 orders** (order count +2); cart badge empties; simulated payment → "Lunas", both orders "Dibayar"; "Pesanan saya" lists both; seller `penjual1` filters "Perlu diproses", processes, ships with a resi note; buyer sees "Dikirim" + resi in the timeline and no cancel button; buyer refunds the other (paid) order; `penjual1` opening Batik Kita's order gets `ORDER_NOT_FOUND`; a new unpaid checkout is cancelled from the payment page; "Lanjut ke checkout" works from /cart |
+| Regression E2E | `auth-flow` 15/15, `catalog-flow` 17/17, `cart-flow` 16/16, `address-flow` 11/11 in one full run. Two old scripts had timing bugs, fixed in the scripts (not the app): `cart-flow` clicked the header "Daftar" link (no `?next` on /login) when the card had not rendered yet; `address-flow` waited for `getByText('Utama')`, which also matches "Jadikan utama". Later repeats of `auth`/`catalog`/`cart-flow` hit `RATE_LIMITED` (register 10/hour per IP), expected backend behaviour |
+| Visual check (screenshots) | fixed during the slice: order item images rendered full width (`ProductImage` is `w-full`; the parent must set the width, as in CartPage); default history notes are English in the DB and are shown in Indonesian via `historyNote()`; the payment card's "Dibayar" time label was renamed "Waktu bayar" (it clashed with the status badge); the stale homepage line "Keranjang dan checkout segera hadir" was replaced |
+| Dev DB ledger invariant | 0 mismatches after all runs |
+
+**Left in the dev DB:** the E2E orders of `penjual3` (one shipped order from Gadget Nusantara per run, refunded Batik Kita orders, cancelled checkouts). Two paid orders left by the first, failed run were refunded through the API so their stock returned.
+
+**Commit CP-5e** (the developer commits):
+
+```bash
+git add -- frontend
+git commit -m "Add Phase 5e checkout and order UI" -m "- /checkout: address picker (+ add new), per-store shipping radio, totals only from POST /checkout/quote, Idempotency-Key generated once per visit" -m "- /checkout/:id payment page: countdown to expiresAt, simulated success/failure (one eventId per outcome per visit), cancel with AlertDialog" -m "- /orders, /orders/:id (timeline, refund before processing), /seller/orders (status filter), /seller/orders/:id (next-status action with note)" -m "- Sonner toasts, shadcn radio-group, cart and Beli sekarang buttons enabled, TS types mirrored from checkout/orders DTOs" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 5e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -309,6 +334,12 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 | Decision | Why |
 |---|---|
+| (5e) `/checkout` sends exactly the shipping methods of the last quote it displayed, not the raw radio state | the order the buyer confirms is the quote they saw; `POST /checkout` requires a method for every store, the quote defaults missing ones to regular |
+| (5e) `Idempotency-Key` = `useState(() => crypto.randomUUID())`, once per visit of /checkout | double click / retry reuses it (server returns the same checkout); a new visit is a new attempt |
+| (5e) Changing the address resets the shipping choices to regular | Same Day depends on the destination city; avoids a 422 from a stale choice |
+| (5e) The payment page keeps one `eventId` per outcome per visit | clicking again resends the same gateway event (harmless repeat), like a real gateway retry |
+| (5e) Which status buttons to show (seller next step, buyer refund) comes from a UI copy of the transition table (`features/orders/status.ts`) | display only; the server still decides, and a 409 reloads the order with a toast |
+| (5e) Default history notes stay English in the DB and are translated in the UI (`historyNote`) | API stays English like its other messages; seller-typed notes are shown as written |
 | (5d) Seller order routes resolve the store from the session and filter every query by `store_id`; status changes lock the order row (`LockStoreOrder`, the same row as the buyer's refund) and go through `Transition` as `BySeller` | ownership cannot be bypassed by changing an id; "seller starts processing" vs "buyer cancels" serialise (proven: without the lock the loser got 500) |
 | (5d) The seller sends the target status (`{status}`), not an action name; any known status is accepted by validation and the table decides (409) | one endpoint, one rule set; 422 only for statuses that do not exist |
 | (5d) Sellers see every status of their orders, including unpaid and cancelled ones, with an optional `?status=` filter | nothing hidden; the UI can default to "paid" |
@@ -408,7 +439,10 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Images are URLs only; no upload, no hotlink protection | seller can point at any host | decide with storage plan |
 | `sold_count` changes with real payments and refunds since 5c, but the demo values are seeded; ratings are 0 | "popular" is mostly demo data | Phase 6 (ratings) |
 | Updating `sold_count` fires the `products` `updated_at` trigger, and the seller product list sorts by `updated_at DESC` | a sale moves the product to the top of the seller's own list | accept, or sort that list by `created_at` / skip the trigger for counter-only updates |
-| `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | acceptable; the UI uses `expiresAt` for its countdown (5e) |
+| `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | handled in the UI: at 0:00 the pay buttons are disabled and "Muat ulang status" is offered |
+| The countdown uses the browser clock | a skewed client clock shows the wrong remaining time | server decides anyway (`CHECKOUT_EXPIRED`); could send server time with the response |
+| No frontend unit tests (Vitest/RTL) yet; UI verified by hand-run E2E scripts | regressions caught only when a script is run | Phase 7 |
+| Frontend bundle is one ~770 kB chunk | slower first load | route-level `lazy()` in Phase 7 |
 | The sweeper runs inside the API process | with several instances each runs one; `SKIP LOCKED` prevents double work, but that setup is untested | before scaling out |
 | A payment event that arrives after expiry is not stored | no audit trail of late notifications | when a real gateway arrives (also signature checks) |
 | Sellers cannot cancel a paid order (e.g. an item turned out to be missing); only the buyer can, before processing | the seller has to ask the buyer | add `paid → cancelled` by seller with restock + refund if needed |
@@ -441,9 +475,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 5d (§1h).
-2. **Slice 5e** — frontend (PLAN.md §5.8): `/checkout` (address picker, per-store shipping radio, totals from `POST /checkout/quote`, `Idempotency-Key` once per visit), `/checkout/:id` (payment page with countdown, simulate success/failure, cancel), `/orders`, `/orders/:id` (timeline, cancel/refund), `/seller/orders`, `/seller/orders/:id` (status filter, next-status buttons), Sonner + AlertDialog, enable the cart and "Beli sekarang" buttons, types mirrored from the Go DTOs, browser E2E `checkout-flow.mjs`.
-3. Then Phase 6. The trusted-proxy question stays in Phase 7 (§9).
+1. Developer reviews and commits 5e (§1i). That closes Phase 5.
+2. **Phase 6** (needs approval first): reviews (rating 1–5 for delivered purchases, one per eligible purchase, average on products/stores), buyer/seller/admin dashboards, admin category UI. Plan it in PLAN.md before coding.
+3. Then Phase 7. The trusted-proxy question stays in Phase 7 (§9).
 
 ---
 

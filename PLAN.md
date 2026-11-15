@@ -26,7 +26,7 @@ Deviations from the proposal:
 
 ## Phase 5 — Checkout & orders: PLAN (approved 2026-11-14 with the proposed answers to Q1–Q12)
 
-Progress: 5a, 5b and 5c committed. **5d done and verified, awaiting review** (evidence: PROJECT_STATE §1h). Next: 5e.
+Progress: 5a–5d committed. **5e done and verified, awaiting review** (evidence: PROJECT_STATE §1i). After 5e Phase 5 is complete.
 
 ### 5.0 Decisions
 
@@ -57,7 +57,7 @@ Each slice ends with its tests green and a short review; the developer commits.
 | **5b Checkout core** ✅ | Migration `000011_create_checkout_tables` (checkouts, orders, order_items, order_status_histories, payments, payment_events, new ledger type); module `shipping` (pure functions); module `checkout` (quote and place); inventory `Reserve`; buyer `GET /orders`, `GET /orders/:id`, `GET /checkout/:id`. As built: `CHECKOUT_STOCK_CHANGED` was folded into `CART_HAS_ISSUES` (place re-validates under lock and reports every bad line the same way; the client reacts identically); a quote defaults a store without a choice to `regular`, placing requires a choice per store; payment rows are created by the checkout package (the `payments` package arrives with simulate in 5c); `CHECKOUT_SWEEP_INTERVAL` is deferred to 5c with the sweeper; nullable `timestamptz` maps to `*time.Time` (sqlc override) |
 | **5c Payment & lifecycle** ✅ | `POST /payments/:id/simulate`; inventory `Consume` / `Release` / `Restock`; `sold_count`; expiry sweeper; `POST /checkout/:id/cancel`; `POST /orders/:id/cancel`; status-transition table. As built: no `payments` package; simulate, cancel, expiry and the sweeper live in `checkout/lifecycle.go` (one payment per checkout, so every payment outcome is a checkout change); the transition table also names the allowed actor (system / buyer / seller); new 409 codes `CHECKOUT_EXPIRED` (the request itself closed the expired checkout, committed) and `PAYMENT_EVENT_CONFLICT`; cancelling one unpaid order → 409 `INVALID_STATUS_TRANSITION` with `checkoutId`; a refund also lowers `sold_count`; no migration was needed |
 | **5d Seller orders** ✅ | `GET /seller/orders`, `GET /seller/orders/:id`, `PATCH /seller/orders/:id/status` (processing → shipped → delivered). As built: the list also takes `pageSize` and shows every status unless `?status=` is given; an empty note gets a default history note; any known status passes validation and the transition table answers (409); no migration |
-| **5e Frontend** | `/checkout`, `/checkout/:id` (payment page), `/orders`, `/orders/:id`, seller order pages, Sonner toast and AlertDialog, enable the cart and product-page buttons |
+| **5e Frontend** ✅ | `/checkout`, `/checkout/:id` (payment page), `/orders`, `/orders/:id`, seller order pages, Sonner toast and AlertDialog, enable the cart and product-page buttons. As built: place sends the methods of the displayed quote; changing the address resets shipping to regular; one payment `eventId` per outcome per visit; buyer order list has no status filter (the API has none); default history notes translated in the UI; `sonner` without `next-themes` |
 
 ### 5.2 Data model
 
