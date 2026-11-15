@@ -246,3 +246,10 @@ type UserSession struct {
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
+
+type WishlistItem struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	ProductID uuid.UUID
+	CreatedAt time.Time
+}

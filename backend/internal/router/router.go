@@ -20,6 +20,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/reviews"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/stores"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/users"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/wishlist"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/authctx"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/response"
 )
@@ -36,6 +37,7 @@ type Handlers struct {
 	Checkout   *checkout.Handler
 	Orders     *orders.Handler
 	Reviews    *reviews.Handler
+	Wishlist   *wishlist.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -119,6 +121,11 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	signedIn.PATCH("/reviews/:id", h.Reviews.Update)
 	signedIn.GET("/me/reviews", h.Reviews.Mine)
 	signedIn.GET("/me/reviews/pending", h.Reviews.Pending)
+	// Wishlist (practice feature): always the session user's own.
+	signedIn.GET("/me/wishlist", h.Wishlist.List)
+	signedIn.GET("/me/wishlist/ids", h.Wishlist.IDs)
+	signedIn.PUT("/me/wishlist/:productId", h.Wishlist.Add)
+	signedIn.DELETE("/me/wishlist/:productId", h.Wishlist.Remove)
 	// Opening a store is how a customer becomes a seller.
 	signedIn.POST("/seller/store", h.Stores.Open)
 
