@@ -65,7 +65,7 @@ SELECT oi.id, oi.order_id, oi.variant_id, oi.product_id, p.slug AS product_slug,
        COALESCE(img.url, '')::text AS image_url,
        COALESCE(img.alt, '')::text AS image_alt,
        -- The buyer's review of this item, if any (6a; at most one per item).
-       r.id AS review_id, r.rating AS review_rating
+       r.id AS review_id, r.rating AS review_rating, r.comment AS review_comment
 FROM order_items oi
 JOIN products p ON p.id = oi.product_id
 LEFT JOIN reviews r ON r.order_item_id = oi.id

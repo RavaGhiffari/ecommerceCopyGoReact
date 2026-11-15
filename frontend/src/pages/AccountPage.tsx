@@ -11,6 +11,7 @@ import { formatMonthYear } from '../lib/format'
 import type { User } from '../types/auth'
 import { SubmitButton } from '../features/auth/AuthCard'
 import { AddressBook } from '../features/addresses/AddressBook'
+import { AccountReviews } from '../features/reviews/AccountReviews'
 
 const ROLE_LABELS: Record<string, string> = { customer: 'Pembeli', seller: 'Penjual', admin: 'Admin' }
 
@@ -89,6 +90,8 @@ function ProfileForm({ user }: { user: User }) {
           </div>
         </form>
       </Card>
+
+      <AccountReviews />
 
       <AddressBook />
     </div>

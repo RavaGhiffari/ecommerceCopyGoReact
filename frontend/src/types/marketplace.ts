@@ -16,7 +16,7 @@ export interface Category {
 }
 
 export interface Rating {
-  average: number // 0 when there are no reviews yet (reviews arrive in a later phase)
+  average: number // one decimal; 0 when there are no reviews yet
   count: number
 }
 
@@ -70,7 +70,7 @@ export interface ProductDetail extends ProductSummary {
   category: Category
 }
 
-export type ProductSort = 'popular' | 'newest' | 'price_asc' | 'price_desc'
+export type ProductSort = 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'
 
 export interface ProductQuery {
   q?: string

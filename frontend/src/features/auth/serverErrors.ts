@@ -23,6 +23,8 @@ const FIELD_MESSAGES: Record<string, string> = {
   'is too long': 'terlalu panjang',
   'must be 5 digits': 'harus 5 digit angka',
   'must be 8-15 digits, optionally starting with +': 'harus 8–15 digit angka, boleh diawali +',
+  'must be between 1 and 5': 'pilih 1 sampai 5 bintang',
+  'must be at most 1000 characters': 'maksimal 1000 karakter',
 }
 
 const CODE_MESSAGES: Record<string, string> = {
@@ -58,6 +60,12 @@ const CODE_MESSAGES: Record<string, string> = {
   PAYMENT_EVENT_CONFLICT: 'Notifikasi pembayaran ini bentrok dengan yang sebelumnya.',
   ORDER_NOT_FOUND: 'Pesanan tidak ditemukan.',
   INVALID_STATUS_TRANSITION: 'Status pesanan sudah berubah, jadi aksi ini tidak bisa dilakukan. Muat ulang halaman.',
+  // Reviews (Phase 6).
+  ORDER_ITEM_NOT_FOUND: 'Barang pesanan ini tidak ditemukan.',
+  REVIEW_NOT_ALLOWED: 'Ulasan hanya bisa diberikan setelah pesanan selesai (diterima).',
+  REVIEW_EXISTS: 'Barang ini sudah kamu ulas. Kamu bisa mengubah ulasannya.',
+  REVIEW_NOT_FOUND: 'Ulasan ini tidak ditemukan.',
+  PRODUCT_NOT_FOUND: 'Produk tidak ditemukan.',
 }
 
 /** A user-facing Indonesian message for any error from the API. */

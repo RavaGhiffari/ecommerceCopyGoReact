@@ -351,8 +351,8 @@ func (r *Repository) attachItems(ctx context.Context, list []Order) error {
 		if row.ImageUrl != "" {
 			it.Image = &Image{URL: row.ImageUrl, Alt: row.ImageAlt}
 		}
-		if row.ReviewID != nil && row.ReviewRating != nil {
-			it.Review = &ItemReview{ID: *row.ReviewID, Rating: *row.ReviewRating}
+		if row.ReviewID != nil && row.ReviewRating != nil && row.ReviewComment != nil {
+			it.Review = &ItemReview{ID: *row.ReviewID, Rating: *row.ReviewRating, Comment: *row.ReviewComment}
 		}
 		i := index[row.OrderID]
 		list[i].Items = append(list[i].Items, it)

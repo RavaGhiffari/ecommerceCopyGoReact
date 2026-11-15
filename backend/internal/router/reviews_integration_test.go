@@ -125,7 +125,7 @@ func TestReviews_OnlyTheBuyersDeliveredItems(t *testing.T) {
 	assert.NotEmpty(t, listItems(mine)[0].(map[string]any)["item"].(map[string]any)["orderNumber"])
 
 	orderItem := f.app.do("GET", "/api/v1/orders/"+p.orderA, "", f.buyer).data()["items"].([]any)[0].(map[string]any)
-	assert.Equal(t, map[string]any{"id": reviewID, "rating": float64(4)}, orderItem["review"])
+	assert.Equal(t, map[string]any{"id": reviewID, "rating": float64(4), "comment": "Suaranya jernih"}, orderItem["review"])
 
 	detail := f.app.do("GET", "/api/v1/stores/toko-alpha/products/earbuds", "", "")
 	require.Equal(t, http.StatusOK, detail.status, detail.raw)

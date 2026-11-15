@@ -28,8 +28,9 @@ type ItemResponse struct {
 }
 
 type ItemReviewResponse struct {
-	ID     string `json:"id"`
-	Rating int16  `json:"rating"`
+	ID      string `json:"id"`
+	Rating  int16  `json:"rating"`
+	Comment string `json:"comment"` // so the edit dialog can start from it
 }
 
 type StoreRefResponse struct {
@@ -84,7 +85,7 @@ func NewOrderResponse(o Order) OrderResponse {
 			items[i].Image = &ImageResponse{URL: it.Image.URL, Alt: it.Image.Alt}
 		}
 		if it.Review != nil {
-			items[i].Review = &ItemReviewResponse{ID: it.Review.ID.String(), Rating: it.Review.Rating}
+			items[i].Review = &ItemReviewResponse{ID: it.Review.ID.String(), Rating: it.Review.Rating, Comment: it.Review.Comment}
 		}
 	}
 	var history []HistoryResponse

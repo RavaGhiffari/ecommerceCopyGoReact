@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, Truck } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -22,8 +23,19 @@ export function OrderStatusBadge({ status, className }: { status: OrderStatus; c
   )
 }
 
-/** Item rows. Names and prices are the snapshots taken at checkout. */
-export function OrderItemList({ items, storeSlug }: { items: OrderItem[]; storeSlug: string }) {
+/**
+ * Item rows. Names and prices are the snapshots taken at checkout.
+ * `itemAction` adds something under an item (the buyer's review button).
+ */
+export function OrderItemList({
+  items,
+  storeSlug,
+  itemAction,
+}: {
+  items: OrderItem[]
+  storeSlug: string
+  itemAction?: (item: OrderItem) => ReactNode
+}) {
   return (
     <ul className="divide-y">
       {items.map((it) => (
@@ -44,6 +56,7 @@ export function OrderItemList({ items, storeSlug }: { items: OrderItem[]; storeS
             <p className="text-sm text-muted-foreground">
               {it.quantity} × {formatRupiah(it.unitPrice)}
             </p>
+            {itemAction && <div className="mt-2">{itemAction(it)}</div>}
           </div>
           <span className="text-sm font-semibold">{formatRupiah(it.lineTotal)}</span>
         </li>

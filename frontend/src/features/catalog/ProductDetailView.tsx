@@ -99,7 +99,13 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
           <header>
             <h1 className="text-2xl font-semibold">{product.name}</h1>
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-              <RatingBadge rating={product.rating} />
+              {product.rating.count > 0 ? (
+                <a href="#ulasan" className="hover:underline">
+                  <RatingBadge rating={product.rating} />
+                </a>
+              ) : (
+                <RatingBadge rating={product.rating} />
+              )}
               <span>· {formatCompactCount(product.soldCount)} terjual</span>
             </div>
           </header>

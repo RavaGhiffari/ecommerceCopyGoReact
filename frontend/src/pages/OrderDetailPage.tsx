@@ -22,8 +22,11 @@ import { useAsyncResource } from '../hooks/useAsync'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { ApiError } from '../lib/api'
 import { formatRupiah } from '../lib/format'
+import { Star } from 'lucide-react'
+import { Stars } from '../components/shared/Stars'
+import { ReviewDialog } from '../features/reviews/ReviewDialog'
 import { cancelMyOrder, getMyOrder } from '../services/orders'
-import type { Order } from '../types/orders'
+import type { Order, OrderItem } from '../types/orders'
 
 /** /orders/:id (behind RequireAuth). Another buyer's order is a 404 from the API. */
 export function OrderDetailPage() {
@@ -34,17 +37,54 @@ export function OrderDetailPage() {
 function BuyerOrder({ id }: { id: string }) {
   usePageTitle('Detail pesanan')
   const { state, replace, reload } = useAsyncResource(() => getMyOrder(id), `my-order:${id}`)
+  const [reviewing, setReviewing] = useState<OrderItem | null>(null)
 
   if (state.status === 'loading') return <OrderDetailSkeleton />
   if (state.status === 'error') return <ErrorState error={state.error} onRetry={reload} title="Gagal memuat pesanan" />
 
   const order = state.data
   return (
-    <OrderDetailLayout
-      order={order}
-      back={{ to: '/orders', label: 'Pesanan saya' }}
-      actions={<BuyerActions order={order} onChange={replace} onReload={reload} />}
-    />
+    <>
+      <OrderDetailLayout
+        order={order}
+        back={{ to: '/orders', label: 'Pesanan saya' }}
+        actions={<BuyerActions order={order} onChange={replace} onReload={reload} />}
+        // Reviews are allowed only once the order is delivered (the API decides).
+        itemAction={order.status === 'delivered' ? (item) => <ReviewButton item={item} onOpen={setReviewing} /> : undefined}
+      />
+      {reviewing && (
+        <ReviewDialog
+          open
+          onOpenChange={(open) => !open && setReviewing(null)}
+          target={{ orderItemId: reviewing.id, productName: reviewing.productName, variantName: reviewing.variantName }}
+          existing={reviewing.review ?? undefined}
+          onSaved={() => {
+            toast.success(reviewing.review ? 'Ulasan diperbarui.' : 'Terima kasih! Ulasanmu sudah tersimpan.')
+            setReviewing(null)
+            // Refetch quietly (no skeleton): the items now carry the review.
+            getMyOrder(order.id).then(replace, reload)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function ReviewButton({ item, onOpen }: { item: OrderItem; onOpen: (item: OrderItem) => void }) {
+  if (!item.review) {
+    return (
+      <Button size="sm" onClick={() => onOpen(item)}>
+        <Star aria-hidden="true" /> Beri ulasan
+      </Button>
+    )
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Stars value={item.review.rating} />
+      <Button size="sm" variant="outline" onClick={() => onOpen(item)}>
+        Ubah ulasan
+      </Button>
+    </div>
   )
 }
 
@@ -133,7 +173,7 @@ function BuyerActions({
 const BUYER_NOTE: Partial<Record<Order['status'], string>> = {
   processing: 'Penjual sedang menyiapkan pesananmu.',
   shipped: 'Pesanan sedang dalam perjalanan.',
-  delivered: 'Pesanan selesai. Terima kasih sudah berbelanja!',
+  delivered: 'Pesanan selesai. Terima kasih sudah berbelanja! Beri ulasan untuk setiap barang di daftar barang.',
   cancelled: 'Pesanan ini dibatalkan.',
   refunded: 'Pesanan dibatalkan dan dananya dikembalikan.',
 }

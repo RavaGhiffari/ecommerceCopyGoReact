@@ -72,8 +72,9 @@ type Item struct {
 }
 
 type ItemReview struct {
-	ID     uuid.UUID
-	Rating int16
+	ID      uuid.UUID
+	Rating  int16
+	Comment string
 }
 
 type HistoryEntry struct {

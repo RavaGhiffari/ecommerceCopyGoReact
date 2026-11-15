@@ -4,7 +4,7 @@ import { ChevronLeft, Store } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime } from '../../lib/format'
-import type { Order } from '../../types/orders'
+import type { Order, OrderItem } from '../../types/orders'
 import { OrderItemList, OrderStatusBadge, OrderTimeline, OrderTotals, ShippingBlock } from './OrderParts'
 
 /** Shared by /orders/:id (buyer) and /seller/orders/:id (seller). `actions` differ. */
@@ -12,10 +12,12 @@ export function OrderDetailLayout({
   order,
   back,
   actions,
+  itemAction,
 }: {
   order: Order
   back: { to: string; label: string }
   actions: ReactNode
+  itemAction?: (item: OrderItem) => ReactNode
 }) {
   return (
     <div className="space-y-4">
@@ -40,7 +42,7 @@ export function OrderDetailLayout({
                 {order.store.name}
               </Link>
             </h2>
-            <OrderItemList items={order.items} storeSlug={order.store.slug} />
+            <OrderItemList items={order.items} storeSlug={order.store.slug} itemAction={itemAction} />
             <div className="border-t pt-3">
               <OrderTotals order={order} />
             </div>

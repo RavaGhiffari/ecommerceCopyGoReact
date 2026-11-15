@@ -25,6 +25,8 @@ export interface OrderItem {
   quantity: number
   lineTotal: Money
   image: ProductImage | null
+  /** The buyer's review of this item, or null (Phase 6a). */
+  review: { id: string; rating: number; comment: string } | null
 }
 
 export interface OrderStoreRef {

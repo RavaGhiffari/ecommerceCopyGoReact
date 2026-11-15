@@ -58,7 +58,7 @@ export function HomePage() {
 
   return (
     <div className="space-y-10">
-      <BannerCarousel banners={BANNERS} intervalMs={10_000} />
+      <BannerCarousel banners={BANNERS} intervalMs={6_000} />
 
       <section aria-labelledby="home-categories">
         <h2 id="home-categories" className="mb-3 text-xl font-semibold">

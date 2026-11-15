@@ -19,19 +19,19 @@ export interface Banner {
  * - Advances every `intervalMs`. The active dot fills left to right and its
  *   animationend event advances the slide, so the fill and the switch can
  *   never drift apart. A manual change restarts the fill.
- * - Pauses while hovered or focused, and has a pause button (WCAG 2.2.2);
- *   pausing freezes the fill and resuming continues from there.
+ * - A pause button (WCAG 2.2.2) freezes the fill; resuming continues from
+ *   there. Focus and hover do not pause the carousel.
  * - Starts paused when the user prefers reduced motion.
  * - Inactive slides are `inert`, so keyboard focus never lands off-screen.
  */
-export function BannerCarousel({ banners, intervalMs = 8_000 }: { banners: Banner[]; intervalMs?: number }) {
+export function BannerCarousel({ banners, intervalMs = 6_000 }: { banners: Banner[]; intervalMs?: number }) {
   const count = banners.length
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(() => prefersReducedMotion())
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
 
-  const running = count > 1 && !paused && !hovered && !focused
+  // Only the pause button controls playback. Pausing on focus broke the
+  // button itself: clicking it focuses the section, so "resume" never resumed.
+  const running = count > 1 && !paused
 
   if (count === 0) return null
 
@@ -42,12 +42,6 @@ export function BannerCarousel({ banners, intervalMs = 8_000 }: { banners: Banne
       aria-roledescription="carousel"
       aria-label="Promo"
       className="relative overflow-hidden rounded-2xl"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false)
-      }}
     >
       <div
         className="flex transition-transform duration-700 ease-out motion-reduce:transition-none"

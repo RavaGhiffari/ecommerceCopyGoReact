@@ -5,6 +5,7 @@ export const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
   { value: 'newest', label: 'Terbaru' },
   { value: 'price_asc', label: 'Harga terendah' },
   { value: 'price_desc', label: 'Harga tertinggi' },
+  { value: 'rating', label: 'Rating tertinggi' },
 ]
 
 export const DEFAULT_SORT: ProductSort = 'popular'

@@ -4,6 +4,7 @@ import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { useProduct, useRelatedProducts } from '../features/catalog/hooks'
 import { ProductDetailView } from '../features/catalog/ProductDetailView'
 import { ProductResults } from '../features/catalog/ProductResults'
+import { ProductReviewsSection } from '../features/reviews/ProductReviewsSection'
 import type { AsyncState } from '../hooks/useAsync'
 import { usePageTitle } from '../hooks/usePageTitle'
 import type { Paginated, ProductSummary } from '../types/marketplace'
@@ -45,6 +46,7 @@ export function ProductDetailPage() {
       return (
         <div className="space-y-12">
           <ProductDetailView key={product.state.data.id} product={product.state.data} />
+          <ProductReviewsSection key={`reviews-${product.state.data.id}`} productId={product.state.data.id} />
           <RelatedProducts productId={product.state.data.id} />
         </div>
       )
