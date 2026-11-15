@@ -227,3 +227,82 @@ Integration tests run against `marketplace_test` unless noted.
 - No rate limit on checkout is planned, since the session and the cart lock already limit abuse. Revisit in Phase 7 together with the trusted-proxy setting.
 
 Preconditions: this plan is approved, and the housekeeping commit (PROJECT_STATE §1d) is done.
+
+---
+
+## Phase 6 — Reviews & dashboards: PLAN (draft 2026-11-15, awaiting approval)
+
+Phase 5 is committed (`33e046e`, `6f10765`). Nothing in this section is built yet.
+
+### 6.0 Decisions
+
+| # | Question | Proposed answer |
+|---|---|---|
+| Q1 | What makes a purchase "eligible" | One **order item** in an order whose status is `delivered`. `reviews.order_item_id UNIQUE` = one review per eligible purchase. Buying the same product in two orders gives two reviews. Refunded or cancelled orders are never eligible |
+| Q2 | Editing and deleting | The buyer may **edit** rating and comment (no time limit); no delete by the buyer. Alternative: one-shot, no edits |
+| Q3 | Review window | None: a delivered item can be reviewed at any time. Alternative: 30 days after delivery |
+| Q4 | Rating aggregate | Denormalised `products.rating_count` + `products.rating_total` (integer sum), updated **in the same transaction** as the review write with an atomic `UPDATE … SET rating_total = rating_total + $delta`. Average = total / count, computed when reading. Store rating = `SUM(total) / SUM(count)` over its products, computed on read. Invariant tested like the stock ledger: `rating_total = SUM(rating)` of visible reviews. Alternative: `AVG()` on read from `reviews` (no denormalisation, but a join in every listing) |
+| Q5 | Sort by rating | Bring back `sort=rating`: average DESC, then count DESC, then newest. Products without reviews sort last |
+| Q6 | Reviewer name shown publicly | First name plus a masked rest, e.g. "Rava G***". The API never returns the email or user id of a reviewer |
+| Q7 | Comment | Optional, at most 1000 characters, trimmed, plain text (React escapes it; no HTML) |
+| Q8 | Review moderation | Admin can **hide** / unhide a review (`status visible|hidden`); hidden reviews leave the aggregate and the public list, the author still sees theirs with a "hidden" note. Every hide/unhide writes an audit log row. Seller replies → backlog |
+| Q9 | Admin scope in this phase | Users (list, search by email, suspend / reactivate), stores (list, suspend / reactivate), categories UI (list, create, edit on the existing API), platform orders (read-only list + detail), basic stats, review moderation, audit log viewer. **Product moderation** is covered by suspending the store; a per-product admin block → backlog. Alternative: add a `blocked` product status now |
+| Q10 | Suspension rules | An admin cannot suspend themselves or another admin. Suspending a user ends their sessions (already enforced in the session lookup). Suspending a user does **not** suspend their store (separate action). Existing orders of a suspended store keep their lifecycle (buyer refund, seller fulfilment) so no buyer is stuck. Reactivating restores visibility |
+| Q11 | Audit log | New table `audit_logs (actor_id, action, target_type, target_id, details JSONB, created_at)`, append-only, written **in the same transaction** as the admin action. Actions in this phase: `user.suspend`, `user.reactivate`, `store.suspend`, `store.reactivate`, `category.create`, `category.update`, `review.hide`, `review.unhide` |
+| Q12 | Seller dashboard | `GET /seller/stats`: order counts per status, revenue (sum of `items_subtotal` of orders in paid/processing/shipped/delivered) for the last 30 days and all time, units sold, top 5 products by units in the last 30 days, rating of the store. Stat tiles + a small table; **no chart library** (no new dependency) |
+| Q13 | Admin stats | `GET /admin/stats`: users (active/suspended), stores (active/suspended), products (active), orders per status, GMV last 30 days (same revenue rule as Q12, over all stores) |
+| Q14 | Buyer side | `/account` gets a "Menunggu ulasan" section (delivered items without a review); `/orders/:id` gets a "Beri ulasan" / "Ubah ulasan" button per item; product detail shows the rating summary (average, count, 1–5 distribution) and a paginated review list |
+| Q15 | `updated_at` side effect | Counter-only updates (`sold_count`, rating columns) currently bump `products.updated_at` and reorder the seller's product list (PROJECT_STATE §9). Proposed: sort the seller product list by `created_at DESC` instead. Alternative: make the trigger skip counter-only changes |
+
+### 6.1 Slices
+
+Each slice ends with its tests green and a review; the developer commits.
+
+| Slice | Content |
+|---|---|
+| **6a Reviews API** | Migration `000012_create_reviews` (reviews table + `products.rating_count/rating_total`); module `reviews`; `POST /reviews`, `PATCH /reviews/:id`, `GET /products/:id/reviews?page=` (public, with summary + distribution), `GET /me/reviews/pending` (eligible items without a review), `GET /me/reviews`; real ratings in product list/detail and store page; `sort=rating`; Q15 |
+| **6b Reviews UI** | Star rating component, review dialog (RHF + zod) from order detail and the account page, reviews section on product detail, stars on product cards, rating sort option |
+| **6c Seller dashboard** | `GET /seller/stats` + dashboard tiles on `/seller` |
+| **6d Admin API** | Migration `000013_create_audit_logs`; module `admin`: `GET /admin/users?q=&status=&page=`, `PATCH /admin/users/:id/status`, `GET /admin/stores?q=&status=&page=`, `PATCH /admin/stores/:id/status`, `GET /admin/orders?status=&page=`, `GET /admin/orders/:id`, `GET /admin/stats`, `PATCH /admin/reviews/:id/status`, `GET /admin/audit-logs?page=`; category create/update start writing audit rows |
+| **6e Admin UI** | `RequireAdmin` guard (UX only), `/admin` (stats), `/admin/users`, `/admin/stores`, `/admin/categories`, `/admin/orders` (+ detail), `/admin/reviews`, `/admin/audit-logs`; header link for admins; AlertDialog confirmations for suspend |
+
+### 6.2 Data model
+
+**`reviews`** (000012):
+
+- `id`, `order_item_id UNIQUE` → order_items `ON DELETE RESTRICT`, `product_id` → products, `store_id` → stores, `user_id` → users (all RESTRICT, history).
+- `rating SMALLINT` CHECK 1..5, `comment TEXT` (CHECK `char_length <= 1000`, may be empty).
+- `status` CHECK `visible|hidden`, `created_at`, `updated_at` (trigger `set_updated_at`).
+- Indexes: `(product_id, created_at DESC) WHERE status = 'visible'` (public list), `(user_id, created_at DESC)` (my reviews).
+- `products` gains `rating_count INTEGER NOT NULL DEFAULT 0 CHECK (>= 0)` and `rating_total INTEGER NOT NULL DEFAULT 0 CHECK (rating_total BETWEEN rating_count AND rating_count * 5)`.
+
+`product_id`, `store_id` and `user_id` are copied from the order (not trusted from the request) so the review rows can be filtered without joining order_items → orders.
+
+**`audit_logs`** (000013): `id`, `actor_id` → users (RESTRICT), `action VARCHAR(64)`, `target_type VARCHAR(32)`, `target_id UUID`, `details JSONB NOT NULL DEFAULT '{}'`, `created_at`. Index `(created_at DESC)` and `(target_type, target_id, created_at DESC)`. No update or delete query is generated for it.
+
+### 6.3 `POST /reviews` step by step (one transaction)
+
+1. Handler: strict JSON `{orderItemId, rating, comment?}`; validation → 422.
+2. Service: load the order item **joined to its order filtered by `buyer_id` = caller** (no lock needed: `delivered` is final in the transition table, so the status cannot change after the check). Not found or another buyer's → 404 `ORDER_ITEM_NOT_FOUND`.
+3. Order status must be `delivered`, else 409 `REVIEW_NOT_ALLOWED`.
+4. `INSERT … ON CONFLICT (order_item_id) DO NOTHING RETURNING id`; no row → 409 `REVIEW_EXISTS` (a plain unique violation would abort the transaction).
+5. `UPDATE products SET rating_count = rating_count + 1, rating_total = rating_total + $rating WHERE id = $product`. The row lock of this `UPDATE` serialises concurrent reviews of the same product, so the counters never lose an update.
+6. Commit; 201 with the review.
+
+Edit: lock the review row (`WHERE id = $1 AND user_id = $caller FOR UPDATE`, foreign → 404), apply `rating_total + (new − old)` only while the review is visible. Hide / unhide: lock the review, move it out of / into the aggregate, write the audit row — same transaction.
+
+### 6.4 Tests
+
+- **Unit**: review validation (rating range, comment length/trim), name masking, stats date window, admin request validation.
+- **Integration (reviews)**: delivered item → 201; not delivered / refunded → 409; another buyer's item → 404; second review → 409; edit changes the aggregate by the delta; hidden review leaves the aggregate and the public list; public list never exposes email/user id; `sort=rating` order; **20 buyers reviewing one product concurrently → `rating_count = 20`, `rating_total = SUM(rating)`** (and proof that it fails if the counter update is replaced by read-modify-write); the same item reviewed twice concurrently → one 201 + one 409.
+- **Integration (admin)**: every admin route → 403 for customer and seller, 401 anonymous; suspend user → their next request is 401; cannot suspend self / another admin → 409; suspend store → its products leave the catalog and the cart flags them, existing orders still progress; every admin write leaves exactly one audit row in the same tx (rollback test: a failing action writes no audit row); stats match hand-computed fixtures.
+- **Integration (seller stats)**: numbers match fixtures; another store's orders never counted.
+- **E2E** (hand-run, git-ignored like the others): `review-flow.mjs` (deliver an order with the demo seller, review it, see the rating on the product page, edit it) and `admin-flow.mjs` (needs an admin from `make seed-admin`: suspend a store, see the products disappear, reactivate, create a category, read the audit log). Register-heavy scripts are not looped (rate limit).
+
+### 6.5 Risks and left out
+
+- Store rating is computed on read over all of its products; fine at this size, `EXPLAIN` in Phase 7.
+- No seller replies, review photos, helpful votes or report-abuse flow.
+- Audit log covers admin actions only, not seller or buyer actions.
+- Admin cannot edit users' data or roles; no admin creation from the UI (still `make seed-admin`).
+- No charts; the dashboards are numbers and tables.

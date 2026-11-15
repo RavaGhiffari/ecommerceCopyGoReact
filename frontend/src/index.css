@@ -128,3 +128,12 @@
     @apply font-sans;
     }
 }
+/* BannerCarousel: the active dot fills left to right over one interval. */
+@keyframes banner-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

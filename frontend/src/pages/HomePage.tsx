@@ -1,10 +1,47 @@
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Link } from 'react-router-dom'
 import { Boxes, Dumbbell, Home, Laptop, Shirt, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { useCategories } from '../features/catalog/hooks'
 import { ProductSection } from '../features/catalog/ProductSection'
+import { BannerCarousel, type Banner } from '../features/home/BannerCarousel'
 import { usePageTitle } from '../hooks/usePageTitle'
+
+// Presentation only: static promo banners (no promo backend exists). Every
+// link points at a real route; nothing here pretends to be a real discount.
+const BANNERS: Banner[] = [
+  {
+    id: 'welcome',
+    eyebrow: 'Marketplace multi-penjual',
+    title: 'Belanja dari banyak toko, dalam satu tempat.',
+    description: 'Jelajahi produk dari berbagai penjual, checkout sekali untuk semua toko.',
+    cta: { label: 'Lihat semua produk', to: '/products' },
+    className: 'bg-gradient-to-r from-emerald-600 to-teal-500',
+  },
+  {
+    id: 'popular',
+    eyebrow: 'Paling diminati',
+    title: 'Produk terlaris pilihan pembeli.',
+    description: 'Lihat apa yang paling banyak dibeli minggu ini dari semua toko.',
+    cta: { label: 'Lihat terlaris', to: '/products?sort=popular' },
+    className: 'bg-gradient-to-r from-sky-600 to-indigo-500',
+  },
+  {
+    id: 'electronics',
+    eyebrow: 'Kategori unggulan',
+    title: 'Gadget dan elektronik untuk setiap hari.',
+    description: 'Dari aksesori kecil sampai perangkat utama, langsung dari penjualnya.',
+    cta: { label: 'Jelajahi elektronik', to: '/categories/elektronik' },
+    className: 'bg-gradient-to-r from-violet-600 to-fuchsia-500',
+  },
+  {
+    id: 'sell',
+    eyebrow: 'Untuk penjual',
+    title: 'Buka tokomu sendiri, gratis.',
+    description: 'Kelola produk, stok, dan pesanan dari satu dasbor penjual.',
+    cta: { label: 'Mulai berjualan', to: '/seller' },
+    className: 'bg-gradient-to-r from-amber-500 to-orange-500',
+  },
+]
 
 // Presentation only: the icon per category slug. Unknown slugs get a default.
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -21,18 +58,7 @@ export function HomePage() {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-10 text-white sm:px-10 sm:py-14">
-        <p className="text-sm font-medium text-emerald-100">Marketplace multi-penjual</p>
-        <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight sm:text-4xl">
-          Belanja dari banyak toko, dalam satu tempat.
-        </h1>
-        <p className="mt-3 max-w-xl text-emerald-50">
-          Jelajahi produk dari berbagai penjual, checkout sekali untuk semua toko.
-        </p>
-        <Button size="lg" asChild className="mt-6 h-10 bg-white px-5 font-semibold text-primary hover:bg-white/90 focus-visible:ring-white/60">
-          <Link to="/products">Lihat semua produk</Link>
-        </Button>
-      </section>
+      <BannerCarousel banners={BANNERS} intervalMs={10_000} />
 
       <section aria-labelledby="home-categories">
         <h2 id="home-categories" className="mb-3 text-xl font-semibold">
