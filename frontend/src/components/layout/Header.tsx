@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronDown, LogOut, Package, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
+import { ChevronDown, Heart, LogOut, Package, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -144,6 +144,11 @@ function AccountActions() {
           <DropdownMenuItem asChild>
             <Link to="/orders">
               <Package aria-hidden="true" /> Pesanan saya
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/wishlist">
+              <Heart aria-hidden="true" /> Favorit saya
             </Link>
           </DropdownMenuItem>
           {/* The header shows the seller link from md up; below that it lives here. */}

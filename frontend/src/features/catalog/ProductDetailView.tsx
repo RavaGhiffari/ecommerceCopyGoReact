@@ -11,6 +11,7 @@ import type { ProductDetail } from '../../types/marketplace'
 import { useAuth } from '../auth/authContext'
 import { messageFor } from '../auth/serverErrors'
 import { useCart } from '../cart/cartContext'
+import { WishlistButton } from '../wishlist/WishlistButton'
 
 /**
  * One product: pick a variant and a quantity, then add it to the cart.
@@ -97,7 +98,10 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
 
         <div className="space-y-5">
           <header>
-            <h1 className="text-2xl font-semibold">{product.name}</h1>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-2xl font-semibold">{product.name}</h1>
+              <WishlistButton productId={product.id} />
+            </div>
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
               {product.rating.count > 0 ? (
                 <a href="#ulasan" className="hover:underline">

@@ -21,6 +21,7 @@ import { SellerOrderDetailPage } from '../pages/SellerOrderDetailPage'
 import { SellerOrdersPage } from '../pages/SellerOrdersPage'
 import { SellerPage } from '../pages/SellerPage'
 import { StorePage } from '../pages/StorePage'
+import { WishlistPage } from '../pages/WishlistPage'
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: 'checkout/:id', element: <RequireAuth><PaymentPage /></RequireAuth> },
       { path: 'orders', element: <RequireAuth><OrdersPage /></RequireAuth> },
       { path: 'orders/:id', element: <RequireAuth><OrderDetailPage /></RequireAuth> },
+      { path: 'wishlist', element: <RequireAuth><WishlistPage /></RequireAuth> },
       { path: 'seller', element: <RequireAuth><SellerPage /></RequireAuth> },
       { path: 'seller/products/new', element: <RequireSeller><SellerNewProductPage /></RequireSeller> },
       { path: 'seller/products/:id', element: <RequireSeller><SellerEditProductPage /></RequireSeller> },
