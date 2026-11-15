@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Info, Minus, Plus, Store, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import { MAX_QUANTITY_PER_LINE, type CartLine, type CartStoreGroup } from '../ty
 export function CartPage() {
   usePageTitle('Keranjang')
   const { status, cart, error, reload } = useCart()
+  const navigate = useNavigate()
 
   if (status === 'loading' || status === 'anonymous') {
     return <Skeleton className="h-64 rounded-xl" role="status" aria-label="Memuat keranjang" />
@@ -66,12 +67,19 @@ export function CartPage() {
             </AlertDescription>
           </Alert>
         )}
-        <Button size="lg" disabled className="h-10 w-full font-semibold">
+        <Button
+          size="lg"
+          disabled={cart.hasIssues}
+          onClick={() => navigate('/checkout')}
+          className="h-10 w-full font-semibold"
+        >
           Lanjut ke checkout
         </Button>
         <p className="flex gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          Checkout tersedia di tahap berikutnya. Harga dan stok dicek ulang saat checkout.
+          {cart.hasIssues
+            ? 'Perbaiki atau hapus barang yang bermasalah dulu. Semua isi keranjang ikut di-checkout.'
+            : 'Semua isi keranjang ikut di-checkout. Harga dan stok dicek ulang saat pesanan dibuat.'}
         </p>
        </Card>
       </aside>

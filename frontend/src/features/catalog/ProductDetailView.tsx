@@ -40,23 +40,29 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
   const { add } = useCart()
   const navigate = useNavigate()
   const location = useLocation()
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<'cart' | 'buy' | null>(null)
   const [cartMessage, setCartMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
-  const addToCart = async () => {
+  // "Beli sekarang" = add to cart, then open /checkout (decision Q10). The
+  // whole cart is checked out, so the buyer sees everything that is in it.
+  const addToCart = async (then: 'stay' | 'checkout') => {
     if (!user) {
       navigate(`/login?next=${encodeURIComponent(location.pathname)}`)
       return
     }
-    setAdding(true)
+    setAdding(then === 'checkout' ? 'buy' : 'cart')
     setCartMessage(null)
     try {
       await add(variant.id, quantity)
+      if (then === 'checkout') {
+        navigate('/checkout')
+        return
+      }
       setCartMessage({ kind: 'ok', text: `${quantity} × ${variant.name} ditambahkan ke keranjang.` })
     } catch (err) {
       setCartMessage({ kind: 'error', text: messageFor(err) })
     } finally {
-      setAdding(false)
+      setAdding(null)
     }
   }
 
@@ -166,11 +172,22 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Button size="lg" onClick={addToCart} disabled={!available || adding} className="h-10 px-5 font-semibold">
-              {adding ? 'Menambahkan…' : 'Tambah ke keranjang'}
+            <Button
+              size="lg"
+              onClick={() => void addToCart('stay')}
+              disabled={!available || adding !== null}
+              className="h-10 px-5 font-semibold"
+            >
+              {adding === 'cart' ? 'Menambahkan…' : 'Tambah ke keranjang'}
             </Button>
-            <Button variant="outline" size="lg" disabled className="h-10 border-primary px-5 font-semibold text-primary">
-              Beli sekarang
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => void addToCart('checkout')}
+              disabled={!available || adding !== null}
+              className="h-10 border-primary px-5 font-semibold text-primary"
+            >
+              {adding === 'buy' ? 'Memproses…' : 'Beli sekarang'}
             </Button>
           </div>
           {cartMessage && (
@@ -194,7 +211,7 @@ export function ProductDetailView({ product }: { product: ProductDetail }) {
           <Alert role="note" className="border-transparent bg-muted">
             <Info aria-hidden="true" />
             <AlertDescription>
-              Checkout ("Beli sekarang") tersedia di tahap berikutnya. Menambahkan ke keranjang tidak memesan stok.
+              Menambahkan ke keranjang belum memesan stok; stok dipesan saat pesanan dibuat di checkout. "Beli sekarang" membuka checkout untuk seluruh isi keranjang.
             </AlertDescription>
           </Alert>
 

@@ -27,7 +27,7 @@ export function HomePage() {
           Belanja dari banyak toko, dalam satu tempat.
         </h1>
         <p className="mt-3 max-w-xl text-emerald-50">
-          Jelajahi produk dari berbagai penjual. Keranjang dan checkout segera hadir.
+          Jelajahi produk dari berbagai penjual, checkout sekali untuk semua toko.
         </p>
         <Button size="lg" asChild className="mt-6 h-10 bg-white px-5 font-semibold text-primary hover:bg-white/90 focus-visible:ring-white/60">
           <Link to="/products">Lihat semua produk</Link>

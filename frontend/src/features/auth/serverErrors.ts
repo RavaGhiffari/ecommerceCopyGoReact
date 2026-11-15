@@ -46,6 +46,18 @@ const CODE_MESSAGES: Record<string, string> = {
   ADDRESS_NOT_FOUND: 'Alamat ini sudah tidak ada. Muat ulang halaman.',
   ADDRESS_LIMIT_REACHED: 'Maksimal 10 alamat. Hapus salah satu dulu.',
   VALIDATION_ERROR: 'Jumlah tidak valid (1–99 per barang).',
+  // Checkout, payment and orders (Phase 5).
+  CART_EMPTY: 'Keranjangmu kosong.',
+  CART_HAS_ISSUES: 'Ada barang di keranjang yang tidak bisa dibeli saat ini. Periksa keranjangmu.',
+  SHIPPING_METHOD_NOT_ALLOWED: 'Metode pengiriman ini tidak tersedia untuk alamat tersebut.',
+  IDEMPOTENCY_KEY_REUSED: 'Pesanan ini sudah pernah dibuat. Cek halaman Pesanan saya.',
+  CHECKOUT_NOT_FOUND: 'Checkout tidak ditemukan.',
+  CHECKOUT_NOT_PENDING: 'Checkout ini sudah tidak menunggu pembayaran.',
+  CHECKOUT_EXPIRED: 'Waktu pembayaran habis. Pesanan dibatalkan dan stok dikembalikan.',
+  PAYMENT_NOT_FOUND: 'Pembayaran tidak ditemukan.',
+  PAYMENT_EVENT_CONFLICT: 'Notifikasi pembayaran ini bentrok dengan yang sebelumnya.',
+  ORDER_NOT_FOUND: 'Pesanan tidak ditemukan.',
+  INVALID_STATUS_TRANSITION: 'Status pesanan sudah berubah, jadi aksi ini tidak bisa dilakukan. Muat ulang halaman.',
 }
 
 /** A user-facing Indonesian message for any error from the API. */

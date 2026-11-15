@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Link } from 'react-router-dom'
-import { ExternalLink, Plus } from 'lucide-react'
+import { ExternalLink, Package, Plus } from 'lucide-react'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { useAuth } from '../features/auth/authContext'
 import { useCategories } from '../features/catalog/hooks'
@@ -42,12 +42,19 @@ function SellerDashboard() {
             <h1 className="text-2xl font-semibold">{store.state.data.name}</h1>
             <p className="text-sm text-muted-foreground">{store.state.data.location}</p>
           </div>
-          <Link
-            to={`/stores/${store.state.data.slug}`}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            Lihat halaman toko <ExternalLink className="size-4" aria-hidden="true" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" asChild>
+              <Link to="/seller/orders">
+                <Package aria-hidden="true" /> Pesanan toko
+              </Link>
+            </Button>
+            <Link
+              to={`/stores/${store.state.data.slug}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              Lihat halaman toko <ExternalLink className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
         </Card>
       )}
 

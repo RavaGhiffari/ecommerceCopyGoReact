@@ -25,6 +25,9 @@ export function useAsync<T>(load: () => Promise<T>, key: string) {
   // The result remembers which request produced it. A result for an older key
   // is ignored, so there is no synchronous setState inside the effect.
   const [result, setResult] = useState<{ key: string; state: Settled<T> } | null>(null)
+  // The latest successful data of ANY key, so a view can keep showing the
+  // previous result while the next one loads (e.g. a re-calculated quote).
+  const [lastData, setLastData] = useState<T | undefined>(undefined)
 
   // Always call the latest `load` without making it an effect dependency.
   const loadRef = useRef(load)
@@ -37,7 +40,9 @@ export function useAsync<T>(load: () => Promise<T>, key: string) {
     loadRef
       .current()
       .then((data) => {
-        if (!cancelled) setResult({ key: requestKey, state: { status: 'success', data } })
+        if (cancelled) return
+        setResult({ key: requestKey, state: { status: 'success', data } })
+        setLastData(data)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -55,5 +60,25 @@ export function useAsync<T>(load: () => Promise<T>, key: string) {
   const state: AsyncState<T> =
     result !== null && result.key === requestKey ? result.state : { status: 'loading' }
 
-  return { state, reload }
+  return { state, reload, lastData }
+}
+
+/**
+ * useAsync for a single resource that the page can also change, e.g. an order
+ * whose cancel endpoint returns the updated order. `replace` shows the
+ * server's answer without a reload; `reload` drops it and fetches again.
+ */
+export function useAsyncResource<T>(load: () => Promise<T>, key: string) {
+  const { state, reload: reloadLoaded } = useAsync(load, key)
+  const [replaced, setReplaced] = useState<{ key: string; data: T } | null>(null)
+
+  const current: AsyncState<T> =
+    replaced !== null && replaced.key === key ? { status: 'success', data: replaced.data } : state
+  const replace = useCallback((data: T) => setReplaced({ key, data }), [key])
+  const reload = useCallback(() => {
+    setReplaced(null)
+    reloadLoaded()
+  }, [reloadLoaded])
+
+  return { state: current, replace, reload }
 }

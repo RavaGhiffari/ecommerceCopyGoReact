@@ -31,3 +31,19 @@ export function formatCompactCount(n: number): string {
 export function formatMonthYear(iso: string): string {
   return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date(iso))
 }
+
+const dateTime = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+
+/** "15 Nov 2026, 14.05" in the viewer's time zone. */
+export function formatDateTime(iso: string): string {
+  return dateTime.format(new Date(iso))
+}
+
+/** Milliseconds -> "29:58" or "1:02:03". Negative values show "0:00". */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = String(total % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
+}

@@ -45,9 +45,9 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 export async function apiRequest<T>(
   method: Method,
   path: string,
-  options: { body?: unknown; signal?: AbortSignal } = {},
+  options: { body?: unknown; signal?: AbortSignal; headers?: Record<string, string> } = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = { Accept: 'application/json', ...options.headers }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
   let res: Response
