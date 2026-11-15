@@ -10,6 +10,7 @@ import { useAuth } from '../features/auth/authContext'
 import { useCategories } from '../features/catalog/hooks'
 import { useMyProducts, useMyStore } from '../features/seller/hooks'
 import { OpenStoreForm } from '../features/seller/OpenStoreForm'
+import { SellerStatsPanel } from '../features/seller/SellerStatsPanel'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { formatPriceRange } from '../lib/format'
 
@@ -57,6 +58,8 @@ function SellerDashboard() {
           </div>
         </Card>
       )}
+
+      <SellerStatsPanel />
 
       <section aria-labelledby="my-products">
         <div className="mb-3 flex items-center justify-between">

@@ -7,6 +7,7 @@ import type {
   OpenStoreInput,
   SellerProduct,
   SellerProductSummary,
+  SellerStats,
   SellerStore,
   UpdateProductInput,
   VariantInput,
@@ -47,3 +48,7 @@ export const setStock = (id: string, variantId: string, quantity: number, reason
     `/api/v1/seller/products/${enc(id)}/variants/${enc(variantId)}/stock`,
     { body: { quantity, reason } },
   )
+
+/** Dashboard numbers of the caller's store (6c). */
+export const getMyStats = (signal?: AbortSignal) =>
+  apiRequest<SellerStats>('GET', '/api/v1/seller/stats', { signal })

@@ -1,6 +1,7 @@
 // Mirrors of the seller API (backend/internal/modules/{stores,products}/dto.go).
 // Keep the two in sync.
-import type { Money, ProductImage, ProductVariant } from './marketplace'
+import type { Money, ProductImage, ProductVariant, Rating } from './marketplace'
+import type { OrderStatus } from './orders'
 
 export interface SellerStore {
   id: string
@@ -67,4 +68,27 @@ export interface UpdateProductInput {
   categoryId?: string
   status?: ProductStatus
   images?: ProductImage[]
+}
+
+// ---- GET /seller/stats (6c), mirror of orders.SellerStatsResponse --------------
+
+export interface SellerTopProduct {
+  productId: string
+  name: string
+  status: ProductStatus
+  units: number
+  revenue: Money // items only, last 30 days
+}
+
+export interface SellerStats {
+  /** Every order status as a key, 0 when the store has none. */
+  ordersByStatus: Record<OrderStatus, number>
+  /** Sum of items (no shipping) of paid, processing, shipped and delivered orders. */
+  revenue: { last30Days: Money; allTime: Money }
+  unitsSold: { last30Days: number; allTime: number }
+  /** Last 30 days, at most 5, by units. */
+  topProducts: SellerTopProduct[]
+  rating: Rating
+  /** Start of the 30-day window (RFC 3339). */
+  since: string
 }
