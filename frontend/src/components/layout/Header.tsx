@@ -51,7 +51,7 @@ export function Header() {
           to="/"
           className="shrink-0 rounded-md text-xl font-bold text-primary outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          Pasar<span className="text-foreground">Kita</span>
+          Niaga<span className="text-foreground">Heula</span>
         </Link>
 
         <SearchForm key={urlQuery} initial={urlQuery} onSearch={(q) => navigate(q ? `/products?q=${encodeURIComponent(q)}` : '/products')} />
@@ -197,7 +197,7 @@ function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: stri
         type="search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Cari produk di PasarKita"
+        placeholder="Cari produk di NiagaHeula"
         className="h-9 min-w-0 flex-1 rounded-r-none border-r-0"
       />
       <Button type="submit" aria-label="Cari" className="h-9 rounded-l-none px-3">

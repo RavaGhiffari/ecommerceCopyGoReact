@@ -45,7 +45,7 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Brand: PasarKita green. --primary = Tailwind emerald-600 (the colour the
+/* Brand: NiagaHeula green. --primary = Tailwind emerald-600 (the colour the
    UI used before shadcn), so default buttons look the same as the old ones.
    Font stays the system sans (no web font dependency). */
 :root {

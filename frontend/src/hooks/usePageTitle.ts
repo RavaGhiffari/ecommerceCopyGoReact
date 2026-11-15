@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const SITE_NAME = 'PasarKita'
+const SITE_NAME = 'NiagaHeula'
 
 /** Sets the browser tab title while the calling page is mounted. */
 export function usePageTitle(title?: string) {

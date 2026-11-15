@@ -38,7 +38,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthCard title="Masuk ke PasarKita">
+    <AuthCard title="Masuk ke NiagaHeula">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <FormAlert message={formError} />
         <TextField label="Email" type="email" autoComplete="email" registration={register('email')} error={errors.email?.message} />
