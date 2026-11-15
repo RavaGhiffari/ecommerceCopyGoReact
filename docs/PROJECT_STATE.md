@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-15 |
-| Last commit | `932065a` (homepage carousel; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 6b — reviews UI** (frontend + one additive backend field) + doc updates — see §1k |
-| Current phase | **Phase 6 in progress**: plan approved (PLAN.md, Q1–Q15 defaults); 6a committed; slice 6b done and verified, awaiting review |
-| Next | review + commit 6b; then 6c (seller dashboard) |
+| Last commit | `12bbd7f` (wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Phase 6c — seller dashboard** (`GET /seller/stats` + tiles on `/seller`) + doc updates — see §1l |
+| Current phase | **Phase 6 in progress**: plan approved (PLAN.md, Q1–Q15 defaults); 6a, 6b committed; slice 6c done and verified, awaiting review |
+| Next | review + commit 6c; then 6d (admin API, migration `000014_create_audit_logs`) |
 
 ---
 
@@ -31,7 +31,9 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-5d | Phase 5d seller orders | `2cf29fb`, docs `1dde9e0` | ✅ committed by the developer | see §1h |
 | CP-5e | Phase 5e checkout & order UI | `33e046e`, docs `6f10765` | ✅ committed by the developer | see §1i |
 | CP-6a | Phase 6a reviews API | `491953f`, docs `f8ab642` | ✅ committed by the developer | see §1j |
-| CP-6b | Phase 6b reviews UI | **uncommitted** | 🟡 awaiting review | see §1k |
+| CP-6b | Phase 6b reviews UI | `6f01036`, docs `b5fe739` | ✅ committed by the developer | see §1k |
+| — | Wishlist (practice feature, PLAN.md §6.4b) | `3d722a3`, `12bbd7f` | ✅ committed by the developer | its 7 integration tests pass in the §1l run; no separate checkpoint |
+| CP-6c | Phase 6c seller dashboard | **uncommitted** | 🟡 awaiting review | see §1l |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -272,6 +274,27 @@ git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 6b" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+### 1l. Verified at CP-6c (seller dashboard), 2026-11-15
+
+| Check | Result |
+|---|---|
+| `make sqlc` / `make fmt` / `make vet` / `make test` | ok |
+| `make test-integration` | all packages ok (router 11 s), including the wishlist tests; the 3 new tests run by name with `-v`: `TestSellerStats_EmptyStore`, `TestSellerStats_MatchesHandComputedNumbers`, `TestSellerStats_Access` all PASS |
+| What the fixture test proves | 5 checkouts for store A (delivered, pending, refunded, paid with a second product, paid but backdated 40 days): status counts; revenue 30 d `450002.00` / all `650003.00` (items only, pending + refunded excluded, shipping excluded); units 9 / 11; top products ordered by units with the old and refunded orders left out; rating 4.5 from the counters; store B's numbers contain only its own orders and not A's rating |
+| `npm run build` / `npm run lint` | clean (existing "chunk > 500 kB" warning only; bundle 800 kB / gzip 240 kB) |
+| Real API (`make up`, curl against :8081) | `/ready` 200; `penjual1` login 200 → `GET /seller/stats` 200 with all 7 statuses at 0, `"0.00"` money, `topProducts: []`; anonymous → 401 |
+| **Not verified** | the dashboard in a browser (no screenshot / E2E run); the dev DB has one order only, owned by an account whose password is not in the repo, so the panel was not seen with real numbers |
+
+**Commit CP-6c** (the developer commits):
+
+```bash
+git add -- backend frontend
+git commit -m "Add Phase 6c seller dashboard" -m "- GET /seller/stats: orders per status, revenue and units (30 days and all time), top 5 products, store rating; store from the session" -m "- Revenue = items_subtotal of paid/processing/shipped/delivered orders; computed on read, no new table" -m "- /seller: stat tiles, orders per status (links to the filtered list), best sellers table" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 6c" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ## 2. What exists, by phase
@@ -285,7 +308,7 @@ git commit -m "Update project docs for Phase 6b" -m "Co-Authored-By: Claude Opus
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
-| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a committed; 6b (reviews UI) done, awaiting review; 6c–6e not started |
+| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a, 6b committed; 6c (seller dashboard) done, awaiting review; 6d–6e not started |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
 
 ---
@@ -324,7 +347,8 @@ Base `/api/v1`. Envelope: `{success, data, message}` / `{success:false, error:{c
 | Infra (no prefix) | `GET /health` (no DB), `GET /ready` (DB query) |
 | Public | `POST /auth/register`, `/auth/login`, `/auth/logout` · `GET /categories` · `GET /products?q&category&store&sort&page&pageSize` (sort `popular\|newest\|price_asc\|price_desc\|rating`) · `GET /products/:id/related` · `GET /products/:id/reviews?page&pageSize` (6a: `{summary: {average, count, distribution: {"1".."5"}}, items: [{id, rating, comment, reviewerName (masked), variantName, edited, createdAt}], page…}`; non-public product → 404 `PRODUCT_NOT_FOUND`) · `GET /stores/:slug` · `GET /stores/:slug/products/:productSlug` |
 | Signed in | `GET`/`PATCH /me` · `GET`/`POST /me/addresses` · `PATCH`/`DELETE /me/addresses/:id` · `POST /me/addresses/:id/default` · `POST /seller/store` (opens store + grants seller role) · `GET /cart` · `POST /cart/items` `{variantId, quantity}` (adds to an existing line) · `PATCH /cart/items/:id` `{quantity}` · `DELETE /cart/items/:id` — every cart route returns the whole cart · `POST /checkout/quote` `{addressId, shipping:{<storeId>: regular\|express\|same_day}}` (read-only; missing store = regular) · `POST /checkout` (same body + header `Idempotency-Key: <uuid>`; 201 new, 200 repeat) · `GET /checkout/:id` · `POST /checkout/:id/cancel` (only while `pending_payment`; returns the checkout) · `POST /payments/:id/simulate` `{outcome: success\|failure, eventId: uuid}` (plays the gateway webhook; the same `eventId` again is a no-op 200; returns the checkout) · `GET /orders?page&pageSize` · `GET /orders/:id` (with `history`) · `POST /orders/:id/cancel` (a `paid` order → `refunded`, stock restocked; returns the order) · `POST /reviews` `{orderItemId, rating 1..5, comment? ≤ 1000}` (6a; 201) · `PATCH /reviews/:id` `{rating?, comment?}` · `GET /me/reviews?page&pageSize` (own, hidden included, with `item` ref) · `GET /me/reviews/pending?page&pageSize` (delivered items without a review) |
-| Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` · `GET /seller/orders?status&page&pageSize` (own store only, newest first) · `GET /seller/orders/:id` (with `history`) · `PATCH /seller/orders/:id/status` `{status, note?}` (paid → processing → shipped → delivered; returns the order) |
+| Seller (`seller` role) | `GET`/`PATCH /seller/store` · `GET`/`POST /seller/products` · `GET`/`PATCH`/`DELETE(archive) /seller/products/:id` · `POST …/variants` · `PATCH …/variants/:variantId` · `PUT …/variants/:variantId/stock` · `GET /seller/orders?status&page&pageSize` (own store only, newest first) · `GET /seller/orders/:id` (with `history`) · `PATCH /seller/orders/:id/status` `{status, note?}` (paid → processing → shipped → delivered; returns the order) · `GET /seller/stats` (6c: `{ordersByStatus: {<all 7 statuses>: n}, revenue: {last30Days, allTime}, unitsSold: {last30Days, allTime}, topProducts: [{productId, name, status, units, revenue}] (≤ 5, last 30 days), rating: {average, count}, since}`; revenue = `items_subtotal` of paid/processing/shipped/delivered orders, window on `orders.created_at`; `STORE_REQUIRED` 409 without a store) |
+| Signed in (wishlist, practice) | `GET /me/wishlist?page&pageSize` · `GET /me/wishlist/ids` · `PUT /me/wishlist/:productId` (idempotent) · `DELETE /me/wishlist/:productId` |
 | Admin (`admin` role) | `POST /admin/categories` · `PUT /admin/categories/:id` |
 
 Status codes in use: 200 201 204 400 401 403 404 409 413 415 422 429 500 503. Error codes are SCREAMING_SNAKE (`EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `STORE_EXISTS`, `RATE_LIMITED`, `ORIGIN_REJECTED`, …). Cart adds: `CART_ITEM_NOT_FOUND` 404, `VARIANT_NOT_FOUND` 404, `VARIANT_UNAVAILABLE` 409, `OUT_OF_STOCK` 409, `QUANTITY_EXCEEDS_STOCK` 409 (details `available`, `inCart`), `OWN_PRODUCT` 409; quantity outside 1..99 → 422. Addresses: `ADDRESS_NOT_FOUND` 404 (also for someone else's id or a malformed id), `ADDRESS_LIMIT_REACHED` 409; create 201, update/default 200 with the address, delete 204. Checkout: `IDEMPOTENCY_KEY_REQUIRED` 400 (missing or not a UUID), `CART_HAS_ISSUES` 409 (details `items[]` with `itemId, variantId, productName, variantName, quantity, availableQuantity, issue`; issue adds `own_product`), `IDEMPOTENCY_KEY_REUSED` 409, `CART_EMPTY` 422, `SHIPPING_METHOD_NOT_ALLOWED` 422 (details keyed `shipping.<storeId>`), `ADDRESS_NOT_FOUND` 404, `CHECKOUT_NOT_FOUND` 404, `ORDER_NOT_FOUND` 404 (also another buyer's order or a malformed id). Lifecycle (5c): `CHECKOUT_NOT_PENDING` 409, `CHECKOUT_EXPIRED` 409 (the checkout was closed as expired by this request), `PAYMENT_NOT_FOUND` 404, `PAYMENT_EVENT_CONFLICT` 409 (event id already used for another payment or outcome), `INVALID_STATUS_TRANSITION` 409 (details `{from, to}`, or `{from: "pending_payment", checkoutId}` when an unpaid order is cancelled on its own). Seller orders (5d): `ORDER_NOT_FOUND` 404 for another store's order, `STORE_REQUIRED` 409 without a store, `INVALID_STATUS_TRANSITION` 409 for any change the table does not allow the seller, 422 for an unknown status or a note over 500 characters.
@@ -542,8 +566,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 6b (§1k).
-2. 6c seller dashboard, then 6d admin API, 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
+1. Developer reviews and commits 6c (§1l).
+2. 6d admin API (migration `000014_create_audit_logs`, since `000013` is the wishlist), then 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
 3. Then Phase 7. The trusted-proxy question stays in Phase 7 (§9).
 
 ---

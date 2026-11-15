@@ -232,7 +232,7 @@ Preconditions: this plan is approved, and the housekeeping commit (PROJECT_STATE
 
 ## Phase 6 — Reviews & dashboards: PLAN (approved 2026-11-15 with the proposed answers to Q1–Q15)
 
-Phase 5 is committed (`33e046e`, `6f10765`). Progress: 6a committed (`491953f`, `f8ab642`). **6b done and verified, awaiting review** (evidence: PROJECT_STATE §1k). 6c–6e not started.
+Phase 5 is committed (`33e046e`, `6f10765`). Progress: 6a committed (`491953f`, `f8ab642`), 6b committed (`6f01036`, `b5fe739`). **6c done and verified, awaiting review** (evidence: PROJECT_STATE §1l). 6d–6e not started.
 
 ### 6.0 Decisions
 
@@ -262,8 +262,8 @@ Each slice ends with its tests green and a review; the developer commits.
 |---|---|
 | **6a Reviews API** ✅ | Migration `000012_create_reviews` (reviews table + `products.rating_count/rating_total`); module `reviews`; `POST /reviews`, `PATCH /reviews/:id`, `GET /products/:id/reviews?page=` (public, with summary + distribution), `GET /me/reviews/pending` (eligible items without a review), `GET /me/reviews`; real ratings in product list/detail and store page; `sort=rating`; Q15. As built: buyer order items carry `review: {id, rating} \| null` (one query, for the 6b buttons); the average is rounded to one decimal in `platform/rating`; `REVIEW_NOT_ALLOWED` details carry `orderStatus`; no lock on the order (delivered is final); the store rating includes archived products |
 | **6b Reviews UI** ✅ | Star rating component, review dialog (RHF + zod) from order detail and the account page, reviews section on product detail, stars on product cards, rating sort option. As built: the order item's `review` also carries `comment` (backend, additive) so "Ubah ulasan" starts from the saved text instead of overwriting it with an empty one; `/account` shows "Menunggu ulasan" **and** "Ulasan saya" (with the "hidden by admin" note, Q8); stars on cards were already there (`RatingBadge`) and now show real data; the rating next to the product title links to `#ulasan`; the star picker is native radios (keyboard works) |
-| **6c Seller dashboard** | `GET /seller/stats` + dashboard tiles on `/seller` |
-| **6d Admin API** | Migration `000013_create_audit_logs`; module `admin`: `GET /admin/users?q=&status=&page=`, `PATCH /admin/users/:id/status`, `GET /admin/stores?q=&status=&page=`, `PATCH /admin/stores/:id/status`, `GET /admin/orders?status=&page=`, `GET /admin/orders/:id`, `GET /admin/stats`, `PATCH /admin/reviews/:id/status`, `GET /admin/audit-logs?page=`; category create/update start writing audit rows |
+| **6c Seller dashboard** ✅ | `GET /seller/stats` + dashboard tiles on `/seller`. As built: lives in module `orders` (`stats.go`; it reuses `storeOf`, so the store comes from the session and no wiring changed); no migration and no stats table, four aggregate queries on read; revenue = `items_subtotal` (no shipping) of `RevenueStatuses` = paid/processing/shipped/delivered, passed from Go as `text[]`; the 30-day window is on `orders.created_at` (a checkout expires in 30 minutes, so created ≈ paid); units sold are shown for 30 days **and** all time; top products use the product's current name and status (archived still count); the four reads are not one transaction (a payment between them could skew one response; acceptable for a dashboard). UI: 4 tiles (revenue, units, "Perlu diproses" = paid count linking to `/seller/orders?status=paid`, rating), orders per status linking to the filtered list, best-sellers table |
+| **6d Admin API** | Migration `000014_create_audit_logs` (`000013` is taken by wishlist); module `admin`: `GET /admin/users?q=&status=&page=`, `PATCH /admin/users/:id/status`, `GET /admin/stores?q=&status=&page=`, `PATCH /admin/stores/:id/status`, `GET /admin/orders?status=&page=`, `GET /admin/orders/:id`, `GET /admin/stats`, `PATCH /admin/reviews/:id/status`, `GET /admin/audit-logs?page=`; category create/update start writing audit rows |
 | **6e Admin UI** | `RequireAdmin` guard (UX only), `/admin` (stats), `/admin/users`, `/admin/stores`, `/admin/categories`, `/admin/orders` (+ detail), `/admin/reviews`, `/admin/audit-logs`; header link for admins; AlertDialog confirmations for suspend |
 
 ### 6.2 Data model
@@ -278,7 +278,7 @@ Each slice ends with its tests green and a review; the developer commits.
 
 `product_id`, `store_id` and `user_id` are copied from the order (not trusted from the request) so the review rows can be filtered without joining order_items → orders.
 
-**`audit_logs`** (000013): `id`, `actor_id` → users (RESTRICT), `action VARCHAR(64)`, `target_type VARCHAR(32)`, `target_id UUID`, `details JSONB NOT NULL DEFAULT '{}'`, `created_at`. Index `(created_at DESC)` and `(target_type, target_id, created_at DESC)`. No update or delete query is generated for it.
+**`audit_logs`** (000014): `id`, `actor_id` → users (RESTRICT), `action VARCHAR(64)`, `target_type VARCHAR(32)`, `target_id UUID`, `details JSONB NOT NULL DEFAULT '{}'`, `created_at`. Index `(created_at DESC)` and `(target_type, target_id, created_at DESC)`. No update or delete query is generated for it.
 
 ### 6.3 `POST /reviews` step by step (one transaction)
 
@@ -298,6 +298,15 @@ Edit: lock the review row (`WHERE id = $1 AND user_id = $caller FOR UPDATE`, for
 - **Integration (admin)**: every admin route → 403 for customer and seller, 401 anonymous; suspend user → their next request is 401; cannot suspend self / another admin → 409; suspend store → its products leave the catalog and the cart flags them, existing orders still progress; every admin write leaves exactly one audit row in the same tx (rollback test: a failing action writes no audit row); stats match hand-computed fixtures.
 - **Integration (seller stats)**: numbers match fixtures; another store's orders never counted.
 - **E2E** (hand-run, git-ignored like the others): `review-flow.mjs` (deliver an order with the demo seller, review it, see the rating on the product page, edit it) and `admin-flow.mjs` (needs an admin from `make seed-admin`: suspend a store, see the products disappear, reactivate, create a category, read the audit log). Register-heavy scripts are not looped (rate limit).
+
+### 6.4b Wishlist (practice feature, outside the phase plan; committed `3d722a3`, `12bbd7f`)
+
+Built by the developer as the DEV_GUIDE §13 level-3 exercise, between 6b and 6c.
+
+- Migration `000013_create_wishlist_items`: `user_id` (CASCADE), `product_id` (RESTRICT), `UNIQUE (user_id, product_id)`, index `(user_id, created_at DESC)`. Rows are inserted or deleted, never updated.
+- Module `wishlist`; routes in the `signedIn` group, always the session user's own: `GET /me/wishlist` (paginated), `GET /me/wishlist/ids`, `PUT /me/wishlist/:productId` (idempotent: `ON CONFLICT DO NOTHING`), `DELETE /me/wishlist/:productId`. Only public products can be added.
+- Frontend: `types/wishlist.ts`, `services/wishlist.ts`, `features/wishlist/WishlistButton` (heart on `ProductCard` and the product page), `/wishlist` page, header link.
+- Tests (`router/wishlist_integration_test.go`): login required, add/list/remove, adding twice keeps one row, only public products, per-user isolation, concurrent adds leave one row, pagination.
 
 ### 6.5 Risks and left out
 

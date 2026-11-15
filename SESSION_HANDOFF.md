@@ -27,7 +27,7 @@ Updated 2026-11-15, after **Phase 6b (reviews UI)** was built (uncommitted; 6a c
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
-| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); **6b reviews UI done and verified, uncommitted** (PROJECT_STATE §1k); next slice 6c (seller dashboard) |
+| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); **6c seller dashboard done and verified, uncommitted** (PROJECT_STATE §1l); next slice 6d (admin API) |
 
 ---
 
@@ -60,9 +60,11 @@ Full log: PROJECT_STATE §6.
 
 ---
 
-## 4. Files and modules relevant to the next task (Phase 5 — Checkout & orders)
+## 4. Files and modules relevant to the next task (Phase 6c — seller dashboard)
 
-The next task is **planning**, not coding: answer PLAN.md Q1–Q8 with the developer, then write the Phase 5 plan. Files a plan (and later the code) will build on:
+> Update 2026-11-15: Phase 5 is complete and 6a/6b are done; the wishlist practice feature is committed (`3d722a3`, `12bbd7f`; PLAN.md §6.4b, migration `000013`, so the admin audit-log migration is now `000014`). The next task is **6c**; the table below is the original Phase 5 file list, still useful as a map of the modules 6c reads (`orders`, `reviews`, `products`).
+
+Files the work builds on:
 
 | Path | Why |
 |---|---|
@@ -103,8 +105,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 6b** (PROJECT_STATE §1k has the commands).
-2. **Exact next task — 6c seller dashboard** (PLAN.md §6.1, Q12): `GET /seller/stats` (order counts per status, revenue = `items_subtotal` of paid/processing/shipped/delivered orders for the last 30 days and all time, units sold, top 5 products by units in 30 days, store rating), integration tests with hand-computed fixtures and another store's orders never counted, then stat tiles + a small table on `/seller` (no chart library). Then stop for review. E2E scripts (6 now, incl. `review-flow.mjs`; `playwright-core` installs in a scratch folder, run them from PowerShell) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
+1. **Developer reviews and commits 6c** (PROJECT_STATE §1l has the commands). Not yet seen in a browser: worth a look at `/seller` (or a short E2E) during review.
+2. **Exact next task — 6d admin API** (PLAN.md §6.1, Q9–Q11, Q13): migration **`000014_create_audit_logs`** (`000013` is the wishlist), module `admin`, user/store suspend + reactivate, platform orders, `GET /admin/stats`, review hide/unhide, audit log written in the same transaction as each admin action. Then stop for review. E2E scripts (6 now, incl. `review-flow.mjs`; `playwright-core` installs in a scratch folder, run them from PowerShell) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
 
 **First 10 minutes in a new session**
 
