@@ -2,6 +2,7 @@ package orders
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -73,4 +74,14 @@ func (h *Handler) SellerUpdateStatus(c *gin.Context) {
 		return
 	}
 	response.OK(c, http.StatusOK, NewOrderResponse(o), "Order status updated")
+}
+
+// SellerStats handles GET /api/v1/seller/stats (the seller dashboard, 6c).
+func (h *Handler) SellerStats(c *gin.Context) {
+	st, err := h.svc.StatsForStore(c.Request.Context(), userID(c), time.Now())
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, NewSellerStatsResponse(st), "")
 }

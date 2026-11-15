@@ -121,3 +121,56 @@ func NewPageResponse(p Page) PageResponse {
 	}
 	return PageResponse{Items: items, Page: p.Page, PageSize: p.PageSize, Total: p.Total, TotalPages: p.TotalPages}
 }
+
+// ---- seller stats (6c), mirrored in frontend/src/types/seller.ts -------------
+
+type PeriodMoneyResponse struct {
+	Last30Days string `json:"last30Days"`
+	AllTime    string `json:"allTime"`
+}
+
+type PeriodCountResponse struct {
+	Last30Days int64 `json:"last30Days"`
+	AllTime    int64 `json:"allTime"`
+}
+
+type TopProductResponse struct {
+	ProductID string `json:"productId"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Units     int64  `json:"units"`
+	Revenue   string `json:"revenue"`
+}
+
+type StoreRatingResponse struct {
+	Average float64 `json:"average"`
+	Count   int32   `json:"count"`
+}
+
+type SellerStatsResponse struct {
+	// Every order status as a key, 0 when the store has none.
+	OrdersByStatus map[string]int64     `json:"ordersByStatus"`
+	Revenue        PeriodMoneyResponse  `json:"revenue"` // items only, no shipping
+	UnitsSold      PeriodCountResponse  `json:"unitsSold"`
+	TopProducts    []TopProductResponse `json:"topProducts"` // last 30 days, at most 5
+	Rating         StoreRatingResponse  `json:"rating"`
+	Since          time.Time            `json:"since"` // start of the 30-day window
+}
+
+func NewSellerStatsResponse(s SellerStats) SellerStatsResponse {
+	top := make([]TopProductResponse, len(s.TopProducts))
+	for i, p := range s.TopProducts {
+		top[i] = TopProductResponse{
+			ProductID: p.ProductID.String(), Name: p.Name, Status: p.Status,
+			Units: p.Units, Revenue: p.Revenue.StringFixed(2),
+		}
+	}
+	return SellerStatsResponse{
+		OrdersByStatus: s.OrdersByStatus,
+		Revenue:        PeriodMoneyResponse{Last30Days: s.RevenueWindow.StringFixed(2), AllTime: s.RevenueAll.StringFixed(2)},
+		UnitsSold:      PeriodCountResponse{Last30Days: s.UnitsWindow, AllTime: s.UnitsAll},
+		TopProducts:    top,
+		Rating:         StoreRatingResponse{Average: s.RatingAverage, Count: s.RatingCount},
+		Since:          s.Since.UTC(),
+	}
+}

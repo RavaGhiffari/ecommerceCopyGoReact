@@ -64,6 +64,46 @@ func (q *Queries) CountStoreOrders(ctx context.Context, arg CountStoreOrdersPara
 	return count, err
 }
 
+const countStoreOrdersByStatus = `-- name: CountStoreOrdersByStatus :many
+
+SELECT o.status, count(*)::bigint AS order_count
+FROM orders o
+WHERE o.store_id = $1
+GROUP BY o.status
+`
+
+type CountStoreOrdersByStatusRow struct {
+	Status     string
+	OrderCount int64
+}
+
+// ---- seller stats (6c) -----------------------------------------------------------
+// GET /seller/stats. Every query filters by the caller's store_id (from the
+// session). "Revenue" counts only orders whose money the store keeps:
+// @statuses is passed from Go (orders.RevenueStatuses = paid, processing,
+// shipped, delivered), so pending, cancelled and refunded orders never count.
+// The 30-day window is on orders.created_at: a checkout expires after 30
+// minutes, so an order is paid (or cancelled) within minutes of being created.
+func (q *Queries) CountStoreOrdersByStatus(ctx context.Context, storeID uuid.UUID) ([]CountStoreOrdersByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countStoreOrdersByStatus, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountStoreOrdersByStatusRow{}
+	for rows.Next() {
+		var i CountStoreOrdersByStatusRow
+		if err := rows.Scan(&i.Status, &i.OrderCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBuyerOrder = `-- name: GetBuyerOrder :one
 SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
        o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
@@ -190,6 +230,26 @@ func (q *Queries) GetStoreOrder(ctx context.Context, arg GetStoreOrderParams) (G
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getStoreRatingTotals = `-- name: GetStoreRatingTotals :one
+SELECT COALESCE(SUM(rating_count), 0)::int AS rating_count,
+       COALESCE(SUM(rating_total), 0)::int AS rating_total
+FROM products
+WHERE store_id = $1
+`
+
+type GetStoreRatingTotalsRow struct {
+	RatingCount int32
+	RatingTotal int32
+}
+
+// Same rule as the public store page: every product, archived included.
+func (q *Queries) GetStoreRatingTotals(ctx context.Context, storeID uuid.UUID) (GetStoreRatingTotalsRow, error) {
+	row := q.db.QueryRow(ctx, getStoreRatingTotals, storeID)
+	var i GetStoreRatingTotalsRow
+	err := row.Scan(&i.RatingCount, &i.RatingTotal)
 	return i, err
 }
 
@@ -736,6 +796,70 @@ func (q *Queries) ListStoreOrders(ctx context.Context, arg ListStoreOrdersParams
 	return items, nil
 }
 
+const listStoreTopProducts = `-- name: ListStoreTopProducts :many
+SELECT oi.product_id, p.name, p.status,
+       SUM(oi.quantity)::bigint    AS units,
+       SUM(oi.line_total)::numeric AS revenue
+FROM order_items oi
+JOIN orders o   ON o.id = oi.order_id
+JOIN products p ON p.id = oi.product_id
+WHERE o.store_id = $1
+  AND o.status = ANY($2::text[])
+  AND o.created_at >= $3
+GROUP BY oi.product_id, p.name, p.status
+ORDER BY units DESC, revenue DESC, p.name, oi.product_id
+LIMIT $4
+`
+
+type ListStoreTopProductsParams struct {
+	StoreID  uuid.UUID
+	Statuses []string
+	Since    time.Time
+	TopLimit int32
+}
+
+type ListStoreTopProductsRow struct {
+	ProductID uuid.UUID
+	Name      string
+	Status    string
+	Units     int64
+	Revenue   decimal.Decimal
+}
+
+// Best sellers of the window by units, then by revenue. The name is the
+// product's current one (the seller knows their products by it); archived
+// products still count, they were real sales.
+func (q *Queries) ListStoreTopProducts(ctx context.Context, arg ListStoreTopProductsParams) ([]ListStoreTopProductsRow, error) {
+	rows, err := q.db.Query(ctx, listStoreTopProducts,
+		arg.StoreID,
+		arg.Statuses,
+		arg.Since,
+		arg.TopLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStoreTopProductsRow{}
+	for rows.Next() {
+		var i ListStoreTopProductsRow
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.Name,
+			&i.Status,
+			&i.Units,
+			&i.Revenue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockBuyerOrder = `-- name: LockBuyerOrder :one
 SELECT id, checkout_id, status
 FROM orders
@@ -844,4 +968,43 @@ func (q *Queries) SetOrderStatus(ctx context.Context, arg SetOrderStatusParams) 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const storeRevenueTotals = `-- name: StoreRevenueTotals :one
+SELECT COALESCE(SUM(o.items_subtotal), 0)::numeric                                      AS revenue_all_time,
+       COALESCE(SUM(o.items_subtotal) FILTER (WHERE o.created_at >= $1), 0)::numeric AS revenue_window,
+       COALESCE(SUM(u.units), 0)::bigint                                                AS units_all_time,
+       COALESCE(SUM(u.units) FILTER (WHERE o.created_at >= $1), 0)::bigint          AS units_window
+FROM orders o
+CROSS JOIN LATERAL (
+    SELECT SUM(oi.quantity) AS units FROM order_items oi WHERE oi.order_id = o.id
+) u
+WHERE o.store_id = $2
+  AND o.status = ANY($3::text[])
+`
+
+type StoreRevenueTotalsParams struct {
+	Since    time.Time
+	StoreID  uuid.UUID
+	Statuses []string
+}
+
+type StoreRevenueTotalsRow struct {
+	RevenueAllTime decimal.Decimal
+	RevenueWindow  decimal.Decimal
+	UnitsAllTime   int64
+	UnitsWindow    int64
+}
+
+// items_subtotal, not total: shipping fees are not the seller's sales.
+func (q *Queries) StoreRevenueTotals(ctx context.Context, arg StoreRevenueTotalsParams) (StoreRevenueTotalsRow, error) {
+	row := q.db.QueryRow(ctx, storeRevenueTotals, arg.Since, arg.StoreID, arg.Statuses)
+	var i StoreRevenueTotalsRow
+	err := row.Scan(
+		&i.RevenueAllTime,
+		&i.RevenueWindow,
+		&i.UnitsAllTime,
+		&i.UnitsWindow,
+	)
+	return i, err
 }

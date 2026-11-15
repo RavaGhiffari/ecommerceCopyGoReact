@@ -167,3 +167,54 @@ SELECT id, checkout_id, status
 FROM orders
 WHERE id = @id AND store_id = @store_id
 FOR UPDATE;
+
+-- ---- seller stats (6c) -----------------------------------------------------------
+-- GET /seller/stats. Every query filters by the caller's store_id (from the
+-- session). "Revenue" counts only orders whose money the store keeps:
+-- @statuses is passed from Go (orders.RevenueStatuses = paid, processing,
+-- shipped, delivered), so pending, cancelled and refunded orders never count.
+-- The 30-day window is on orders.created_at: a checkout expires after 30
+-- minutes, so an order is paid (or cancelled) within minutes of being created.
+
+-- name: CountStoreOrdersByStatus :many
+SELECT o.status, count(*)::bigint AS order_count
+FROM orders o
+WHERE o.store_id = @store_id
+GROUP BY o.status;
+
+-- name: StoreRevenueTotals :one
+-- items_subtotal, not total: shipping fees are not the seller's sales.
+SELECT COALESCE(SUM(o.items_subtotal), 0)::numeric                                      AS revenue_all_time,
+       COALESCE(SUM(o.items_subtotal) FILTER (WHERE o.created_at >= @since), 0)::numeric AS revenue_window,
+       COALESCE(SUM(u.units), 0)::bigint                                                AS units_all_time,
+       COALESCE(SUM(u.units) FILTER (WHERE o.created_at >= @since), 0)::bigint          AS units_window
+FROM orders o
+CROSS JOIN LATERAL (
+    SELECT SUM(oi.quantity) AS units FROM order_items oi WHERE oi.order_id = o.id
+) u
+WHERE o.store_id = @store_id
+  AND o.status = ANY(@statuses::text[]);
+
+-- name: ListStoreTopProducts :many
+-- Best sellers of the window by units, then by revenue. The name is the
+-- product's current one (the seller knows their products by it); archived
+-- products still count, they were real sales.
+SELECT oi.product_id, p.name, p.status,
+       SUM(oi.quantity)::bigint    AS units,
+       SUM(oi.line_total)::numeric AS revenue
+FROM order_items oi
+JOIN orders o   ON o.id = oi.order_id
+JOIN products p ON p.id = oi.product_id
+WHERE o.store_id = @store_id
+  AND o.status = ANY(@statuses::text[])
+  AND o.created_at >= @since
+GROUP BY oi.product_id, p.name, p.status
+ORDER BY units DESC, revenue DESC, p.name, oi.product_id
+LIMIT @top_limit;
+
+-- name: GetStoreRatingTotals :one
+-- Same rule as the public store page: every product, archived included.
+SELECT COALESCE(SUM(rating_count), 0)::int AS rating_count,
+       COALESCE(SUM(rating_total), 0)::int AS rating_total
+FROM products
+WHERE store_id = @store_id;

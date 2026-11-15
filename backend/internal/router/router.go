@@ -145,6 +145,8 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	seller.GET("/orders", h.Orders.SellerList)
 	seller.GET("/orders/:id", h.Orders.SellerGet)
 	seller.PATCH("/orders/:id/status", h.Orders.SellerUpdateStatus)
+	// Dashboard numbers of the caller's store (6c).
+	seller.GET("/stats", h.Orders.SellerStats)
 
 	// ---- Admins ----------------------------------------------------------------
 	admin := api.Group("/admin", middleware.RequireRole(authctx.RoleAdmin))
