@@ -25,6 +25,13 @@ const FIELD_MESSAGES: Record<string, string> = {
   'must be 8-15 digits, optionally starting with +': 'harus 8–15 digit angka, boleh diawali +',
   'must be between 1 and 5': 'pilih 1 sampai 5 bintang',
   'must be at most 1000 characters': 'maksimal 1000 karakter',
+  // Categories (admin, Phase 6e).
+  'must be at most 100 characters': 'maksimal 100 karakter',
+  'may only contain a-z, 0-9 and single hyphens': 'hanya a–z, 0–9, dan tanda hubung tunggal',
+  'cannot be the category itself': 'tidak boleh kategori itu sendiri',
+  'must be a top-level category (only two levels are allowed)': 'harus kategori utama (hanya dua tingkat)',
+  'a category with subcategories cannot get a parent': 'kategori yang punya subkategori tidak bisa diberi induk',
+  'only two category levels are allowed': 'hanya boleh dua tingkat kategori',
 }
 
 const CODE_MESSAGES: Record<string, string> = {
@@ -66,6 +73,12 @@ const CODE_MESSAGES: Record<string, string> = {
   REVIEW_EXISTS: 'Barang ini sudah kamu ulas. Kamu bisa mengubah ulasannya.',
   REVIEW_NOT_FOUND: 'Ulasan ini tidak ditemukan.',
   PRODUCT_NOT_FOUND: 'Produk tidak ditemukan.',
+  // Admin (Phase 6d/6e).
+  USER_NOT_FOUND: 'Pengguna tidak ditemukan.',
+  STORE_NOT_FOUND: 'Toko tidak ditemukan.',
+  CATEGORY_NOT_FOUND: 'Kategori tidak ditemukan. Muat ulang halaman.',
+  CANNOT_CHANGE_SELF: 'Kamu tidak bisa mengubah status akunmu sendiri.',
+  CANNOT_CHANGE_ADMIN: 'Status akun admin lain tidak bisa diubah.',
 }
 
 /** A user-facing Indonesian message for any error from the API. */

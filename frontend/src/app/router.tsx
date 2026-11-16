@@ -1,8 +1,18 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { AdminLayout } from '../features/admin/AdminLayout'
+import { RequireAdmin } from '../features/admin/RequireAdmin'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { StatusPage } from '../features/status/StatusPage'
 import { MainLayout } from '../layouts/MainLayout'
 import { AccountPage } from '../pages/AccountPage'
+import { AdminAuditLogsPage } from '../pages/AdminAuditLogsPage'
+import { AdminCategoriesPage } from '../pages/AdminCategoriesPage'
+import { AdminDashboardPage } from '../pages/AdminDashboardPage'
+import { AdminOrderDetailPage } from '../pages/AdminOrderDetailPage'
+import { AdminOrdersPage } from '../pages/AdminOrdersPage'
+import { AdminReviewsPage } from '../pages/AdminReviewsPage'
+import { AdminStoresPage } from '../pages/AdminStoresPage'
+import { AdminUsersPage } from '../pages/AdminUsersPage'
 import { CartPage } from '../pages/CartPage'
 import { CheckoutPage } from '../pages/CheckoutPage'
 import { HomePage } from '../pages/HomePage'
@@ -49,6 +59,22 @@ export const router = createBrowserRouter([
       { path: 'seller/products/:id', element: <RequireSeller><SellerEditProductPage /></RequireSeller> },
       { path: 'seller/orders', element: <RequireSeller><SellerOrdersPage /></RequireSeller> },
       { path: 'seller/orders/:id', element: <RequireSeller><SellerOrderDetailPage /></RequireSeller> },
+
+      // Admin panel (6e). RequireAdmin is UX only; every /api/v1/admin route checks the role.
+      {
+        path: 'admin',
+        element: <RequireAdmin><AdminLayout /></RequireAdmin>,
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'users', element: <AdminUsersPage /> },
+          { path: 'stores', element: <AdminStoresPage /> },
+          { path: 'categories', element: <AdminCategoriesPage /> },
+          { path: 'orders', element: <AdminOrdersPage /> },
+          { path: 'orders/:id', element: <AdminOrderDetailPage /> },
+          { path: 'reviews', element: <AdminReviewsPage /> },
+          { path: 'audit-logs', element: <AdminAuditLogsPage /> },
+        ],
+      },
 
       { path: 'status', element: <StatusPage /> },
       { path: '*', element: <NotFoundPage /> },

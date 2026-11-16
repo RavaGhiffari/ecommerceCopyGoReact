@@ -208,7 +208,10 @@ func placeDemoOrder(
 			"UPDATE orders SET created_at = created_at - make_interval(days => $2) WHERE checkout_id = $1",
 			`UPDATE order_status_histories h SET created_at = h.created_at - make_interval(days => $2)
 			 FROM orders o WHERE o.id = h.order_id AND o.checkout_id = $1`,
-			`UPDATE reviews r SET created_at = r.created_at - make_interval(days => $2)
+			// updated_at moves too: "edited" means updated_at > created_at, and a
+			// seeded review was never edited.
+			`UPDATE reviews r SET created_at = r.created_at - make_interval(days => $2),
+			                      updated_at = r.updated_at - make_interval(days => $2)
 			 FROM order_items oi JOIN orders o ON o.id = oi.order_id
 			 WHERE oi.id = r.order_item_id AND o.checkout_id = $1`,
 		} {

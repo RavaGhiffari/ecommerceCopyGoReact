@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronDown, Heart, LogOut, Package, Search, ShoppingCart, Store, UserRound } from 'lucide-react'
+import { ChevronDown, Heart, LogOut, Package, Search, ShieldCheck, ShoppingCart, Store, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useIsAdmin } from '../../features/admin/hooks'
 import { useAuth } from '../../features/auth/authContext'
 import { useCart } from '../../features/cart/cartContext'
 import { useCategories } from '../../features/catalog/hooks'
@@ -60,6 +61,7 @@ export function Header() {
           <CartLink />
           <AccountActions />
           <SellerLink />
+          <AdminLink />
         </div>
       </div>
 
@@ -71,6 +73,19 @@ export function Header() {
 function useIsSeller() {
   const { user } = useAuth()
   return user?.roles.includes('seller') ?? false
+}
+
+/** "Admin" for admins only, from md up (smaller screens: the account menu). */
+function AdminLink() {
+  const isAdmin = useIsAdmin()
+  if (!isAdmin) return null
+  return (
+    <Button variant="ghost" asChild className="hidden text-muted-foreground hover:text-primary md:inline-flex">
+      <Link to="/admin">
+        <ShieldCheck aria-hidden="true" /> Admin
+      </Link>
+    </Button>
+  )
 }
 
 /** "Toko saya" for sellers, "Buka toko" for everyone else (/seller decides what to show). */
@@ -93,6 +108,7 @@ function SellerLink() {
 function AccountActions() {
   const { status, user, logout } = useAuth()
   const isSeller = useIsSeller()
+  const isAdmin = useIsAdmin()
   const navigate = useNavigate()
   const location = useLocation()
   const [busy, setBusy] = useState(false)
@@ -157,6 +173,13 @@ function AccountActions() {
               <Store aria-hidden="true" /> {isSeller ? 'Toko saya' : 'Buka toko'}
             </Link>
           </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem asChild className="md:hidden">
+              <Link to="/admin">
+                <ShieldCheck aria-hidden="true" /> Panel admin
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" disabled={busy} onSelect={() => void signOut()}>
             <LogOut aria-hidden="true" /> Keluar
