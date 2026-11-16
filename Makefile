@@ -28,7 +28,7 @@ help:
 	@echo "Stack:      up | down | logs | ps"
 	@echo "Migrations: migrate-up | migrate-down | migrate-version | migrate-create name=... | migrate-force version=N"
 	@echo "Code:       sqlc | fmt | vet | test | test-db | test-integration"
-	@echo "Accounts:   seed-admin email=... name=... | seed-dev (demo catalog)"
+	@echo "Accounts:   seed-admin email=... name=... | seed-dev (demo catalog + orders)"
 
 # ---- Stack -------------------------------------------------------------------
 

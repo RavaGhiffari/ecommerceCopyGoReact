@@ -4,10 +4,14 @@
 //
 //	make seed-dev
 //
+// It then adds demo orders (orders.go): one buyer, checkouts in every order
+// status and a few reviews, spread over the last weeks.
+//
 // It goes through the same services as the API, so demo data obeys every
 // validation rule, uses the same transactions and writes inventory ledger
-// rows like real data would. It refuses to run in production and does
-// nothing if categories already exist.
+// rows like real data would. It refuses to run in production. Each step runs
+// once: the catalog is skipped if categories exist, the orders if the demo
+// buyer exists.
 package main
 
 import (
@@ -18,6 +22,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
@@ -159,11 +164,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if len(existing) > 0 {
-		fmt.Println("categories already exist; database looks seeded, nothing to do")
-		return nil
-	}
-
 	authSvc, err := auth.NewService(pool, auth.Config{
 		SessionTTL: cfg.SessionTTL,
 		Password:   password.Params{MemoryKiB: cfg.Argon2.MemoryKiB, Iterations: cfg.Argon2.Iterations, Parallelism: cfg.Argon2.Parallelism},
@@ -171,6 +171,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	// Two independent steps, each run once: the catalog (skipped when
+	// categories exist) and the demo orders (skipped when the demo buyer
+	// exists). An already seeded database can therefore still get the orders.
+	if len(existing) > 0 {
+		fmt.Println("categories already exist; skipping the demo catalog")
+	} else if err := seedCatalog(ctx, pool, catSvc, authSvc); err != nil {
+		return err
+	}
+	return seedOrders(ctx, pool, cfg, authSvc)
+}
+
+func seedCatalog(ctx context.Context, pool *pgxpool.Pool, catSvc *categories.Service, authSvc *auth.Service) error {
 	storeSvc := stores.NewService(pool)
 	productSvc := products.NewService(pool)
 	productRepo := products.NewRepository(pool)
