@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ItemRowSkeleton, LineSkeleton, LoadingRegion } from '../components/shared/Skeletons'
 import { ProductImage } from '../components/product/ProductImage'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { messageFor } from '../features/auth/serverErrors'
@@ -20,7 +21,7 @@ export function CartPage() {
   const navigate = useNavigate()
 
   if (status === 'loading' || status === 'anonymous') {
-    return <Skeleton className="h-64 rounded-xl" role="status" aria-label="Memuat keranjang" />
+    return <CartSkeleton />
   }
   if (status === 'error' && error) {
     return <ErrorState error={error} onRetry={reload} title="Gagal memuat keranjang" />
@@ -84,6 +85,42 @@ export function CartPage() {
        </Card>
       </aside>
     </div>
+  )
+}
+
+/** Same grid as the cart: two store cards with two lines each, and the summary. */
+function CartSkeleton() {
+  return (
+    <LoadingRegion label="Memuat keranjang" className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-40" />
+        {[0, 1].map((i) => (
+          <Card key={i} className="gap-0 py-0">
+            <div className="flex items-center justify-between border-b px-5 py-3">
+              <LineSkeleton className="w-48" />
+              <LineSkeleton className="w-24" />
+            </div>
+            <div className="divide-y">
+              <ItemRowSkeleton />
+              <ItemRowSkeleton />
+            </div>
+          </Card>
+        ))}
+      </div>
+      <Card className="gap-3 p-5">
+        <Skeleton className="h-6 w-40" />
+        <div className="flex justify-between">
+          <LineSkeleton className="w-24" />
+          <LineSkeleton className="w-8" />
+        </div>
+        <div className="flex justify-between border-t pt-3">
+          <LineSkeleton className="w-20" />
+          <LineSkeleton className="w-28" />
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <LineSkeleton className="h-3 w-full" />
+      </Card>
+    </LoadingRegion>
   )
 }
 

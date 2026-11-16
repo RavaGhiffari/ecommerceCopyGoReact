@@ -3,6 +3,7 @@ import { Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LineSkeleton, LoadingRegion } from '../components/shared/Skeletons'
 import { ProductImage } from '../components/product/ProductImage'
 import { Pagination } from '../components/shared/Pagination'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
@@ -25,10 +26,11 @@ export function OrdersPage() {
       <h1 className="text-2xl font-semibold">Pesanan saya</h1>
 
       {state.status === 'loading' && (
-        <div className="space-y-3" role="status" aria-label="Memuat pesanan">
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-        </div>
+        <LoadingRegion label="Memuat pesanan" className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <OrderCardSkeleton key={i} />
+          ))}
+        </LoadingRegion>
       )}
       {state.status === 'error' && <ErrorState error={state.error} onRetry={reload} title="Gagal memuat pesanan" />}
       {state.status === 'success' && state.data.items.length === 0 && (
@@ -59,6 +61,29 @@ export function OrdersPage() {
         </>
       )}
     </div>
+  )
+}
+
+/** Same three bands as OrderCard: store + status, first item, number + buttons. */
+function OrderCardSkeleton() {
+  return (
+    <Card className="block p-5">
+      <div className="flex items-center justify-between gap-2 border-b pb-3">
+        <LineSkeleton className="w-56" />
+        <Skeleton className="h-5 w-24 rounded-md" />
+      </div>
+      <div className="flex gap-3 py-3">
+        <Skeleton className="aspect-square w-14 shrink-0 rounded-md" />
+        <div className="flex-1 space-y-2">
+          <LineSkeleton className="w-2/3" />
+          <LineSkeleton className="h-3 w-1/4" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t pt-3">
+        <LineSkeleton className="w-64" />
+        <Skeleton className="h-8 w-24" />
+      </div>
+    </Card>
   )
 }
 

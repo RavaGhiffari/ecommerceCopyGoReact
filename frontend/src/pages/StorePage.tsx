@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LineSkeleton, LoadingRegion } from '../components/shared/Skeletons'
 import { Link, useParams } from 'react-router-dom'
 import { CalendarDays, MapPin } from 'lucide-react'
 import { Pagination } from '../components/shared/Pagination'
@@ -41,7 +42,23 @@ export function StorePage() {
   return (
     <div className="space-y-6">
       {store.state.status === 'loading' ? (
-        <Skeleton className="h-36 rounded-xl" role="status" aria-label="Memuat toko" />
+        <LoadingRegion label="Memuat toko">
+          <Card className="p-5">
+            <div className="flex items-start gap-4">
+              <Skeleton className="size-16 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-8 w-56" />
+                <LineSkeleton className="w-2/3" />
+                <div className="flex flex-wrap gap-5 pt-2">
+                  <LineSkeleton className="w-24" />
+                  <LineSkeleton className="w-20" />
+                  <LineSkeleton className="w-36" />
+                  <LineSkeleton className="w-24" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </LoadingRegion>
       ) : (
         <Card className="p-5">
           <div className="flex items-start gap-4">

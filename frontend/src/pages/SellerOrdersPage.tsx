@@ -2,7 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { TableSkeleton } from '../components/shared/Skeletons'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { Pagination } from '../components/shared/Pagination'
@@ -63,7 +63,12 @@ export function SellerOrdersPage() {
         })}
       </div>
 
-      {state.status === 'loading' && <Skeleton className="h-64 rounded-xl" role="status" aria-label="Memuat pesanan" />}
+      {state.status === 'loading' && (
+        <TableSkeleton
+          label="Memuat pesanan"
+          headers={['No. pesanan', 'Penerima', 'Barang', 'Kirim', 'Total', 'Status', '']}
+        />
+      )}
       {state.status === 'error' && <ErrorState error={state.error} onRetry={reload} title="Gagal memuat pesanan" />}
       {state.status === 'success' && state.data.items.length === 0 && (
         <EmptyState

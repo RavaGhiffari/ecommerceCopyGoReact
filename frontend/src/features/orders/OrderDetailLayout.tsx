@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, Store } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ItemRowSkeleton, LineSkeleton, LoadingRegion } from '../../components/shared/Skeletons'
 import { formatDateTime } from '../../lib/format'
 import type { Order, OrderItem } from '../../types/orders'
 import { OrderItemList, OrderStatusBadge, OrderTimeline, OrderTotals, ShippingBlock } from './OrderParts'
@@ -67,12 +68,51 @@ export function OrderDetailLayout({
 
 export function OrderDetailSkeleton() {
   return (
-    <div className="space-y-4" role="status" aria-label="Memuat pesanan">
-      <Skeleton className="h-10 w-64" />
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <Skeleton className="h-72 rounded-xl" />
-        <Skeleton className="h-48 rounded-xl" />
+    <LoadingRegion label="Memuat pesanan" className="block space-y-4">
+      <LineSkeleton className="w-24" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <LineSkeleton className="w-40" />
+        </div>
+        <Skeleton className="h-7 w-28 rounded-md" />
       </div>
-    </div>
+      <div className="grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
+        <div className="space-y-4">
+          <Card className="block p-0">
+            <div className="px-5 pt-5">
+              <LineSkeleton className="w-40" />
+            </div>
+            <ItemRowSkeleton thumb="w-14" />
+            <ItemRowSkeleton thumb="w-14" />
+            <div className="space-y-2 border-t p-5">
+              <LineSkeleton className="ml-auto w-48" />
+              <LineSkeleton className="ml-auto w-40" />
+            </div>
+          </Card>
+          <Card className="block space-y-3 p-5">
+            <LineSkeleton className="w-32" />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="size-3 rounded-full" />
+                <LineSkeleton className="w-1/2" />
+              </div>
+            ))}
+          </Card>
+        </div>
+        <div className="space-y-4">
+          <Card className="block space-y-3 p-5">
+            <LineSkeleton className="w-1/2" />
+            <Skeleton className="h-9 w-full" />
+          </Card>
+          <Card className="block space-y-2 p-5">
+            <LineSkeleton className="w-1/3" />
+            <LineSkeleton className="w-3/4" />
+            <LineSkeleton className="w-full" />
+            <LineSkeleton className="w-2/3" />
+          </Card>
+        </div>
+      </div>
+    </LoadingRegion>
   )
 }

@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Link } from 'react-router-dom'
 import { ExternalLink, Package, Plus } from 'lucide-react'
+import { LineSkeleton, LoadingRegion, TableSkeleton } from '../components/shared/Skeletons'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
 import { useAuth } from '../features/auth/authContext'
 import { useCategories } from '../features/catalog/hooks'
@@ -36,7 +37,18 @@ function SellerDashboard() {
   return (
     <div className="space-y-6">
       {store.state.status === 'loading' ? (
-        <Skeleton className="h-24 rounded-xl" role="status" aria-label="Memuat toko" />
+        <LoadingRegion label="Memuat toko">
+          <Card className="flex-row flex-wrap items-start justify-between gap-4 p-5">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-56" />
+              <LineSkeleton className="w-32" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-36" />
+              <LineSkeleton className="w-36" />
+            </div>
+          </Card>
+        </LoadingRegion>
       ) : (
         <Card className="flex-row flex-wrap items-start justify-between gap-4 p-5">
           <div>
@@ -74,7 +86,7 @@ function SellerDashboard() {
         </div>
 
         {products.state.status === 'loading' && (
-          <Skeleton className="h-40 rounded-xl" role="status" aria-label="Memuat produk" />
+          <TableSkeleton label="Memuat produk" rows={4} headers={['Produk', 'Kategori', 'Harga', 'Stok', 'Status']} />
         )}
         {products.state.status === 'error' && (
           <ErrorState error={products.state.error} onRetry={products.reload} title="Gagal memuat produk" />

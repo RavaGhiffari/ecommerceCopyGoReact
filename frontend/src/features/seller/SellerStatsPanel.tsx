@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LineSkeleton, LoadingRegion, StatTileSkeleton } from '../../components/shared/Skeletons'
 import { ErrorState } from '../../components/shared/StateViews'
 import { formatCompactCount, formatRupiah } from '../../lib/format'
 import { ORDER_STATUSES, ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from '../orders/status'
@@ -19,11 +20,35 @@ export function SellerStatsPanel() {
 
   if (state.status === 'loading') {
     return (
-      <div role="status" aria-label="Memuat ringkasan toko" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
+      <LoadingRegion label="Memuat ringkasan toko" className="block space-y-4">
+        <Skeleton className="h-7 w-48" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <StatTileSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <Card className="gap-3 p-4">
+            <LineSkeleton className="w-32" />
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className="h-5 w-28 rounded-md" />
+                <LineSkeleton className="w-6" />
+              </div>
+            ))}
+          </Card>
+          <Card className="gap-3 p-4">
+            <LineSkeleton className="w-40" />
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="flex items-center justify-between gap-4 border-t pt-3">
+                <LineSkeleton className="w-1/2" />
+                <LineSkeleton className="w-8" />
+                <LineSkeleton className="w-24" />
+              </div>
+            ))}
+          </Card>
+        </div>
+      </LoadingRegion>
     )
   }
   if (state.status === 'error') {

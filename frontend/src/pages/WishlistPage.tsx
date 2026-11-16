@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ItemRowSkeleton, LoadingRegion } from '../components/shared/Skeletons'
 import { ProductImage } from '../components/product/ProductImage'
 import { Pagination } from '../components/shared/Pagination'
 import { EmptyState, ErrorState } from '../components/shared/StateViews'
@@ -45,11 +45,15 @@ export function WishlistPage() {
     body = <ErrorState error={state.error} onRetry={reload} title="Gagal memuat favorit" />
   } else if (!data) {
     body = (
-      <div className="space-y-3" role="status" aria-label="Memuat favorit">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
+      <LoadingRegion label="Memuat favorit">
+        <Card className="block p-0">
+          <div className="divide-y">
+            {Array.from({ length: 4 }, (_, i) => (
+              <ItemRowSkeleton key={i} trailing={false} />
+            ))}
+          </div>
+        </Card>
+      </LoadingRegion>
     )
   } else if (data.items.length === 0 && data.page === 1) {
     body = (
