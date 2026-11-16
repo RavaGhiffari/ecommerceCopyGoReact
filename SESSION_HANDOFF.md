@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-15, after **Phase 6b (reviews UI)** was built (uncommitted; 6a committed), for a fresh Claude Code session.
+Updated 2026-11-16, after **Phase 6e (admin UI)** was built (uncommitted; 6a–6d committed), for a fresh Claude Code session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -27,7 +27,7 @@ Updated 2026-11-15, after **Phase 6b (reviews UI)** was built (uncommitted; 6a c
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
-| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); **6d admin API done and verified, uncommitted**, together with demo orders in `seed-dev` (PROJECT_STATE §1m; loading skeletons committed `019fdbb`); next slice 6e (admin UI) |
+| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); 6d committed (`4ed91de`, `e00c95f`, docs `07bdc43`); **6e admin UI done and verified, uncommitted** (PROJECT_STATE §1n); that closes Phase 6 |
 
 ---
 
@@ -105,8 +105,9 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 6d and the demo orders** (PROJECT_STATE §1m has the separate commit commands).
-2. **Exact next task — 6e admin UI** (PLAN.md §6.1): `RequireAdmin` guard (UX only), `/admin` (stats tiles), `/admin/users`, `/admin/stores` (search, status filter, suspend/reactivate with AlertDialog), `/admin/categories` (list + create/edit on the existing API), `/admin/orders` (+ detail, reuse `OrderDetailLayout`), `/admin/reviews` (hide/unhide), `/admin/audit-logs`; header link for admins; types in `src/types/admin.ts` from PROJECT_STATE §4; loading states with `components/shared/Skeletons`. To log in as admin locally: `make seed-admin email=... name=...` (the existing `admin@contoh.id` password is not in the repo). Then stop for review.
+1. **Developer reviews and commits 6e** (PROJECT_STATE §1n has the commit commands).
+2. **Next — Phase 7 (hardening)**: write a plan (PHASES.md row 7 and PROJECT_STATE §9/§10 list the candidates) and wait for approval. Local admin for the UI: `make seed-admin email=... name=...`; the E2E admin `e2e-admin@contoh.id` exists in the dev DB (password kept outside the repo).
+3. *(Done in 6e, kept for reference)* 6e admin UI (PLAN.md §6.1): `RequireAdmin` guard (UX only), `/admin` (stats tiles), `/admin/users`, `/admin/stores` (search, status filter, suspend/reactivate with AlertDialog), `/admin/categories` (list + create/edit on the existing API), `/admin/orders` (+ detail, reuse `OrderDetailLayout`), `/admin/reviews` (hide/unhide), `/admin/audit-logs`; header link for admins; types in `src/types/admin.ts` from PROJECT_STATE §4; loading states with `components/shared/Skeletons`. To log in as admin locally: `make seed-admin email=... name=...` (the existing `admin@contoh.id` password is not in the repo). Then stop for review.
 
 **First 10 minutes in a new session**
 

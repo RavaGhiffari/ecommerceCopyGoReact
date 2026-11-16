@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-16 |
-| Last commit | `019fdbb` (loading skeletons; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 6d — admin API** (migrations 000014 + 000015, modules `admin` and `audit`, review moderation, platform orders) + **demo orders in `seed-dev`** + doc updates — see §1m (loading skeletons committed as `019fdbb`) |
-| Current phase | **Phase 6 in progress**: 6a, 6b, 6c committed; slice 6d (admin API) done and verified, awaiting review |
-| Next | review + commit 6d; then 6e (admin UI) |
+| Last commit | `07bdc43` (Phase 6d docs; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Phase 6e — admin UI** (`/admin/*` pages, `features/admin`, `types/admin.ts`, `services/admin.ts`, header link) + a one-line `seed-dev` fix (demo reviews showed "(diubah)") + doc updates — see §1n |
+| Current phase | **Phase 6 complete pending review**: 6a–6d committed; slice 6e (admin UI) done and verified, awaiting review |
+| Next | review + commit 6e; then Phase 7 (hardening) |
 
 ---
 
@@ -34,7 +34,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-6b | Phase 6b reviews UI | `6f01036`, docs `b5fe739` | ✅ committed by the developer | see §1k |
 | — | Wishlist (practice feature, PLAN.md §6.4b) | `3d722a3`, `12bbd7f` | ✅ committed by the developer | its 7 integration tests pass in the §1l run; no separate checkpoint |
 | CP-6c | Phase 6c seller dashboard | `0677906`, `6e18967`, docs `9716ed9` | ✅ committed by the developer | see §1l |
-| CP-6d | Phase 6d admin API (+ demo orders in seed-dev) | **uncommitted** | 🟡 awaiting review | see §1m |
+| CP-6d | Phase 6d admin API (+ demo orders in seed-dev) | `4ed91de`, `e00c95f`, docs `07bdc43` | ✅ committed by the developer | see §1m |
+| CP-6e | Phase 6e admin UI | **uncommitted** | 🟡 awaiting review | see §1n |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -322,6 +323,28 @@ git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 6d" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+### 1n. Verified at CP-6e (admin UI), 2026-11-16
+
+| Check | Result |
+|---|---|
+| `npm run build` / `npm run lint` | clean (bundle 838 kB, gzip 248 kB; the >500 kB warning is the known Phase 7 item) |
+| `make fmt` / `make vet` | clean (only `cmd/seed-dev/orders.go` changed on the backend) |
+| Browser E2E `admin-flow.mjs` (headless Edge, real API + dev DB, admin from `make seed-admin`) | **16/16 PASS**: seller sees "Halaman khusus admin" and no header link; anonymous `/admin/stores` → `/login?next=…`; admin header link → dashboard tiles; "Selesai" on the dashboard → `/admin/orders?status=delivered`; order detail read-only; user search, own row "(kamu)" without action; suspend: AlertDialog, "Batal" changes nothing, confirm → "Ditangguhkan" and the user's open session answers 401 at once; reactivate; store suspend → public store 404, no link in the row, reactivate → 200; status filter from the URL; category edit (sortOrder 777) and revert; category form: client errors (empty name, bad slug) and server 409 `SLUG_TAKEN` on the slug field, nothing created; review hide (AlertDialog) → "Disembunyikan" → show again; audit log shows all 7 action labels and "N sesi diakhiri"; 390 px: no horizontal page scroll on users and reviews (tables scroll inside their card); no uncaught page errors |
+| Screenshots | dashboard, audit log, users and reviews at 390 px, read in the session |
+| Bug found and fixed in the 6d demo seed | `seed-dev` moved only `created_at` of demo reviews into the past, so `updated_at > created_at` and every demo review showed "(diubah)". Seed now moves `updated_at` too; the 4 existing demo reviews in the dev DB were corrected with one `UPDATE … SET updated_at = created_at` limited to `pembeli.demo@contoh.id` (allowed by 000015: the trigger only fires on rating/comment) |
+| Left in the dev DB | admin `e2e-admin@contoh.id` (random password, kept outside the repo) and the audit rows of the E2E runs (append-only by design). Every other change was reverted by the script |
+| Not verified | keyboard-only walk through the dialogs (Radix handles focus, not re-checked by hand); dark mode; Safari/Firefox |
+
+**Commits CP-6e** (the developer commits):
+
+```bash
+git add -- frontend/src backend/cmd/seed-dev/orders.go
+git commit -m "Add Phase 6e admin UI" -m "- /admin behind RequireAdmin (UX only): dashboard, users, stores, categories, orders (+ read-only detail), reviews, audit log" -m "- Search, status filter and page in the URL; suspend and hide behind AlertDialog; rows updated from the PATCH answer" -m "- Category create/edit dialog (RHF + zod, server field errors on the fields); header link for admins" -m "- seed-dev: move demo reviews' updated_at with created_at so they do not show as edited" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 6e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ## 2. What exists, by phase
@@ -335,7 +358,7 @@ git commit -m "Update project docs for Phase 6d" -m "Co-Authored-By: Claude Opus
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
-| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a–6c committed; 6d (admin API) done, awaiting review; 6e not started |
+| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a–6d committed; 6e (admin UI) done, awaiting review |
 | 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
 
 ---
@@ -357,7 +380,7 @@ Backend request path (`backend/internal/`):
 
 Frontend (`frontend/src/`): `pages/` (routes) → `features/<area>/` (hooks, forms, views) → `services/` (**only** place that calls the API) → `lib/api.ts` (envelope-aware fetch, `ApiError`). `types/` mirrors Go DTOs by hand.
 
-Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/cart` (RequireAuth), `/status`, `*`. "Tambah ke keranjang" works (anonymous → `/login?next=…`); **"Beli sekarang" and "Lanjut ke checkout" stay disabled** until Phase 5. `CartProvider` (inside `AuthProvider`) holds the server's cart for the badge, product page and `/cart`.
+Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:categorySlug`, `/stores/:storeSlug`, `/stores/:storeSlug/products/:productSlug`, `/login`, `/register`, `/account` (RequireAuth), `/seller` (RequireAuth; opens a store or shows the dashboard), `/seller/products/new` and `/seller/products/:id` (RequireSeller), `/cart` (RequireAuth), `/admin` with `users`, `stores`, `categories`, `orders`, `orders/:id`, `reviews`, `audit-logs` (6e; `RequireAdmin` + `AdminLayout` section bar), `/status`, `*`. "Tambah ke keranjang" works (anonymous → `/login?next=…`); **"Beli sekarang" and "Lanjut ke checkout" stay disabled** until Phase 5. `CartProvider` (inside `AuthProvider`) holds the server's cart for the badge, product page and `/cart`.
 
 Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend: react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4.3.5 (+ vite plugin), and for **shadcn/ui** (developer's choice): `radix-ui` (primitives), `class-variance-authority` (variants), `clsx` + `tailwind-merge` (`cn()`), `tw-animate-css` (open/close animations), `shadcn` (its `tailwind.css` is imported by `index.css`, so it stays a runtime dependency). The npm package `cn` and the Geist font were removed.
 
@@ -552,7 +575,6 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Rate limiter is in memory | wrong behind >1 API instance | before scaling out |
 | No CSRF token (relies on SameSite + Origin) | fine for same-site; weaker if frontend is hosted on another site | Phase 7 review |
 | Dev DB contains leftover test accounts/stores (`seller-…@contoh.id`, `admin@contoh.id`, `e2e-…`) | clutter only | cleanup offered, not done |
-| Categories manageable only via admin API (no UI) | admin must use curl | Phase 6 |
 | Images are URLs only; no upload, no hotlink protection | seller can point at any host | decide with storage plan |
 | `sold_count` changes with real payments and refunds since 5c, but the demo values are seeded; ratings are real since 6a but `seed-dev` creates no reviews | "popular" is mostly demo data; almost every product shows 0 ratings | seed reviews later if wanted |
 | Updating `sold_count` or the rating counters fires the `products` `updated_at` trigger | `updated_at` means "last change of anything", not "last edit by the seller"; the seller list no longer sorts by it (6a) | accept, or skip the trigger for counter-only updates |
@@ -560,7 +582,7 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | handled in the UI: at 0:00 the pay buttons are disabled and "Muat ulang status" is offered |
 | The countdown uses the browser clock | a skewed client clock shows the wrong remaining time | server decides anyway (`CHECKOUT_EXPIRED`); could send server time with the response |
 | No frontend unit tests (Vitest/RTL) yet; UI verified by hand-run E2E scripts | regressions caught only when a script is run | Phase 7 |
-| Frontend bundle is one ~770 kB chunk | slower first load | route-level `lazy()` in Phase 7 |
+| Frontend bundle is one ~840 kB chunk (admin pages included for everyone) | slower first load | route-level `lazy()` in Phase 7; `/admin/*` is the obvious first split |
 | The sweeper runs inside the API process | with several instances each runs one; `SKIP LOCKED` prevents double work, but that setup is untested | before scaling out |
 | A payment event that arrives after expiry is not stored | no audit trail of late notifications | when a real gateway arrives (also signature checks) |
 | Sellers cannot cancel a paid order (e.g. an item turned out to be missing); only the buyer can, before processing | the seller has to ask the buyer | add `paid → cancelled` by seller with restock + refund if needed |
@@ -571,7 +593,6 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `ListCartLines` joins six tables + a LATERAL image lookup; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
 | E2E reference scripts are git-ignored (`/docs/e2e-reference`) | they are lost if this machine is lost | promote into a real Playwright suite (Phase 7) |
 | No `/auth/me`; no email verification; no password reset | account recovery impossible | backlog |
-| No audit log table yet | admin actions untracked | Phase 6/7 |
 | Frontend has no automated tests | regressions caught manually | Phase 7 |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
 | Money display converts strings to JS numbers | fine for display; never sum client-side for charging | rule for Phase 4–5 |
@@ -593,9 +614,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 6d and the demo orders (§1m).
-2. 6e admin UI (PLAN.md §6.1), one slice at a time with a review stop after each.
-3. Then Phase 7. The trusted-proxy question stays in Phase 7 (§9).
+1. Developer reviews and commits 6e (§1n). That closes Phase 6.
+2. Phase 7 (hardening): plan first, wait for approval. Candidates: Playwright + Vitest suites (promote the git-ignored E2E scripts), route-level code splitting, `EXPLAIN` review, CI, pinned images, session cleanup, OpenAPI.
+3. Within Phase 7, the trusted-proxy question stays in Phase 7 (§9).
 
 ---
 
