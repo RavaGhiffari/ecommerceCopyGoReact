@@ -124,3 +124,37 @@ WHERE o.buyer_id = @buyer_id
   AND r.id IS NULL
 ORDER BY o.updated_at DESC, oi.id
 LIMIT @page_limit OFFSET @page_offset;
+
+-- ---- admin moderation (6d) -----------------------------------------------------
+
+-- name: CountAdminReviews :one
+SELECT count(*) FROM reviews r
+WHERE (sqlc.narg('status')::text IS NULL OR r.status = sqlc.narg('status')::text);
+
+-- name: ListAdminReviews :many
+-- Every review, newest first; status NULL = both. The admin sees who wrote it.
+SELECT r.id, r.rating, r.comment, r.status, r.created_at, r.updated_at,
+       r.product_id, oi.product_name, s.name AS store_name,
+       u.name AS reviewer_name, u.email AS reviewer_email
+FROM reviews r
+JOIN users u ON u.id = r.user_id
+JOIN stores s ON s.id = r.store_id
+JOIN order_items oi ON oi.id = r.order_item_id
+WHERE (sqlc.narg('status')::text IS NULL OR r.status = sqlc.narg('status')::text)
+ORDER BY r.created_at DESC, r.id
+LIMIT @page_limit OFFSET @page_offset;
+
+-- name: LockReview :one
+-- Moderation locks the row, like an author edit does, so the two apply their
+-- aggregate deltas one at a time.
+SELECT id, order_item_id, product_id, store_id, user_id, rating, comment, status, created_at, updated_at
+FROM reviews
+WHERE id = @id
+FOR UPDATE;
+
+-- name: SetReviewStatus :one
+-- Leaves updated_at alone (trigger is UPDATE OF rating, comment since 000015).
+UPDATE reviews
+SET status = @status
+WHERE id = @id
+RETURNING id, order_item_id, product_id, store_id, user_id, rating, comment, status, created_at, updated_at;

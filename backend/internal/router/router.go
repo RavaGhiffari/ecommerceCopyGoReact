@@ -10,6 +10,7 @@ import (
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/config"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/middleware"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/addresses"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/admin"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/auth"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/cart"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/categories"
@@ -38,6 +39,7 @@ type Handlers struct {
 	Orders     *orders.Handler
 	Reviews    *reviews.Handler
 	Wishlist   *wishlist.Handler
+	Admin      *admin.Handler
 }
 
 func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolver) *gin.Engine {
@@ -149,9 +151,21 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	seller.GET("/stats", h.Orders.SellerStats)
 
 	// ---- Admins ----------------------------------------------------------------
-	admin := api.Group("/admin", middleware.RequireRole(authctx.RoleAdmin))
-	admin.POST("/categories", h.Categories.Create)
-	admin.PUT("/categories/:id", h.Categories.Replace)
+	adminGroup := api.Group("/admin", middleware.RequireRole(authctx.RoleAdmin))
+	// Categories: create/update also write an audit row (6d).
+	adminGroup.POST("/categories", h.Categories.Create)
+	adminGroup.PUT("/categories/:id", h.Categories.Replace)
+	// Back office (6d). Every write runs in one transaction with its audit row.
+	adminGroup.GET("/stats", h.Admin.Stats)
+	adminGroup.GET("/users", h.Admin.ListUsers)
+	adminGroup.PATCH("/users/:id/status", h.Admin.SetUserStatus)
+	adminGroup.GET("/stores", h.Admin.ListStores)
+	adminGroup.PATCH("/stores/:id/status", h.Admin.SetStoreStatus)
+	adminGroup.GET("/orders", h.Orders.AdminList)
+	adminGroup.GET("/orders/:id", h.Orders.AdminGet)
+	adminGroup.GET("/reviews", h.Reviews.AdminList)
+	adminGroup.PATCH("/reviews/:id/status", h.Reviews.AdminSetStatus)
+	adminGroup.GET("/audit-logs", h.Admin.AuditLogs)
 
 	return r
 }

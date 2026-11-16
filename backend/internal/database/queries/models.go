@@ -11,6 +11,16 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type AuditLog struct {
+	ID         uuid.UUID
+	ActorID    uuid.UUID
+	Action     string
+	TargetType string
+	TargetID   uuid.UUID
+	Details    []byte
+	CreatedAt  time.Time
+}
+
 type Cart struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID

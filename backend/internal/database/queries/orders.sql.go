@@ -29,6 +29,21 @@ func (q *Queries) AddProductSoldCount(ctx context.Context, arg AddProductSoldCou
 	return err
 }
 
+const countAllOrders = `-- name: CountAllOrders :one
+
+SELECT count(*)
+FROM orders o
+WHERE ($1::text IS NULL OR o.status = $1::text)
+`
+
+// ---- admin: platform orders (6d), read-only -----------------------------------------
+func (q *Queries) CountAllOrders(ctx context.Context, status *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllOrders, status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countBuyerOrders = `-- name: CountBuyerOrders :one
 SELECT count(*) FROM orders WHERE buyer_id = $1
 `
@@ -102,6 +117,65 @@ func (q *Queries) CountStoreOrdersByStatus(ctx context.Context, storeID uuid.UUI
 		return nil, err
 	}
 	return items, nil
+}
+
+const getAnyOrder = `-- name: GetAnyOrder :one
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.id = $1
+`
+
+type GetAnyOrderRow struct {
+	ID                uuid.UUID
+	CheckoutID        uuid.UUID
+	OrderNumber       string
+	Status            string
+	ShippingMethod    string
+	ShippingFee       decimal.Decimal
+	ItemsSubtotal     decimal.Decimal
+	Total             decimal.Decimal
+	StoreID           uuid.UUID
+	StoreSlug         string
+	StoreName         string
+	ShipRecipientName string
+	ShipPhone         string
+	ShipAddressLine   string
+	ShipCity          string
+	ShipProvince      string
+	ShipPostalCode    string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (q *Queries) GetAnyOrder(ctx context.Context, id uuid.UUID) (GetAnyOrderRow, error) {
+	row := q.db.QueryRow(ctx, getAnyOrder, id)
+	var i GetAnyOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.CheckoutID,
+		&i.OrderNumber,
+		&i.Status,
+		&i.ShippingMethod,
+		&i.ShippingFee,
+		&i.ItemsSubtotal,
+		&i.Total,
+		&i.StoreID,
+		&i.StoreSlug,
+		&i.StoreName,
+		&i.ShipRecipientName,
+		&i.ShipPhone,
+		&i.ShipAddressLine,
+		&i.ShipCity,
+		&i.ShipProvince,
+		&i.ShipPostalCode,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getBuyerOrder = `-- name: GetBuyerOrder :one
@@ -364,6 +438,88 @@ func (q *Queries) InsertOrderStatusHistory(ctx context.Context, arg InsertOrderS
 		arg.Note,
 	)
 	return err
+}
+
+const listAllOrders = `-- name: ListAllOrders :many
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE ($1::text IS NULL OR o.status = $1::text)
+ORDER BY o.created_at DESC, o.id
+LIMIT $3 OFFSET $2
+`
+
+type ListAllOrdersParams struct {
+	Status     *string
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListAllOrdersRow struct {
+	ID                uuid.UUID
+	CheckoutID        uuid.UUID
+	OrderNumber       string
+	Status            string
+	ShippingMethod    string
+	ShippingFee       decimal.Decimal
+	ItemsSubtotal     decimal.Decimal
+	Total             decimal.Decimal
+	StoreID           uuid.UUID
+	StoreSlug         string
+	StoreName         string
+	ShipRecipientName string
+	ShipPhone         string
+	ShipAddressLine   string
+	ShipCity          string
+	ShipProvince      string
+	ShipPostalCode    string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+// Every store, newest first. No index on created_at alone yet: fine at this
+// size, revisit with EXPLAIN in Phase 7.
+func (q *Queries) ListAllOrders(ctx context.Context, arg ListAllOrdersParams) ([]ListAllOrdersRow, error) {
+	rows, err := q.db.Query(ctx, listAllOrders, arg.Status, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllOrdersRow{}
+	for rows.Next() {
+		var i ListAllOrdersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CheckoutID,
+			&i.OrderNumber,
+			&i.Status,
+			&i.ShippingMethod,
+			&i.ShippingFee,
+			&i.ItemsSubtotal,
+			&i.Total,
+			&i.StoreID,
+			&i.StoreSlug,
+			&i.StoreName,
+			&i.ShipRecipientName,
+			&i.ShipPhone,
+			&i.ShipAddressLine,
+			&i.ShipCity,
+			&i.ShipProvince,
+			&i.ShipPostalCode,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBuyerOrders = `-- name: ListBuyerOrders :many

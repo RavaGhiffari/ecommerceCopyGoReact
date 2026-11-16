@@ -218,3 +218,32 @@ SELECT COALESCE(SUM(rating_count), 0)::int AS rating_count,
        COALESCE(SUM(rating_total), 0)::int AS rating_total
 FROM products
 WHERE store_id = @store_id;
+
+-- ---- admin: platform orders (6d), read-only -----------------------------------------
+
+-- name: CountAllOrders :one
+SELECT count(*)
+FROM orders o
+WHERE (sqlc.narg('status')::text IS NULL OR o.status = sqlc.narg('status')::text);
+
+-- name: ListAllOrders :many
+-- Every store, newest first. No index on created_at alone yet: fine at this
+-- size, revisit with EXPLAIN in Phase 7.
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE (sqlc.narg('status')::text IS NULL OR o.status = sqlc.narg('status')::text)
+ORDER BY o.created_at DESC, o.id
+LIMIT @page_limit OFFSET @page_offset;
+
+-- name: GetAnyOrder :one
+SELECT o.id, o.checkout_id, o.order_number, o.status, o.shipping_method, o.shipping_fee,
+       o.items_subtotal, o.total, o.store_id, s.slug AS store_slug, o.store_name,
+       o.ship_recipient_name, o.ship_phone, o.ship_address_line, o.ship_city, o.ship_province,
+       o.ship_postal_code, o.created_at, o.updated_at
+FROM orders o
+JOIN stores s ON s.id = o.store_id
+WHERE o.id = @id;

@@ -33,6 +33,20 @@ func (q *Queries) AdjustProductRating(ctx context.Context, arg AdjustProductRati
 	return err
 }
 
+const countAdminReviews = `-- name: CountAdminReviews :one
+
+SELECT count(*) FROM reviews r
+WHERE ($1::text IS NULL OR r.status = $1::text)
+`
+
+// ---- admin moderation (6d) -----------------------------------------------------
+func (q *Queries) CountAdminReviews(ctx context.Context, status *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminReviews, status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getPublicProductRating = `-- name: GetPublicProductRating :one
 SELECT p.rating_count, p.rating_total
 FROM products p
@@ -137,6 +151,72 @@ func (q *Queries) InsertReview(ctx context.Context, arg InsertReviewParams) (Rev
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listAdminReviews = `-- name: ListAdminReviews :many
+SELECT r.id, r.rating, r.comment, r.status, r.created_at, r.updated_at,
+       r.product_id, oi.product_name, s.name AS store_name,
+       u.name AS reviewer_name, u.email AS reviewer_email
+FROM reviews r
+JOIN users u ON u.id = r.user_id
+JOIN stores s ON s.id = r.store_id
+JOIN order_items oi ON oi.id = r.order_item_id
+WHERE ($1::text IS NULL OR r.status = $1::text)
+ORDER BY r.created_at DESC, r.id
+LIMIT $3 OFFSET $2
+`
+
+type ListAdminReviewsParams struct {
+	Status     *string
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListAdminReviewsRow struct {
+	ID            uuid.UUID
+	Rating        int16
+	Comment       string
+	Status        string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	ProductID     uuid.UUID
+	ProductName   string
+	StoreName     string
+	ReviewerName  string
+	ReviewerEmail string
+}
+
+// Every review, newest first; status NULL = both. The admin sees who wrote it.
+func (q *Queries) ListAdminReviews(ctx context.Context, arg ListAdminReviewsParams) ([]ListAdminReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminReviews, arg.Status, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdminReviewsRow{}
+	for rows.Next() {
+		var i ListAdminReviewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Rating,
+			&i.Comment,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ProductID,
+			&i.ProductName,
+			&i.StoreName,
+			&i.ReviewerName,
+			&i.ReviewerEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMyReviews = `-- name: ListMyReviews :many
@@ -404,6 +484,33 @@ func (q *Queries) LockOwnReview(ctx context.Context, arg LockOwnReviewParams) (R
 	return i, err
 }
 
+const lockReview = `-- name: LockReview :one
+SELECT id, order_item_id, product_id, store_id, user_id, rating, comment, status, created_at, updated_at
+FROM reviews
+WHERE id = $1
+FOR UPDATE
+`
+
+// Moderation locks the row, like an author edit does, so the two apply their
+// aggregate deltas one at a time.
+func (q *Queries) LockReview(ctx context.Context, id uuid.UUID) (Review, error) {
+	row := q.db.QueryRow(ctx, lockReview, id)
+	var i Review
+	err := row.Scan(
+		&i.ID,
+		&i.OrderItemID,
+		&i.ProductID,
+		&i.StoreID,
+		&i.UserID,
+		&i.Rating,
+		&i.Comment,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const productRatingDistribution = `-- name: ProductRatingDistribution :many
 SELECT rating, COUNT(*)::int AS count
 FROM reviews
@@ -435,6 +542,37 @@ func (q *Queries) ProductRatingDistribution(ctx context.Context, productID uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const setReviewStatus = `-- name: SetReviewStatus :one
+UPDATE reviews
+SET status = $1
+WHERE id = $2
+RETURNING id, order_item_id, product_id, store_id, user_id, rating, comment, status, created_at, updated_at
+`
+
+type SetReviewStatusParams struct {
+	Status string
+	ID     uuid.UUID
+}
+
+// Leaves updated_at alone (trigger is UPDATE OF rating, comment since 000015).
+func (q *Queries) SetReviewStatus(ctx context.Context, arg SetReviewStatusParams) (Review, error) {
+	row := q.db.QueryRow(ctx, setReviewStatus, arg.Status, arg.ID)
+	var i Review
+	err := row.Scan(
+		&i.ID,
+		&i.OrderItemID,
+		&i.ProductID,
+		&i.StoreID,
+		&i.UserID,
+		&i.Rating,
+		&i.Comment,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateReview = `-- name: UpdateReview :one

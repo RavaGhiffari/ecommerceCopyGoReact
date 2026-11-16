@@ -7,18 +7,22 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/database"
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/modules/audit"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/slug"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/validation"
 )
 
 type Service struct {
+	pool *pgxpool.Pool
 	repo *Repository
 }
 
 func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{repo: NewRepository(pool)}
+	return &Service{pool: pool, repo: NewRepository(pool)}
 }
 
 func (s *Service) List(ctx context.Context) ([]Category, error) {
@@ -102,4 +106,63 @@ func (s *Service) validate(ctx context.Context, id uuid.UUID, in Input) (Categor
 		return Category{}, err
 	}
 	return Category{ParentID: in.ParentID, Name: name, Slug: sl, SortOrder: in.SortOrder}, nil
+}
+
+// ---- admin writes with an audit row (Phase 6d) --------------------------------------
+//
+// The admin routes use these: the category write and its audit_logs row run
+// in one transaction, so the log never misses a change and never shows one
+// that rolled back. Create/Replace above stay for seed-dev, which has no
+// admin actor.
+
+func auditDetails(c Category) map[string]any {
+	d := map[string]any{"name": c.Name, "slug": c.Slug, "parentId": nil}
+	if c.ParentID != nil {
+		d["parentId"] = c.ParentID.String()
+	}
+	return d
+}
+
+// CreateAsAdmin creates a category and writes category.create.
+func (s *Service) CreateAsAdmin(ctx context.Context, actorID uuid.UUID, in Input) (Category, error) {
+	c, err := s.validate(ctx, uuid.Nil, in)
+	if err != nil {
+		return Category{}, err
+	}
+	var out Category
+	err = database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if out, err = NewRepository(tx).Create(ctx, c); err != nil {
+			return err
+		}
+		return audit.Write(ctx, tx, audit.Entry{
+			ActorID: actorID, Action: audit.CategoryCreate, TargetType: audit.TargetCategory,
+			TargetID: out.ID, Details: auditDetails(out),
+		})
+	})
+	return out, err
+}
+
+// ReplaceAsAdmin replaces a category and writes category.update with the
+// definition before and after.
+func (s *Service) ReplaceAsAdmin(ctx context.Context, actorID, id uuid.UUID, in Input) (Category, error) {
+	before, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return Category{}, err
+	}
+	c, err := s.validate(ctx, id, in)
+	if err != nil {
+		return Category{}, err
+	}
+	c.ID = id
+	var out Category
+	err = database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if out, err = NewRepository(tx).Update(ctx, c); err != nil {
+			return err
+		}
+		return audit.Write(ctx, tx, audit.Entry{
+			ActorID: actorID, Action: audit.CategoryUpdate, TargetType: audit.TargetCategory, TargetID: id,
+			Details: map[string]any{"before": auditDetails(before), "after": auditDetails(out)},
+		})
+	})
+	return out, err
 }

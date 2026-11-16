@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/authctx"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/request"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/response"
 	"github.com/RavaGhiffari/ecommerceCopyGoReact/backend/internal/platform/validation"
@@ -45,7 +46,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if !request.BindJSON(c, &body) {
 		return
 	}
-	cat, err := h.svc.Create(c.Request.Context(), Input(body))
+	cat, err := h.svc.CreateAsAdmin(c.Request.Context(), actorID(c), Input(body))
 	if err != nil {
 		h.fail(c, err)
 		return
@@ -64,7 +65,7 @@ func (h *Handler) Replace(c *gin.Context) {
 	if !request.BindJSON(c, &body) {
 		return
 	}
-	cat, err := h.svc.Replace(c.Request.Context(), id, Input(body))
+	cat, err := h.svc.ReplaceAsAdmin(c.Request.Context(), actorID(c), id, Input(body))
 	if err != nil {
 		h.fail(c, err)
 		return
@@ -86,4 +87,10 @@ func (h *Handler) fail(c *gin.Context, err error) {
 	default:
 		response.Internal(c, err)
 	}
+}
+
+// actorID is the signed-in admin (the route is behind RequireRole(admin)).
+func actorID(c *gin.Context) uuid.UUID {
+	p, _ := authctx.FromContext(c.Request.Context())
+	return p.UserID
 }
