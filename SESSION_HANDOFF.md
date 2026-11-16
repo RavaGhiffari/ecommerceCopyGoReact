@@ -27,7 +27,7 @@ Updated 2026-11-15, after **Phase 6b (reviews UI)** was built (uncommitted; 6a c
 | UI migration to shadcn/ui | committed (`db15fef`; docs `83b34a7`) |
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
-| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); **6c seller dashboard done and verified, uncommitted** (PROJECT_STATE §1l); next slice 6d (admin API) |
+| **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); **6d admin API done and verified, uncommitted**, together with demo orders in `seed-dev` (PROJECT_STATE §1m; loading skeletons committed `019fdbb`); next slice 6e (admin UI) |
 
 ---
 
@@ -105,8 +105,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 
 ## 6. Recommended next steps
 
-1. **Developer reviews and commits 6c** (PROJECT_STATE §1l has the commands). Not yet seen in a browser: worth a look at `/seller` (or a short E2E) during review.
-2. **Exact next task — 6d admin API** (PLAN.md §6.1, Q9–Q11, Q13): migration **`000014_create_audit_logs`** (`000013` is the wishlist), module `admin`, user/store suspend + reactivate, platform orders, `GET /admin/stats`, review hide/unhide, audit log written in the same transaction as each admin action. Then stop for review. E2E scripts (6 now, incl. `review-flow.mjs`; `playwright-core` installs in a scratch folder, run them from PowerShell) live in the git-ignored `docs/e2e-reference/` and the session scratchpad; registration is rate-limited to 10/hour per IP, so don't loop the scripts that sign up.
+1. **Developer reviews and commits 6d and the demo orders** (PROJECT_STATE §1m has the separate commit commands).
+2. **Exact next task — 6e admin UI** (PLAN.md §6.1): `RequireAdmin` guard (UX only), `/admin` (stats tiles), `/admin/users`, `/admin/stores` (search, status filter, suspend/reactivate with AlertDialog), `/admin/categories` (list + create/edit on the existing API), `/admin/orders` (+ detail, reuse `OrderDetailLayout`), `/admin/reviews` (hide/unhide), `/admin/audit-logs`; header link for admins; types in `src/types/admin.ts` from PROJECT_STATE §4; loading states with `components/shared/Skeletons`. To log in as admin locally: `make seed-admin email=... name=...` (the existing `admin@contoh.id` password is not in the repo). Then stop for review.
 
 **First 10 minutes in a new session**
 
