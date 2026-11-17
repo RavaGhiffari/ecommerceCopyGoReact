@@ -315,3 +315,50 @@ Built by the developer as the DEV_GUIDE §13 level-3 exercise, between 6b and 6c
 - Audit log covers admin actions only, not seller or buyer actions.
 - Admin cannot edit users' data or roles; no admin creation from the UI (still `make seed-admin`).
 - No charts; the dashboards are numbers and tables.
+
+---
+
+## Phase 7 — Hardening: PLAN (written 2026-11-17, **awaiting approval**)
+
+Goal: make what exists trustworthy and repeatable: automated tests that anyone can run, CI on every push, proven query plans, a security pass over the known gaps (PROJECT_STATE §9), API docs and a production-shaped build. **No new product features.** One slice at a time, stop for review after each (CLAUDE.md §16).
+
+### 7.0 Open questions (proposed default in bold)
+
+| # | Question | Default |
+|---|---|---|
+| Q1 | Which DB do E2E tests use? | **A dedicated `marketplace_e2e` DB and a second API container (Compose profile `e2e`, port 8082), reset + migrated + `seed-dev` before each run.** The dev DB stops collecting throw-away accounts |
+| Q2 | Where does the Playwright suite live? | **`frontend/e2e/` with `@playwright/test` as a frontend devDependency**; local runs use the installed Edge (`channel: 'msedge'`), CI uses Playwright's Chromium |
+| Q3 | Register rate limit (10/hour per IP) blocks E2E | **Make limits configurable (`RATE_LIMIT_REGISTER_PER_HOUR`, `RATE_LIMIT_LOGIN_FAILURES`); only the e2e container raises them.** Defaults stay as they are; a test proves the default still bites |
+| Q4 | CI | **GitHub Actions on the existing `origin` repo**: backend unit + integration (Postgres service container), frontend build + lint + Vitest; E2E as a separate job on `main` and on manual trigger |
+| Q5 | OpenAPI | **Hand-written `backend/api/openapi.yaml` (3.1) + a Go test that fails when a route in `router.go` is missing from the spec.** No annotation generator (swaggo) — keeps handlers clean |
+| Q6 | Deploy prep: how far? | **Production build only, no real deploy**: `frontend/Dockerfile` (build → nginx serving `dist` and proxying `/api`, so the app stays same-origin and the CSRF model holds), `docker-compose.prod.yml`, pinned image digests/tags, `.env.example` complete. Hosting choice later |
+| Q7 | Trusted proxies | **`TRUSTED_PROXIES` setting (empty = today's behaviour); the prod compose sets it to the nginx container network**, so `ClientIP()` is the real client and the rate limiter works per user. Dev stays as is (documented) |
+| Q8 | Phase 3 leftovers (390 px polish, banner/recommended) | **Not in Phase 7.** Only the mobile check that the E2E suite gets for free (one 390 px project for a few key pages) |
+
+### 7.1 Slices
+
+| Slice | Content | Done when |
+|---|---|---|
+| **7a — Test suites** | Vitest + React Testing Library (jsdom) in `frontend`: zod schemas (address, product, review, category), `features/orders/status.ts` transition copy, money/date formatting, `lib/api.ts` envelope + `ApiError`, `RequireAuth`/`RequireSeller`/`RequireAdmin` redirects, `ProductCard` render, cart line issue display, loading/empty/error states of one list page. Playwright suite in `frontend/e2e/` ported from the 8 git-ignored scripts (auth, catalog, cart, address, checkout, review, wishlist, admin) with shared fixtures (login helpers, API-side setup), no `Date.now()` emails on the dev DB, no manual cleanup. Compose profile `e2e` + `make e2e` (reset DB → migrate → seed-dev → seed-admin with a generated password → run). Configurable rate limits (Q3) | `npm run test` and `make e2e` green 3 runs in a row; the dev DB untouched by E2E; `docs/e2e-reference/` can be deleted |
+| **7b — CI** | `.github/workflows/ci.yml`: `backend` job (go vet, gofmt check, unit, integration on a `postgres:18.x` service, `sqlc diff` so generated code matches the SQL, migrations up → down → up), `frontend` job (npm ci, build, lint, Vitest), `e2e` job (compose `e2e` profile, Playwright report as artifact on failure). `govulncheck` and `npm audit --omit=dev` as non-blocking steps first | a pushed branch shows all jobs green; a deliberately broken test turns it red (shown once) |
+| **7c — Performance & indexes** | A `make seed-load` command (dev-only) that bulk-creates ~50k products / 200k variants / 100k orders through SQL for measurement only, on a separate `marketplace_perf` DB. `EXPLAIN (ANALYZE, BUFFERS)` for: `ListPublicProducts` (each sort, search, category), `sort=rating`, `ListCartLines`, `ListCheckoutLines`, `ListOrderItems`, seller/admin order lists with and without `?status=`, seller/admin stats, store rating, public reviews. Indexes only where a plan proves it (migration `000016`, with before/after plans recorded in PROJECT_STATE). Frontend: route-level `React.lazy` (admin, seller, checkout/orders chunks first) so the main chunk drops below 500 kB | every listed query has its plan recorded; no Seq Scan on a large table for a selective query; Vite warning gone |
+| **7d — Security pass** | Written review of PROJECT_STATE §9 items + OWASP API Top 10 against this codebase, findings in a table. Expected fixes: `TRUSTED_PROXIES` (Q7); expired-session cleanup in the existing sweeper (new query `DeleteExpiredSessions`, batched); test for the `Secure` cookie under `APP_ENV=production`; security headers middleware (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`/CSP `frame-ancestors`; CSP for the SPA in nginx); body-size and pagination limits re-checked; `AddVariant` 20-variant cap made race-free (lock the product row); unused `cn` npm package removed (still in `package.json`). Each fix gets a regression test | review table in `docs/SECURITY_REVIEW.md`; every "fix" row links a test |
+| **7e — API docs & deploy prep** | `backend/api/openapi.yaml` for every route + error codes (Q5) and the route-coverage test; served read-only at `/api/docs` only in development (or just the file — decide in review). `frontend/Dockerfile`, `docker-compose.prod.yml`, pinned `golang`/`postgres`/`alpine`/`nginx` versions, `.env.example` with all 17+ variables, `frontend/README.md` replaced, a short `docs/DEPLOY.md` (build, migrate, seed-admin, env, backups not covered) | `docker compose -f docker-compose.prod.yml up` serves the built app on one origin with `APP_ENV=production`; login works over the proxy; the Secure-cookie note documented (needs HTTPS in front) |
+
+Order matters: 7a first (everything later is verified by it), 7b right after (so 7c–7e run in CI), 7c/7d can swap.
+
+### 7.2 What changes in the backend
+
+- `config`: `RATE_LIMIT_*`, `TRUSTED_PROXIES`, `SESSION_CLEANUP_BATCH` (validated like the others).
+- `router.go`: `SetTrustedProxies(cfg.TrustedProxies)`; security-headers middleware after CORS.
+- Sweeper: a second task deletes expired sessions (`DELETE … WHERE id IN (SELECT id … WHERE expires_at < now() LIMIT n)`), logged with a count.
+- Possibly migration `000016` (indexes only, decided by 7c measurements).
+- No change to any business rule, transaction or lock order.
+
+### 7.3 Risks and left out
+
+- E2E against a real browser stays the slowest and flakiest layer; the rule from §11 applies (repeat timing-sensitive tests, never trust one green run). Retries in CI are limited to 1 and reported.
+- `seed-load` writes data with raw SQL (unlike `seed-dev`); it must never target the dev or test DB — it refuses unless the DB name ends in `_perf`.
+- Rate limiter stays in memory (single instance); multi-instance and Redis are out of scope.
+- No real hosting, TLS, backups, monitoring/alerting or log shipping; `DEPLOY.md` lists them as next steps.
+- No email verification / password reset (backlog, not hardening).

@@ -5,11 +5,11 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 
 |  |  |
 |---|---|
-| Snapshot date | 2026-11-16 |
-| Last commit | `07bdc43` (Phase 6d docs; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Phase 6e — admin UI** (`/admin/*` pages, `features/admin`, `types/admin.ts`, `services/admin.ts`, header link) + a one-line `seed-dev` fix (demo reviews showed "(diubah)") + doc updates — see §1n |
-| Current phase | **Phase 6 complete pending review**: 6a–6d committed; slice 6e (admin UI) done and verified, awaiting review |
-| Next | review + commit 6e; then Phase 7 (hardening) |
+| Snapshot date | 2026-11-17 |
+| Last commit | `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | Phase 7 plan (PLAN.md) + these doc updates |
+| Current phase | **Phase 6 complete** (6a–6e committed). **Phase 7 (hardening): plan written 2026-11-17, awaiting approval** |
+| Next | developer answers PLAN.md Phase 7 Q1–Q8, then slice 7a |
 
 ---
 
@@ -35,7 +35,7 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | — | Wishlist (practice feature, PLAN.md §6.4b) | `3d722a3`, `12bbd7f` | ✅ committed by the developer | its 7 integration tests pass in the §1l run; no separate checkpoint |
 | CP-6c | Phase 6c seller dashboard | `0677906`, `6e18967`, docs `9716ed9` | ✅ committed by the developer | see §1l |
 | CP-6d | Phase 6d admin API (+ demo orders in seed-dev) | `4ed91de`, `e00c95f`, docs `07bdc43` | ✅ committed by the developer | see §1m |
-| CP-6e | Phase 6e admin UI | **uncommitted** | 🟡 awaiting review | see §1n |
+| CP-6e | Phase 6e admin UI | `2c44965`, docs `d5b8577` | ✅ committed by the developer | see §1n |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -335,7 +335,7 @@ git commit -m "Update project docs for Phase 6d" -m "Co-Authored-By: Claude Opus
 | Left in the dev DB | admin `e2e-admin@contoh.id` (random password, kept outside the repo) and the audit rows of the E2E runs (append-only by design). Every other change was reverted by the script |
 | Not verified | keyboard-only walk through the dialogs (Radix handles focus, not re-checked by hand); dark mode; Safari/Firefox |
 
-**Commits CP-6e** (the developer commits):
+**Committed** as `2c44965` + `d5b8577` with:
 
 ```bash
 git add -- frontend/src backend/cmd/seed-dev/orders.go
@@ -358,8 +358,8 @@ git commit -m "Update project docs for Phase 6e" -m "Co-Authored-By: Claude Opus
 | 3 Marketplace UI | Homepage, nav, cards, detail, store page, search on real APIs | ≈ done as a side effect of CP-2; polish (banner, popular/recommended refinements, mobile check) remains |
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
-| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | 🟡 6a–6d committed; 6e (admin UI) done, awaiting review |
-| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ |
+| 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ✅ 6a–6e committed |
+| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ plan written (PLAN.md), awaiting approval |
 
 ---
 
@@ -614,9 +614,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 6e (§1n). That closes Phase 6.
-2. Phase 7 (hardening): plan first, wait for approval. Candidates: Playwright + Vitest suites (promote the git-ignored E2E scripts), route-level code splitting, `EXPLAIN` review, CI, pinned images, session cleanup, OpenAPI.
-3. Within Phase 7, the trusted-proxy question stays in Phase 7 (§9).
+1. Phase 6 is closed (6e committed `2c44965`).
+2. Phase 7 (hardening): plan in [PLAN.md](../PLAN.md) "Phase 7", slices 7a–7e. Waiting for the developer's answers to Q1–Q8 and approval; then 7a.
 
 ---
 

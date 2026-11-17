@@ -161,7 +161,7 @@ First-class requirement. Backend: service unit tests, repository integration tes
 6. **Reviews & frontend completion**: reviews, buyer/seller/admin dashboards.
 7. **Hardening**: integration + E2E tests, security review, performance/index review, OpenAPI docs, deploy prep.
 
-Scope status: Phases 0, 0.5, 1, 2, 4 and 5 are committed; the shadcn/ui migration is committed; Phase 6 is in progress (plan approved, 6a done). Phase 3 (marketplace UI on real APIs) is largely covered already because the prototype UI was wired to the Phase 2 API. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
+Scope status: Phases 0, 0.5, 1, 2, 4, 5 and 6 are committed; the shadcn/ui migration is committed; Phase 7 has a written plan (PLAN.md) awaiting approval. Phase 3 (marketplace UI on real APIs) is largely covered already because the prototype UI was wired to the Phase 2 API. Each later phase starts only after explicit developer approval; stop at the end of each phase for review.
 
 ## 15. Where the two source briefs disagreed (resolved — newer brief wins)
 
