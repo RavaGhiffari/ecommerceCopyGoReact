@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Playwright (e2e/): reports, traces, and the generated E2E admin password
+/test-results/
+/playwright-report/
+/e2e/.auth/
 dist-ssr
 *.local
 
