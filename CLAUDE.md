@@ -82,7 +82,8 @@ From the repo root (Makefile wraps Docker):
 - Accounts & data: `make seed-admin email=... name="..."` (password prompted, or `ADMIN_PASSWORD` env; needs the api image from `make up`); `make seed-dev` (demo catalog through the real services; refuses production; no-op if categories exist)
 - Single Go test: `docker run --rm -v <repo>/backend:/src -v gomodcache:/go/pkg/mod -w /src golang:1.27-alpine go test ./internal/middleware -run TestCORS -v`
 - Smoke check: `curl http://localhost:8081/health` and `/ready`
-- Frontend (`cd frontend`): `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (**oxlint**, not ESLint)
+- Frontend (`cd frontend`): `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (**oxlint**, not ESLint), `npm run test` (Vitest + RTL, `src/**/*.test.ts(x)`; on Windows the cwd needs an upper-case drive letter: Git Bash `cd /D/...`, see `vitest.config.ts`)
+- Browser E2E: `make e2e` (drops + migrates + seeds `marketplace_e2e`, creates `e2e-admin@contoh.id` with a random password in the git-ignored `frontend/e2e/.auth/`, restarts `api-e2e` on :8082, runs Playwright with Vite on :5191). Pieces: `make e2e-reset`, `make e2e-up`, `cd frontend && npm run e2e [-- <spec>]`, `make e2e-down`. **Never point E2E at the dev API or dev DB.**
 
 ## 6. Roles and authorization
 

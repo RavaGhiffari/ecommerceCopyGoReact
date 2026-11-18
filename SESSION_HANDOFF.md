@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-17: **Phase 6 is committed** (6e = `2c44965`, docs `d5b8577`). **Phase 7 plan written in [PLAN.md](PLAN.md), awaiting the developer's answers (Q1–Q8) and approval.** Sections below §6 still describe the Phase 6 session.
+Updated 2026-11-17: Phase 6 committed; Phase 7 plan approved (defaults Q1–Q8, docs `6b6d7d7`). **Slice 7a (test suites) is built and verified, uncommitted** — PROJECT_STATE §1o has the evidence and commit commands. Next: 7b (CI). Sections §3–§5 still describe the Phase 6 session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -28,7 +28,7 @@ Updated 2026-11-17: **Phase 6 is committed** (6e = `2c44965`, docs `d5b8577`). *
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
 | **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); 6d committed (`4ed91de`, `e00c95f`, docs `07bdc43`); 6e committed (`2c44965`, docs `d5b8577`); **Phase 6 closed** |
-| **7 Hardening** | plan written 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); not started |
+| **7 Hardening** | plan approved 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); **7a done, uncommitted** (Vitest 107 tests, Playwright 10 tests via `make e2e`, 3 green runs in a row); 7b–7e open |
 
 ---
 
@@ -107,7 +107,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 ## 6. Recommended next steps
 
 1. *(Done)* 6e committed as `2c44965` + `d5b8577`.
-2. **Next — Phase 7 (hardening)**: the plan is in PLAN.md "Phase 7". Get the developer's answers to Q1–Q8 (or approval of the defaults), then build slice 7a and stop for review after each slice. Local admin for the UI: `make seed-admin email=... name=...`; the E2E admin `e2e-admin@contoh.id` exists in the dev DB (password kept outside the repo).
+2. **Developer reviews and commits 7a** (PROJECT_STATE §1o).
+3. **Next — 7b (CI)**: `.github/workflows/ci.yml` per PLAN.md §7.1; the E2E job can reuse `make e2e-reset` / `e2e-up` and `npm run e2e` (Linux: no drive-letter issue; Playwright Chromium instead of Edge). Stop for review after each slice. Local admin for the UI: `make seed-admin email=... name=...`; the E2E admin `e2e-admin@contoh.id` exists in the dev DB (password kept outside the repo).
 3. *(Done in 6e, kept for reference)* 6e admin UI (PLAN.md §6.1): `RequireAdmin` guard (UX only), `/admin` (stats tiles), `/admin/users`, `/admin/stores` (search, status filter, suspend/reactivate with AlertDialog), `/admin/categories` (list + create/edit on the existing API), `/admin/orders` (+ detail, reuse `OrderDetailLayout`), `/admin/reviews` (hide/unhide), `/admin/audit-logs`; header link for admins; types in `src/types/admin.ts` from PROJECT_STATE §4; loading states with `components/shared/Skeletons`. To log in as admin locally: `make seed-admin email=... name=...` (the existing `admin@contoh.id` password is not in the repo). Then stop for review.
 
 **First 10 minutes in a new session**
@@ -116,7 +117,8 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 git status --short ; git log --oneline | head -4     # housekeeping uncommitted (or committed by now) on top of 83b34a7
 make ps                                               # postgres healthy, api up; otherwise: make up
 make test && make test-integration                    # all ok
-cd frontend && npm run build && npm run lint          # clean
+cd /D/Portofolio/goFrameworkFirstTry/frontend && npm run build && npm run lint && npm run test   # clean; upper-case drive for Vitest
+make e2e                                              # 10/10 (fresh marketplace_e2e; never the dev DB)
 ```
 
 Then tell the developer (in Indonesian) what you found and ask how to proceed.

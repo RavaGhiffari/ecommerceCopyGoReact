@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-17 |
-| Last commit | `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | Phase 7 plan (PLAN.md) + these doc updates |
-| Current phase | **Phase 6 complete** (6a–6e committed). **Phase 7 (hardening): plan written 2026-11-17, awaiting approval** |
-| Next | developer answers PLAN.md Phase 7 Q1–Q8, then slice 7a |
+| Last commit | `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Slice 7a — test suites** (Vitest unit/component tests, Playwright suite in `frontend/e2e/`, `make e2e` stack, configurable rate limits) + doc updates — see §1o |
+| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; **7a done and verified, awaiting review** |
+| Next | review + commit 7a; then 7b (CI) |
 
 ---
 
@@ -36,6 +36,7 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-6c | Phase 6c seller dashboard | `0677906`, `6e18967`, docs `9716ed9` | ✅ committed by the developer | see §1l |
 | CP-6d | Phase 6d admin API (+ demo orders in seed-dev) | `4ed91de`, `e00c95f`, docs `07bdc43` | ✅ committed by the developer | see §1m |
 | CP-6e | Phase 6e admin UI | `2c44965`, docs `d5b8577` | ✅ committed by the developer | see §1n |
+| CP-7a | Phase 7a test suites | **uncommitted** | 🟡 awaiting review | see §1o |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -345,6 +346,36 @@ git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 6e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+### 1o. Verified at CP-7a (test suites), 2026-11-17
+
+| Check | Result |
+|---|---|
+| `make fmt` / `make vet` / `make test` | ok (gofmt re-aligned `cmd/api/main.go`); new `TestLoad_RateLimits` pins the production defaults 5 / 15 min / 10 / 1 h and rejects 0, negative and non-numbers |
+| `make test-integration` | all packages ok (router 12 s); new `TestRegister_RateLimitedPerIP` (3rd sign-up → 429 `RATE_LIMITED` + `Retry-After`, nothing created). There was no register-limit test before |
+| `npm run build` / `npm run lint` | clean; bundle unchanged (838 kB, tests are not bundled); `tsc -b` now also type-checks `e2e/` (`tsconfig.e2e.json`) and `vitest.config.ts` |
+| `npm run test` (Vitest 5 + RTL + jsdom) | **11 files, 107 tests pass**, twice in a row: format, `lib/api` (envelope, 204, network error, abort, non-JSON), `safeNextPath`, server error translation + RHF field mapping, every zod schema's edges, order-status UI copy, URL parsing, the 3 route guards, `ProductCard`, `CartPage` (loading / error / empty / issue flags / blocked checkout), `OrdersPage` (loading / empty / error / list) |
+| Unit tests catch a regression (proved) | removing the `//` check from `safeNextPath` → `falls back to / for //evil.example` fails; restored |
+| `make e2e` (Playwright 1.65, Edge, fresh `marketplace_e2e` each run) | **3 consecutive full runs, 10/10 tests each, ~1.5 min per run**: auth, catalog (public + seller journey), cart, address, checkout, review, wishlist, admin (admin spec ran, not skipped), and a new 390 px check of home / listing / product / cart / checkout (no horizontal scroll). Every spec also fails on any uncaught page error |
+| Dev DB untouched (proved) | `main`: users 52, orders 14, reviews 4, audit rows 22, ledger rows 168, newest user 2026-11-16 — identical before and after the 3 runs |
+| E2E DB after a run | stock + reserved ledger invariant 0 mismatches |
+| Reruns without a reset | review + wishlist specs re-run on the same E2E DB: pass (every spec signs up its own customer) |
+| Not verified | CI (7b); Firefox/Safari; the suite with `retries` (local runs use 0) |
+
+Fixed during the slice (test code, not the app): two ambiguous selectors (`1 ulasan` also matched the screen-reader text of the rating bars; the t-shirt page has hearts on "Produk terkait" cards too) and one timing bug (the admin spec read a skeleton row's text). Findings for later slices: `npm audit` reports 4 moderate advisories, all through `shadcn` → `ts-morph` → `minimatch` (7d).
+
+**Commit CP-7a** (the developer commits):
+
+```bash
+git add -- backend Makefile docker-compose.yml scripts/reset-e2e-db.sh .env.example
+git commit -m "Add E2E stack and configurable rate limits" -m "- RATE_LIMIT_* config (defaults = the old hard-coded limits, pinned by a test); register limit now has an integration test" -m "- Compose profile e2e: api-e2e on :8082 with its own database marketplace_e2e and raised limits" -m "- make e2e / e2e-reset / e2e-up / e2e-down: drop, migrate, seed-dev, seed-admin with a random password, run Playwright" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- frontend
+git commit -m "Add Vitest and Playwright suites" -m "- Vitest + React Testing Library: api client, formatting, schemas, server errors, guards, ProductCard, CartPage, OrdersPage (107 tests)" -m "- Playwright suite in frontend/e2e ported from the hand-run scripts: auth, catalog, cart, address, checkout, review, wishlist, admin, 390 px" -m "- Fresh customer per spec, page-error watch on every page, Vite on :5191 proxying to api-e2e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 7a" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ## 2. What exists, by phase
@@ -359,7 +390,7 @@ git commit -m "Update project docs for Phase 6e" -m "Co-Authored-By: Claude Opus
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
 | 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ✅ 6a–6e committed |
-| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | ⬜ plan written (PLAN.md), awaiting approval |
+| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | 🟡 plan approved; 7a (test suites) done, awaiting review; 7b–7e open |
 
 ---
 
@@ -542,8 +573,8 @@ Decisions made so far and **why** (newest first). Reverse one only deliberately.
 
 - **Unit** (`make test`, no DB): config, middleware (request ID, recovery, timeout, CORS, auth, same-origin), response, logger, password, token, ratelimit, request/JSON, slug, products validation + search query, auth validation, users model, cart model (issue classification, grouping, exact totals). 98 test functions in total (counted in source), 14 unit packages + `modules/health` integration only; integration-tagged files: `modules/health/integration_test.go`, `router/auth_integration_test.go`, `router/catalog_integration_test.go`, `router/cart_integration_test.go`, `router/addresses_integration_test.go`, `router/checkout_integration_test.go`. Since CP-5a also the `modules/addresses` unit package; since CP-5b `modules/shipping`, `modules/orders`, `modules/checkout`; since CP-5c the order transition table (`orders/transitions_test.go`) and `router/lifecycle_integration_test.go`; since CP-5d `orders/service_seller_test.go` and `router/seller_orders_integration_test.go`; since CP-6a `platform/rating`, `modules/reviews/model_test.go` and `router/reviews_integration_test.go`. 165 test functions in source at CP-6a.
 - **Integration** (`make test-integration`, `-tags=integration`, DB `marketplace_test`): health against a real DB; 13 auth flows; 12 catalog flows (ownership, uniqueness, validation, ledger, concurrency, search/sort/filter/pagination, archive); 12 cart flows (login required, empty cart, grouping/totals, not-a-reservation, quantity/stock rules, own product, archived + stock-drop flags, current price, ownership 404s, persistence across sessions, concurrent adds); 10 address flows (see §1e); 12 checkout flows incl. rollback, idempotency and two concurrency tests (see §1f); 9 lifecycle flows incl. idempotent payment events, expiry, refund and two race tests (see §1g); 4 seller order flows incl. ownership, transition rules and the processing-vs-cancel race (see §1h); 5 review flows incl. ownership, the rating invariant and two race tests (see §1j).
-- **Browser E2E**: four `playwright-core` scripts (`auth-flow.mjs` 15 checks, `catalog-flow.mjs` 17, `cart-flow.mjs` 16, `address-flow.mjs` 11, which uses the demo login `penjual3@contoh.id` and deletes what it creates) run by hand against Vite on port 5190 + the real API and dev DB. Copies live in `docs/e2e-reference/`, which the developer **git-ignored** — they exist only on this machine. They create throw-away accounts in the dev DB; `cart-flow.mjs` temporarily lowers a demo stock and restores it. A proper Playwright suite is a Phase 7 deliverable.
-- **Frontend unit tests (Vitest)**: none yet.
+- **Browser E2E (since 7a)**: `@playwright/test` suite in `frontend/e2e/` (10 tests in 9 specs, `test.step` per check), run by `make e2e` against `api-e2e` (:8082) on the `marketplace_e2e` DB, which is dropped, migrated and seeded before every full run. `e2e/support/fixtures.ts`: `pageErrors` (auto; any uncaught page error fails the test), `actor()` (second browser, e.g. the seller), `api` (`Api` helper with the page's cookies and a same-origin `Origin`), `customer` (fresh sign-up per test). One worker: specs share demo accounts (admin suspends `penjual4`; cart lowers a demo stock and restores it in `finally`). The old hand-run scripts in the git-ignored `docs/e2e-reference/` are superseded.
+- **Frontend unit/component tests (since 7a)**: Vitest 5 + React Testing Library + jsdom, `src/**/*.test.ts(x)`, setup `src/test/setup.ts`, builders in `src/test/fixtures.ts`. 107 tests (see §1o). Services are mocked with `vi.mock('../services/…')`; contexts are provided with their `*Context.Provider` and a fixture value.
 
 ---
 
@@ -555,14 +586,15 @@ make migrate-up         # apply migrations to the dev DB (named `main` on this m
 make seed-dev           # demo catalog (no-op if categories exist)
 make test               # unit tests
 make test-integration   # creates/migrates marketplace_test, runs integration tests
-cd frontend && npm run build && npm run lint
+cd frontend && npm run build && npm run lint && npm run test   # Git Bash: cd /D/... (upper-case drive, see §11)
+make e2e                # fresh marketplace_e2e + api-e2e (:8082) + Playwright (Vite :5191)
 cd frontend && npm run dev -- --port 5174    # open http://localhost:5174  (or http://[::1]:5174)
 curl http://localhost:8081/health ; curl http://localhost:8081/ready
 ```
 
 Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penjual-123`. Admins: `make seed-admin email=… name="…"`.
 
-**API configuration** (all optional except `DATABASE_URL`; defaults in `internal/config/config.go`): `APP_ENV` (development|production), `APP_PORT` (8081), `LOG_LEVEL` (info), `CORS_ALLOWED_ORIGINS` (`http://localhost:5173`), `REQUEST_TIMEOUT` (10s), `SHUTDOWN_TIMEOUT` (15s), `SESSION_TTL` (24h), `ARGON2_MEMORY_KIB` (19456) / `ARGON2_ITERATIONS` (2) / `ARGON2_PARALLELISM` (1), `DB_MAX_CONNS` (10) / `DB_MIN_CONNS` (2) / `DB_MAX_CONN_LIFETIME` / `DB_MAX_CONN_IDLE_TIME` / `DB_HEALTH_CHECK_PERIOD` / `DB_CONNECT_TIMEOUT`. Compose forwards only `APP_ENV`, `APP_PORT`, `LOG_LEVEL`, `CORS_ALLOWED_ORIGINS`, `SESSION_TTL`, `DATABASE_URL`; the rest need a compose change to be overridden.
+**API configuration** (all optional except `DATABASE_URL`; defaults in `internal/config/config.go`): `APP_ENV` (development|production), `APP_PORT` (8081), `LOG_LEVEL` (info), `CORS_ALLOWED_ORIGINS` (`http://localhost:5173`), `REQUEST_TIMEOUT` (10s), `SHUTDOWN_TIMEOUT` (15s), `SESSION_TTL` (24h), `ARGON2_MEMORY_KIB` (19456) / `ARGON2_ITERATIONS` (2) / `ARGON2_PARALLELISM` (1), `RATE_LIMIT_LOGIN_FAILURES` (5) / `RATE_LIMIT_LOGIN_WINDOW` (15m) / `RATE_LIMIT_REGISTRATIONS` (10) / `RATE_LIMIT_REGISTER_WINDOW` (1h) (7a; ≥ 1, only `api-e2e` raises them), `DB_MAX_CONNS` (10) / `DB_MIN_CONNS` (2) / `DB_MAX_CONN_LIFETIME` / `DB_MAX_CONN_IDLE_TIME` / `DB_HEALTH_CHECK_PERIOD` / `DB_CONNECT_TIMEOUT`. Compose forwards only `APP_ENV`, `APP_PORT`, `LOG_LEVEL`, `CORS_ALLOWED_ORIGINS`, `SESSION_TTL`, `DATABASE_URL`; the rest need a compose change to be overridden.
 
 **Environment quirks** (this machine): Go is not installed on the host — everything Go/sqlc runs in Docker via the Makefile; GNU make came from scoop; Git Bash path conversion is disabled in the Makefile (`MSYS_NO_PATHCONV=1`); local PostgreSQL 18 owns port 5432 (Compose uses **5433**); another app owns IPv4 `:5173` — use `--port 5174` or `http://[::1]:5173`. Never kill a process by port without checking its command line.
 
@@ -581,7 +613,6 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | No index for `sort=rating` (computed `rating_total / rating_count`) | full sort of the matching products | Phase 7 `EXPLAIN` |
 | `GET /checkout/:id` does not expire anything itself; the sweeper runs every `CHECKOUT_SWEEP_INTERVAL` (1m) | a checkout can show `pending_payment` up to ~1 minute after `expiresAt` (pay/cancel still refuse it) | handled in the UI: at 0:00 the pay buttons are disabled and "Muat ulang status" is offered |
 | The countdown uses the browser clock | a skewed client clock shows the wrong remaining time | server decides anyway (`CHECKOUT_EXPIRED`); could send server time with the response |
-| No frontend unit tests (Vitest/RTL) yet; UI verified by hand-run E2E scripts | regressions caught only when a script is run | Phase 7 |
 | Frontend bundle is one ~840 kB chunk (admin pages included for everyone) | slower first load | route-level `lazy()` in Phase 7; `/admin/*` is the obvious first split |
 | The sweeper runs inside the API process | with several instances each runs one; `SKIP LOCKED` prevents double work, but that setup is untested | before scaling out |
 | A payment event that arrives after expiry is not stored | no audit trail of late notifications | when a real gateway arrives (also signature checks) |
@@ -591,9 +622,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Right after "Keluar", the header badge keeps the old count until the logout request returns (the page navigates first by design) | cosmetic, milliseconds | accept, or clear the cart state optimistically |
 | Cart issue flags are recomputed on every `GET /cart`, but the page does not refresh by itself | a stock change by the seller shows up on the next load/mutation | acceptable; checkout re-validates |
 | `ListCartLines` joins six tables + a LATERAL image lookup; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
-| E2E reference scripts are git-ignored (`/docs/e2e-reference`) | they are lost if this machine is lost | promote into a real Playwright suite (Phase 7) |
+| Test suites exist (7a) but nothing runs them automatically | a regression shows up only when someone runs `make e2e` / `npm run test` | CI in 7b |
+| `npm audit`: 4 moderate advisories via `shadcn` → `ts-morph` → `minimatch` (a CLI dependency kept at runtime) | ReDoS in a build-time glob library; not reachable from the browser bundle | 7d (move `shadcn` to devDependencies or update) |
 | No `/auth/me`; no email verification; no password reset | account recovery impossible | backlog |
-| Frontend has no automated tests | regressions caught manually | Phase 7 |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
 | Money display converts strings to JS numbers | fine for display; never sum client-side for charging | rule for Phase 4–5 |
 | **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **Phase 7 / deploy**. A `TRUSTED_PROXIES` setting would not help in dev: the Vite proxy sends no `X-Forwarded-For`, and every dev request comes from the same machine anyway |
@@ -614,8 +645,8 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Phase 6 is closed (6e committed `2c44965`).
-2. Phase 7 (hardening): plan in [PLAN.md](../PLAN.md) "Phase 7", slices 7a–7e. Waiting for the developer's answers to Q1–Q8 and approval; then 7a.
+1. Developer reviews and commits 7a (§1o has the commands). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted by the developer.
+2. 7b — CI (PLAN.md "Phase 7" §7.1): GitHub Actions running `make`-equivalent backend checks, `npm run build/lint/test`, and the E2E stack.
 
 ---
 
@@ -646,7 +677,11 @@ The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF
 | Cart E2E saw the old badge count right after "Keluar" | the test read the badge before the logout request returned | wait for the "Masuk" link (logged-out header) before asserting |
 | `shadcn init` wrote `import { cn } from "cn"` (an unrelated npm package) and added the Geist font | CLI behaviour with this setup | removed both; fix the import after every `shadcn add` (§3) |
 | Logout from `/account` landed on `/login` again after moving "Keluar" into the Radix menu; `await navigate('/')` alone did not fix it (1 of 2 runs still failed) | React Router commits navigations in a transition; the urgent `setUser(null)` could render first, so the guard on the old page redirected | `navigate('/', { flushSync: true })`; measured 9/10 failures before, 0/10 after. For timing bugs, repeat the scenario several times instead of trusting one green run |
-| A debug run timed out on sign-up | the register limit (10/hour per IP, shared Docker gateway IP) was used up by repeated E2E/debug runs | debug with existing demo logins; restart the `api` container before a full E2E run |
+| A debug run timed out on sign-up | the register limit (10/hour per IP, shared Docker gateway IP) was used up by repeated E2E/debug runs | debug with existing demo logins; restart the `api` container before a full E2E run. Since 7a the E2E stack has its own API with raised `RATE_LIMIT_*` |
+| (7a) Every Vitest file failed with "Vitest failed to find the current suite" (the first run had worked) | Git Bash `cd /d/...` gives the process a lower-case drive (`d:\`); Vitest then loads its runtime twice. `process.chdir` and an explicit `root` in the config did not help (the CLI is already loaded) | run from PowerShell/cmd or Git Bash `cd /D/...`; `vitest.config.ts` now stops at once with that hint |
+| (7a) A Vitest hook timed out after 10 s | `beforeEach(() => mock.mockReset())` returns the mock (a function), which Vitest calls as a teardown; it returned a never-settling promise | write hooks with braces: `beforeEach(() => { … })` |
+| (7a) Two E2E steps failed with "strict mode violation" on a fresh DB but had passed on the old dev DB | `getByText('1 ulasan')` also matched the rating bars' screen-reader text; the product page has hearts on related-product cards too | `exact: true`; scope to the product `article`. A fresh DB exposes selectors that only worked because of leftover data |
+| (7a) The admin spec read an empty category name | `innerText` of the first table row while the skeleton rows were still shown (`innerText` does not wait) | wait for something only a real row has (its "Ubah" button) before reading text |
 
 ---
 
