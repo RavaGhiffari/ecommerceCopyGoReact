@@ -22,13 +22,15 @@ GO := docker run --rm -v "$(BACKEND_DIR):/src" -v gomodcache:/go/pkg/mod -v gobu
 
 .PHONY: help up down logs ps \
         migrate-up migrate-down migrate-version migrate-create migrate-force \
-        sqlc fmt vet test test-db test-integration seed-admin seed-dev
+        sqlc fmt vet test test-db test-integration seed-admin seed-dev \
+        e2e e2e-reset e2e-up e2e-down
 
 help:
 	@echo "Stack:      up | down | logs | ps"
 	@echo "Migrations: migrate-up | migrate-down | migrate-version | migrate-create name=... | migrate-force version=N"
 	@echo "Code:       sqlc | fmt | vet | test | test-db | test-integration"
 	@echo "Accounts:   seed-admin email=... name=... | seed-dev (demo catalog + orders)"
+	@echo "Browser:    e2e (reset + seed marketplace_e2e, start api-e2e, run Playwright) | e2e-reset | e2e-up | e2e-down"
 
 # ---- Stack -------------------------------------------------------------------
 
@@ -119,3 +121,37 @@ endif
 # Refuses APP_ENV=production; does nothing if categories already exist.
 seed-dev:
 	$(COMPOSE) run --rm --entrypoint /app/seed-dev api
+
+# ---- Browser E2E (Playwright, frontend/e2e) -----------------------------------
+#
+# Uses its own database (marketplace_e2e) and API container (api-e2e, host
+# port 8082), so the dev database is never touched. Postgres must be up.
+
+E2E          := $(COMPOSE) --profile e2e
+E2E_ADMIN    := e2e-admin@contoh.id
+E2E_PW_FILE  := frontend/e2e/.auth/admin-password
+
+# Full run: fresh database, fresh API (also resets its in-memory rate
+# limiter), then the whole suite. Vite is started by Playwright on :5191.
+e2e: e2e-reset e2e-up
+	cd frontend && npm run e2e
+
+# Drop + recreate marketplace_e2e, migrate, load the demo data, create the
+# admin with a random password. The password is written to a git-ignored file
+# that the admin spec reads; it never appears in the output.
+e2e-reset:
+	$(E2E) build api-e2e
+	$(E2E) stop api-e2e
+	$(COMPOSE) exec -T postgres sh -s < scripts/reset-e2e-db.sh
+	$(COMPOSE) run --rm migrate-e2e up
+	$(E2E) run --rm --entrypoint /app/seed-dev api-e2e
+	mkdir -p $(dir $(E2E_PW_FILE))
+	pw=$$(node -e "process.stdout.write(require('crypto').randomBytes(18).toString('base64url'))") && \
+		printf '%s' "$$pw" > $(E2E_PW_FILE) && \
+		ADMIN_PASSWORD="$$pw" $(E2E) run --rm -e ADMIN_PASSWORD --entrypoint /app/seed-admin api-e2e -email "$(E2E_ADMIN)" -name "Admin E2E"
+
+e2e-up:
+	$(E2E) up -d --force-recreate api-e2e
+
+e2e-down:
+	$(E2E) stop api-e2e

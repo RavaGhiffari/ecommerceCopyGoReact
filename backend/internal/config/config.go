@@ -32,6 +32,7 @@ type Config struct {
 
 	SessionTTL time.Duration // how long a login stays valid
 	Argon2     Argon2Config
+	RateLimits RateLimits
 
 	CheckoutTTL time.Duration // how long an unpaid checkout holds its stock
 	// How often the API looks for checkouts whose time ran out.
@@ -46,6 +47,16 @@ type Argon2Config struct {
 	MemoryKiB   uint32
 	Iterations  uint32
 	Parallelism uint8
+}
+
+// RateLimits are the brute-force limits of login and register (see
+// modules/auth). The defaults are the production values; only the E2E stack
+// raises them, because every browser test signs up from the same IP.
+type RateLimits struct {
+	LoginFailures  int // failed logins allowed per IP + email within LoginWindow
+	LoginWindow    time.Duration
+	Registrations  int // sign-ups allowed per IP within RegisterWindow
+	RegisterWindow time.Duration
 }
 
 // ShippingFees are the flat fees per store order (simulated courier, Phase 5).
@@ -84,6 +95,12 @@ func Load() (Config, error) {
 			Iterations:  uint32(getInt32("ARGON2_ITERATIONS", 2, &errs)),
 			Parallelism: uint8(min(getInt32("ARGON2_PARALLELISM", 1, &errs), 255)),
 		},
+		RateLimits: RateLimits{
+			LoginFailures:  int(getInt32("RATE_LIMIT_LOGIN_FAILURES", 5, &errs)),
+			LoginWindow:    getDuration("RATE_LIMIT_LOGIN_WINDOW", 15*time.Minute, &errs),
+			Registrations:  int(getInt32("RATE_LIMIT_REGISTRATIONS", 10, &errs)),
+			RegisterWindow: getDuration("RATE_LIMIT_REGISTER_WINDOW", time.Hour, &errs),
+		},
 		CheckoutTTL:           getDuration("CHECKOUT_TTL", 30*time.Minute, &errs),
 		CheckoutSweepInterval: getDuration("CHECKOUT_SWEEP_INTERVAL", time.Minute, &errs),
 		Shipping: ShippingFees{
@@ -110,6 +127,11 @@ func Load() (Config, error) {
 	}
 	if cfg.Argon2.MemoryKiB < 8*1024 || cfg.Argon2.Iterations < 1 || cfg.Argon2.Parallelism < 1 {
 		errs = append(errs, errors.New("ARGON2_* settings are below the safe minimum (8 MiB memory, 1 iteration, 1 thread)"))
+	}
+	// 0 would lock everyone out (or, read the other way, mean "no limit");
+	// neither is something to get by accident from a typo.
+	if cfg.RateLimits.LoginFailures < 1 || cfg.RateLimits.Registrations < 1 {
+		errs = append(errs, errors.New("RATE_LIMIT_LOGIN_FAILURES and RATE_LIMIT_REGISTRATIONS must be at least 1"))
 	}
 	if cfg.DB.MinConns > cfg.DB.MaxConns {
 		errs = append(errs, fmt.Errorf("DB_MIN_CONNS (%d) cannot exceed DB_MAX_CONNS (%d)", cfg.DB.MinConns, cfg.DB.MaxConns))

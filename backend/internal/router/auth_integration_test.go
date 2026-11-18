@@ -327,6 +327,19 @@ func TestLogin_RateLimitedAfterConsecutiveFailures(t *testing.T) {
 	assert.NotEmpty(t, res.header.Get("Retry-After"))
 }
 
+func TestRegister_RateLimitedPerIP(t *testing.T) {
+	app := newTestApp(t, auth.Limits{LoginAttempts: 100, LoginWindow: time.Minute, RegisterAttempts: 2, RegisterWindow: time.Minute})
+
+	app.register("A", "a@example.com", "rahasia-123")
+	app.register("B", "b@example.com", "rahasia-123")
+	res := app.do("POST", "/api/v1/auth/register", `{"name":"C","email":"c@example.com","password":"rahasia-123"}`, "")
+
+	assert.Equal(t, http.StatusTooManyRequests, res.status, res.raw)
+	assert.Equal(t, "RATE_LIMITED", res.errorCode())
+	assert.NotEmpty(t, res.header.Get("Retry-After"))
+	assert.Equal(t, 2, app.count("SELECT count(*) FROM users"), "the refused sign-up created nothing")
+}
+
 func TestCrossSiteLoginIsRejected(t *testing.T) {
 	app := newTestApp(t, generousLimits)
 	app.register("Rava", "rava@example.com", "rahasia-123")

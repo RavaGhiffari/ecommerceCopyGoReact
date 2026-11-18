@@ -21,6 +21,7 @@ func clearEnv(t *testing.T) {
 		"DB_MAX_CONN_IDLE_TIME", "DB_HEALTH_CHECK_PERIOD", "DB_CONNECT_TIMEOUT",
 		"SESSION_TTL", "ARGON2_MEMORY_KIB", "ARGON2_ITERATIONS", "ARGON2_PARALLELISM",
 		"CHECKOUT_TTL", "CHECKOUT_SWEEP_INTERVAL", "SHIPPING_FEE_REGULAR", "SHIPPING_FEE_EXPRESS", "SHIPPING_FEE_SAME_DAY",
+		"RATE_LIMIT_LOGIN_FAILURES", "RATE_LIMIT_LOGIN_WINDOW", "RATE_LIMIT_REGISTRATIONS", "RATE_LIMIT_REGISTER_WINDOW",
 	} {
 		t.Setenv(k, "")
 	}
@@ -107,6 +108,30 @@ func TestLoad_CORSOrigins(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, cfg.CORSAllowedOrigins)
 		})
+	}
+}
+
+// The defaults are the production brute-force limits. If this test has to
+// change, the change loosens (or tightens) login protection for everyone.
+func TestLoad_RateLimits(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, RateLimits{LoginFailures: 5, LoginWindow: 15 * time.Minute, Registrations: 10, RegisterWindow: time.Hour}, cfg.RateLimits)
+
+	t.Setenv("RATE_LIMIT_REGISTRATIONS", "1000")
+	t.Setenv("RATE_LIMIT_REGISTER_WINDOW", "1m")
+	cfg, err = Load()
+	require.NoError(t, err)
+	assert.Equal(t, 1000, cfg.RateLimits.Registrations)
+	assert.Equal(t, time.Minute, cfg.RateLimits.RegisterWindow)
+
+	for _, bad := range []string{"0", "-1", "many"} {
+		t.Setenv("RATE_LIMIT_LOGIN_FAILURES", bad)
+		_, err = Load()
+		assert.ErrorContains(t, err, "RATE_LIMIT_LOGIN_FAILURES", bad)
 	}
 }
 

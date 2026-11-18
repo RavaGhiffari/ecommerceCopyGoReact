@@ -95,9 +95,14 @@ func run() error {
 	}()
 
 	handlers := router.Handlers{
-		Health:     health.NewHandler(health.NewRepository(pool)),
-		Addresses:  addresses.NewHandler(addresses.NewService(pool)),
-		Auth:       auth.NewHandler(authSvc, cfg.IsProduction(), auth.DefaultLimits),
+		Health:    health.NewHandler(health.NewRepository(pool)),
+		Addresses: addresses.NewHandler(addresses.NewService(pool)),
+		Auth: auth.NewHandler(authSvc, cfg.IsProduction(), auth.Limits{
+			LoginAttempts:    cfg.RateLimits.LoginFailures,
+			LoginWindow:      cfg.RateLimits.LoginWindow,
+			RegisterAttempts: cfg.RateLimits.Registrations,
+			RegisterWindow:   cfg.RateLimits.RegisterWindow,
+		}),
 		Users:      users.NewHandler(users.NewService(pool)),
 		Categories: categories.NewHandler(categories.NewService(pool)),
 		Stores:     stores.NewHandler(stores.NewService(pool)),

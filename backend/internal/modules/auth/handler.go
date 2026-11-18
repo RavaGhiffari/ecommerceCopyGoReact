@@ -23,19 +23,14 @@ const (
 	CodeAccountSuspended   = "ACCOUNT_SUSPENDED"
 )
 
-// Limits for brute-force protection. Tests pass larger values.
+// Limits for brute-force protection. The production values come from config
+// (RATE_LIMIT_*, defaults 5 failures / 15 min and 10 sign-ups / hour);
+// tests pass their own.
 type Limits struct {
 	LoginAttempts    int // consecutive failures allowed per IP + email
 	LoginWindow      time.Duration
 	RegisterAttempts int // sign-ups allowed per IP
 	RegisterWindow   time.Duration
-}
-
-var DefaultLimits = Limits{
-	LoginAttempts:    5,
-	LoginWindow:      15 * time.Minute,
-	RegisterAttempts: 10,
-	RegisterWindow:   time.Hour,
 }
 
 type Handler struct {
