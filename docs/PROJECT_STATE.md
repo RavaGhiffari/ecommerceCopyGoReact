@@ -6,10 +6,10 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 |  |  |
 |---|---|
 | Snapshot date | 2026-11-19 |
-| Last commit | `0cb0fc8` (Phase 7c docs; 7c = `1a0e2e3`, `ee43cab`); `d8cac67` (7b CI workflow; `main` was 8 commits ahead of `origin` when checked, so not pushed); `b20d7ea` (Phase 7a docs; 7a = `bce9df0`, `cdc43ad`); `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Slice 7d — security pass** (`docs/SECURITY_REVIEW.md`, `TRUSTED_PROXIES`, session cleanup, Secure-cookie test, security headers, race-free variant cap, page upper bound, `cn`/`shadcn` cleanup) + doc updates — see §1r |
-| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; 7a and 7c committed; 7b committed, **GitHub run not yet seen**; **7d done and verified, awaiting review** |
-| Next | developer reviews and commits 7d; pushes and confirms green CI jobs + one red run; then 7e |
+| Last commit | `70c0ac2` (Phase 7d docs; 7d = `a1045ca`, `5e08655`); `0cb0fc8` (Phase 7c docs; 7c = `1a0e2e3`, `ee43cab`); `d8cac67` (7b CI workflow; `main` was 8 commits ahead of `origin` when checked, so not pushed); `b20d7ea` (Phase 7a docs; 7a = `bce9df0`, `cdc43ad`); `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Slice 7e — API docs & deploy prep** (`backend/api/openapi.yaml` + route-coverage test + `make api-lint`, `frontend/Dockerfile` + nginx, `docker-compose.prod.yml`, exact image tags, `.env.example` / `.env.prod.example`, `frontend/README.md`, `docs/DEPLOY.md`, CI `images` job) + doc updates — see §1s |
+| Current phase | **Phase 7 (hardening)**: all slices built. 7a–7d committed; 7b's workflow **has not run on GitHub yet**; **7e done and verified, awaiting review**. After 7e Phase 7 is complete |
+| Next | developer reviews and commits 7e; pushes and confirms green CI jobs + one red run; then decides the next phase (backlog: PROJECT_STATE §9, DEPLOY.md §7) |
 
 ---
 
@@ -39,7 +39,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-7a | Phase 7a test suites | `bce9df0`, `cdc43ad`, docs `b20d7ea` | ✅ committed by the developer | see §1o |
 | CP-7b | Phase 7b CI | `d8cac67` | 🟡 committed locally; GitHub run not seen | see §1p |
 | CP-7c | Phase 7c performance & indexes | `1a0e2e3`, `ee43cab`, docs `0cb0fc8` | ✅ committed by the developer | see §1q |
-| CP-7d | Phase 7d security pass | **uncommitted** | 🟡 awaiting review | see §1r |
+| CP-7d | Phase 7d security pass | `a1045ca`, `5e08655`, docs `70c0ac2` | ✅ committed by the developer | see §1r |
+| CP-7e | Phase 7e API docs & deploy prep | **uncommitted** | 🟡 awaiting review | see §1s |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -493,6 +494,43 @@ git add -- docs/SECURITY_REVIEW.md docs/PROJECT_STATE.md PLAN.md PHASES.md SESSI
 git commit -m "Add security review and update project docs for Phase 7d" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+### 1s. Verified at CP-7e (API docs & deploy prep), 2026-11-19
+
+| Change | Files | Proof |
+|---|---|---|
+| OpenAPI 3.1 for all **65 routes** (the test counts them from the live router): every request body, response shape and error code, written from the DTOs and handlers. Claims that were guesses were checked against the code; that caught phone 8–15 (not 20), optional category slug, `CART_HAS_ISSUES` details as `{items: […]}`, and the admin store search fields | `backend/api/openapi.yaml` | Redocly `lint`: **valid** (4 style warnings: no `license`, 3 operations without a 4xx); `make api-lint` |
+| Route-coverage test in both directions, plus well-formedness (unique operationIds, a 2xx everywhere, every `{param}` declared, every `$ref` resolves). `gopkg.in/yaml.v3` goes from indirect to direct (it was already in the module graph via testify; test-only) | `backend/internal/router/openapi_test.go`, `backend/go.mod` | `TestOpenAPI_CoversExactlyTheRoutes` and `TestOpenAPI_IsWellFormed` pass. Renaming one path in the spec **fails** with both messages ("route … is not in", "documents … which router.go does not serve"), shown once and reverted |
+| Docs are a file, not served (the "decide in review" item of the plan): no new route and no viewer dependency | — | — |
+| `frontend/Dockerfile` (Node build → nginx), `frontend/nginx/default.conf` (SPA fallback, `/assets/` immutable, `index.html` no-cache, real 404 for a missing asset, `/api` + `/health` + `/ready` proxy keeping `Host`, `client_max_body_size 2m`, gzip, `server_tokens off`), `security-headers.conf` (SPA CSP, nosniff, DENY, Referrer-Policy, Permissions-Policy), `.dockerignore` (keeps `e2e/` for `tsc -b`, drops `e2e/.auth`) | `frontend/` | `curl` through nginx: every header present on `/`, `/assets/*` immutable, `/assets/nope.js` 404, `/orders/123` → `index.html`; API answers keep the API's own headers, with no duplicates |
+| `docker-compose.prod.yml`: project `goframework-prod` (own volume), `APP_ENV=production`, only `web` published (`127.0.0.1:8080` by default), api healthcheck, `migrate` (tools profile), fixed network; `.env.prod.example` (+ `.gitignore` exception) | root | Built and started with a throw-away env file on port 8090 (8080 is Laragon's nginx on this machine): migrations 1→16, all healthy, register 201 with `Secure; HttpOnly; SameSite=Lax`, `/me` with the cookie, cross-site login 403, `seed-admin` works, `seed-dev` refuses (exit 1), data survives `down` + `up`. The stack and its volume were removed afterwards |
+| **Finding F8 (fixed):** trusting the /24 also trusted the Docker gateway, so a forged `X-Forwarded-For: 1.2.3.4` became `client_ip` | `docker-compose.prod.yml` (`TRUSTED_PROXIES: 172.31.240.10`, web `ipv4_address`), `nginx/default.conf` (`X-Forwarded-For $remote_addr`) | Before: `client_ip":"1.2.3.4"`. After: single and chained forgeries log the real peer. SECURITY_REVIEW F8 |
+| Real browser (Edge, Playwright script, not committed) through nginx in production mode | — | login, `sid` `secure=true httpOnly=true sameSite=Lax`, reload on lazy `/account` keeps the session, no CSP violation. The only error is the expected anonymous `GET /me` 401 before login |
+| Exact image tags: `golang:1.27.4-alpine3.24`, `alpine:3.24.4` (was 3.20), `postgres:18.7-trixie`, `node:24.22.3-alpine3.24`, `nginx:1.30.7-alpine3.24` | both Dockerfiles, both compose files, `Makefile`, CI, CLAUDE.md, DEV_GUIDE | The floating `golang:1.27-alpine` had silently become Go 1.27.4 / Alpine 3.24.4. `postgres:18` and `18.7-trixie` differ in image id but have the same PG 18.7, Debian 13, glibc 2.41 and ICU 76.1, so the dev volume is safe. The dev postgres container was recreated on the pinned tag (same volume) |
+| `.env.example` lists every setting the API reads (checkout TTL/sweep, shipping fees added); `.env.prod.example`; `frontend/README.md` replaced; `docs/DEPLOY.md` | root, `frontend/`, `docs/` | — |
+| CI: `OpenAPI lint` step (backend job); new `images` job (build the production images + `nginx -t`) | `.github/workflows/ci.yml` | `actionlint` 1.7.7: clean (it could not be pulled in 7b). `nginx -t` passes locally with the same `--add-host` trick. **Not run on GitHub** |
+
+| Check | Result |
+|---|---|
+| `make fmt` / `make vet` / `go vet -tags=integration` | ok (on the pinned Go image) |
+| `make test` / `make test-integration` | all packages ok (router 27 s) |
+| `make api-lint` | valid |
+| `npm run build` / `lint` / `test` | clean / exit 0 / 107 tests |
+| `make e2e` | 10/10, then `npm run e2e` 10/10 (api-e2e built on the pinned images) |
+| Not verified | real TLS; the GitHub run of the new CI steps; real client IPs on a Linux host (Docker Desktop shows every client as the gateway); CSP with external product images (the prod test DB had no products) |
+
+**Commit CP-7e** (the developer commits):
+
+```bash
+git add -- backend/api backend/internal/router/openapi_test.go backend/go.mod Makefile
+git commit -m "Add the OpenAPI spec with a route-coverage test" -m "- backend/api/openapi.yaml: OpenAPI 3.1 for all 65 routes, bodies, responses and error codes" -m "- router/openapi_test.go fails when the spec and router.go disagree, in either direction" -m "- make api-lint (Redocly)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- frontend/Dockerfile frontend/.dockerignore frontend/nginx docker-compose.prod.yml .env.prod.example .gitignore backend/Dockerfile docker-compose.yml .env.example .github/workflows/ci.yml
+git commit -m "Add the production build and pin image tags" -m "- frontend/Dockerfile: Node build, nginx serves the SPA and proxies /api (one origin), SPA CSP" -m "- docker-compose.prod.yml: APP_ENV=production, only nginx published, TRUSTED_PROXIES = nginx only" -m "- exact tags for golang, alpine, postgres, node, nginx" -m "- CI: OpenAPI lint and a production image build" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- docs/DEPLOY.md frontend/README.md docs/SECURITY_REVIEW.md docs/PROJECT_STATE.md docs/DEV_GUIDE.md PLAN.md PHASES.md SESSION_HANDOFF.md CLAUDE.md
+git commit -m "Add deploy guide and update project docs for Phase 7e" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ---
@@ -534,7 +572,7 @@ Frontend routes (`src/app/router.tsx`): `/`, `/products`, `/categories/:category
 
 Runtime dependencies — Go: gin, pgx/v5, pgx-shopspring-decimal, shopspring/decimal, google/uuid, x/crypto (argon2), x/text (slug NFD), testify (tests). Frontend: react 19, react-router-dom, react-hook-form, zod 4, @hookform/resolvers, lucide-react, tailwindcss 4.3.5 (+ vite plugin), and for **shadcn/ui** (developer's choice): `radix-ui` (primitives), `class-variance-authority` (variants), `clsx` + `tailwind-merge` (`cn()`), `tw-animate-css` (open/close animations), `shadcn` (its `tailwind.css` is imported by `index.css`, so it stays a runtime dependency). The npm package `cn` and the Geist font were removed.
 
-**shadcn/ui components** live in `src/components/ui/` (generated, then owned by us). Add more with `npx shadcn add <name>`. **The CLI writes `import { cn } from "cn"` into new files** even though `components.json` points at `@/lib/utils`. After every `add`, run `sed -i 's#from "cn"#from "@/lib/utils"#' src/components/ui/*.tsx`; otherwise the build fails. The wrappers in `components/shared/` (`TextField`, `TextAreaField`, `FieldMessage`, `StateViews`, `Pagination`) keep their old props, so pages did not change. `CategorySelect` is now controlled (`value`/`onChange`/`ref`) and must be used through RHF `<Controller>`. Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`; `golang:1.27-alpine` and `postgres:18` are floating tags.
+**shadcn/ui components** live in `src/components/ui/` (generated, then owned by us). Add more with `npx shadcn add <name>`. **The CLI writes `import { cn } from "cn"` into new files** even though `components.json` points at `@/lib/utils`. After every `add`, run `sed -i 's#from "cn"#from "@/lib/utils"#' src/components/ui/*.tsx`; otherwise the build fails. The wrappers in `components/shared/` (`TextField`, `TextAreaField`, `FieldMessage`, `StateViews`, `Pagination`) keep their old props, so pages did not change. `CategorySelect` is now controlled (`value`/`onChange`/`ref`) and must be used through RHF `<Controller>`. Pinned tool images: `sqlc/sqlc:1.29.0`, `migrate/migrate:v4.18.3`, `redocly/cli:2.14.0`; since 7e every runtime image is pinned too (CLAUDE.md §2 Docker).
 
 ---
 
@@ -754,9 +792,11 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | `AddVariant` checked the 20-variant cap before inserting | fixed in 7d: lock the product, then count (26 → 20 under concurrency, §1r) | resolved |
 | Search uses the `simple` config without `unaccent` | "kemeja" ≠ "kémeja"; no stemming | acceptable for now |
 | `.env.example` lists the main variables plus commented tuning (7d added `TRUSTED_PROXIES`, `SESSION_CLEANUP_BATCH`); the checkout/shipping ones are still missing | people don't discover optional tuning | document-only; defaults are safe |
-| `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
-| `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
-| CI not yet proven | `ci.yml` written in 7b, no GitHub run yet | see §1p |
+| `frontend/README.md` was the Vite template | replaced in 7e | resolved |
+| Image tags floated (`golang:1.27-alpine` had silently become Go 1.27.4 / Alpine 3.24) | pinned to exact tags in 7e (§1s) | bump on purpose, all files at once (DEPLOY.md §5) |
+| CI not yet proven | `ci.yml` written in 7b and extended in 7e (OpenAPI lint, `images` job); `actionlint` clean; no GitHub run yet | push and watch the Actions tab |
+| No backups, monitoring, log shipping or real TLS | the production build exists (7e) but is not hosted | DEPLOY.md §7, before real hosting |
+| Rate limiter on Docker Desktop sees every client as the network gateway (also through nginx) | per-IP limits are shared on this machine | a Linux host normally keeps client addresses; a TLS terminator needs the nginx real-IP setup (DEPLOY.md §4) |
 | JS bundle was one 838 kB chunk | fixed in 7c: entry 190 kB + vendor chunks + route chunks (§1q) | resolved |
 
 ---
@@ -765,9 +805,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 7d (§1r has the commands).
-2. Developer pushes and checks the Actions tab (all jobs green; one deliberately broken test shows red, then revert; the first run also proves migration 16 on CI's up → down → up). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted.
-3. 7e — API docs & deploy prep (PLAN.md "Phase 7" §7.1): include `TRUSTED_PROXIES` = nginx, the SPA CSP and HSTS in nginx (SECURITY_REVIEW §4).
+1. Developer reviews and commits 7e (§1s has the commands). That closes Phase 7.
+2. Developer pushes and checks the Actions tab: backend (now with the OpenAPI lint), frontend, the new `images` job, and e2e on `main`. Then one deliberately broken test should show red, and gets reverted. The first run also proves migration 16 on CI's up → down → up. `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted.
+3. Next phase, when the developer chooses: real hosting (DEPLOY.md §7: TLS, backups, monitoring), or product backlog (Phase 3 polish at 390 px, seller cancel, email verification / password reset, image upload).
 
 ---
 
@@ -775,7 +815,9 @@ The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF
 
 | What happened | Cause | What was done / lesson |
 |---|---|---|
-| `docker run … -w /src` failed with `C:/Program Files/Git/src` | Git Bash rewrites arguments that look like POSIX paths | `export MSYS_NO_PATHCONV := 1` in the Makefile; use it in any ad-hoc `docker run` from Git Bash |
+| `docker run … -w /src` failed with `C:/Program Files/Git/src` | Git Bash rewrites arguments that look like POSIX paths | `export MSYS_NO_PATHCONV := 1` in the Makefile; use it in any ad-hoc `docker run` from Git Bash (7e: `docker compose run --entrypoint /app/seed-admin` failed the same way, `exec: "C:/Program"`) |
+| `TRUSTED_PROXIES` set to the whole compose network let a client forge its IP (7e, F8) | published-port traffic arrives from the network **gateway**, which is inside that network | trust exactly the proxy's address, and have the edge proxy overwrite `X-Forwarded-For`; verify with a forged header, not by reading config |
+| A YAML flow mapping `{ description: A, B }` passed the Go parser but was wrong | a comma inside an unquoted flow value starts a new key; the Go test only checked paths | quote flow values with commas or colons; the Redocly lint (CI) catches it, the coverage test does not |
 | `go`, `docker`, `make` "not found" in the agent shell | not on PATH (Go not installed at all) | Go/sqlc/migrate run in containers; Docker CLI path is in CLAUDE.md; `make` via scoop |
 | `seed-admin` test created an admin in the **dev** DB | a `sed` rewrote `…/marketplace_dev?` but the dev DB is called `main` | never assume the dev DB name; check `.env` keys, not values; test accounts were left behind |
 | A process on port 5173 was killed and turned out to be the developer's Laravel app | killed by port without reading its command line | always inspect `CommandLine` first; use port 5190 for agent-run Vite |

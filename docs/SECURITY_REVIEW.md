@@ -26,6 +26,14 @@ Test paths are relative to `backend/internal/`. Integration tests need
 | F6 | **No security headers** on API responses | A JSON body that echoes user text (e.g. a review comment) could be sniffed or framed by an old or odd client. Responses with personal data could be cached | `middleware.SecurityHeaders` sits right after RequestID, so every answer gets it, including 404, 405, a recovered panic and a refused preflight. It sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `Referrer-Policy: strict-origin-when-cross-origin` and `Cache-Control: no-store` | `middleware/security_headers_test.go`. `router/router_test.go` `TestSecurityHeaders_OnEveryKindOfResponse` covers 6 response kinds. Also checked with `curl -i` on the running dev API |
 | F7 | **`npm audit --omit=dev`: 4 moderate advisories** (`shadcn` → `ts-morph` → `minimatch` ReDoS). Also the unused `cn` package | Build-time only, not reachable from the browser bundle, but reported as a runtime dependency | `cn` removed (nothing imports it). `shadcn` moved to `devDependencies`; it is still needed at build time for `@import "shadcn/tailwind.css"`. The lockfile changed only flags and the `cn` entry; no other version changed | `npm audit --omit=dev` → **0 vulnerabilities**. Build, lint, Vitest 107/107 and E2E 10/10 (twice) all pass |
 
+### Added in 7e (production build)
+
+| # | Finding | Risk before | Fix | Evidence |
+|---|---|---|---|---|
+| F8 | **Trusting the proxy network trusted the Docker gateway.** The first `docker-compose.prod.yml` set `TRUSTED_PROXIES` to the internal /24. Traffic to a published port reaches nginx from the gateway `172.31.240.1`, which is in that /24. Gin therefore walked past it and believed whatever `X-Forwarded-For` the client had sent | **Verified through nginx**: `X-Forwarded-For: 1.2.3.4` was logged as `client_ip: 1.2.3.4`. Any client could choose its own rate-limit bucket (login and sign-up brute-force limits bypassed) | Two layers, each enough on its own: `TRUSTED_PROXIES` is nginx's fixed address only (`172.31.240.10`), and nginx **replaces** the header with `$remote_addr` instead of appending to it | After the fix, a single and a chained forged header both log the real peer. The Gin side is unit-tested (`TestClientIP_TrustedProxies`, forged chain). `docs/DEPLOY.md` §4 covers the real-IP setup for a TLS terminator in front |
+
+The 7e production build also adds the SPA's own headers in nginx (`frontend/nginx/security-headers.conf`). The CSP is `script-src 'self'` with no inline script in the build. Other headers: `frame-ancestors 'none'`, `connect-src 'self'`, nosniff, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`. nginx also sends `server_tokens off`, `index.html` with `no-cache`, and hashed assets as `immutable`. A real browser (Edge) was checked through nginx with `APP_ENV=production`: login and reload work, there were no CSP violations, and the `sid` cookie is `Secure; HttpOnly; SameSite=Lax`.
+
 ---
 
 ## 2. OWASP API Security Top 10 (2023) against this codebase
@@ -40,7 +48,7 @@ Test paths are relative to `backend/internal/`. Integration tests need
 | **API6 Unrestricted Access to Sensitive Business Flows** | Checkout: idempotency key, the cart row locked, inventory locked in `variant_id` order, conditional updates. Payment events are idempotent by `eventId`. Sellers cannot buy their own products. Sign-up limited per IP | ok | `TestCheckout_IdempotencyKey`, `TestCheckout_ConcurrentSubmitsWithTheSameKey`, `TestCheckout_ConcurrentBuyersNeverOversell`, `TestCheckout_ConcurrentLifecycleRequestsHaveOneWinner`, `TestCheckout_CannotBuyFromOwnStore`, `TestCart_SellerCannotBuyOwnProduct` |
 | **API7 Server Side Request Forgery** | The server never fetches a URL. Image URLs are validated as http(s) and only rendered by the browser | ok (n/a) | Code read: no outgoing HTTP client in `backend/` (`grep -r "http.Get\|http.Client"` finds none outside tests) |
 | **API8 Security Misconfiguration** | Config fails fast on bad values. CORS is an exact allow-list with no `*`. CSRF uses SameSite=Lax, an Origin-vs-Host check and JSON-only bodies. Errors use one envelope and never return SQL errors or stacks (F1 was a 500 with a generic body, not a leak). Security headers (F6). Gin release mode in production | ok + fix | `config/config_test.go`, `middleware/same_origin_test.go` `TestSameOrigin`, `TestCrossSiteLoginIsRejected`, `TestCORS_DisallowedOriginPreflight`, `TestSecurityHeaders_OnEveryKindOfResponse` |
-| **API9 Improper Inventory Management** | All routes live in one file (`router/router.go`). There are no old versions and no debug endpoints. `/health` and `/ready` reveal nothing about the infrastructure. The OpenAPI spec and its route-coverage test are 7e | 7e | PLAN.md §7.1 7e |
+| **API9 Improper Inventory Management** | All routes live in one file (`router/router.go`). There are no old versions and no debug endpoints. `/health` and `/ready` reveal nothing about the infrastructure. `backend/api/openapi.yaml` documents every route and error code. A test fails when the spec and the router disagree in either direction, and CI lints the spec | ok (7e) | `router/openapi_test.go` `TestOpenAPI_CoversExactlyTheRoutes`, `TestOpenAPI_IsWellFormed`; `make api-lint` |
 | **API10 Unsafe Consumption of APIs** | No third-party APIs: payment and shipping are simulated. Webhook signature checks become required when a real gateway arrives (CLAUDE.md §7) | ok (n/a) / backlog | — |
 
 ---
@@ -71,6 +79,7 @@ Test paths are relative to `backend/internal/`. Integration tests need
 
 ## 5. Not verified
 
-- `TRUSTED_PROXIES` through a real nginx: needs the 7e production compose.
-- `Secure` cookie over real HTTPS: only the `Set-Cookie` header is tested.
+- ~~`TRUSTED_PROXIES` through a real nginx~~: verified in 7e, and that check found F8.
+- `Secure` cookie over real HTTPS: verified only over `http://localhost`, which browsers treat as secure. Real TLS waits for hosting (DEPLOY.md §4).
+- Real client IPs: on Docker Desktop every client reaches nginx as the gateway, so the rate limiter still sees one IP there. On Linux, traffic from other machines normally keeps its source address (iptables NAT), but loopback traffic goes through docker-proxy and does not. With a terminator in front, the real-IP setup in DEPLOY.md §4 is what counts. Not tested on Linux.
 - Several API instances running the cleanup at the same time: reasoned harmless (two DELETEs of the same rows), but not tested.

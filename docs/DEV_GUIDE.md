@@ -97,7 +97,7 @@ fmt:
 
 Hal penting di Makefile ini:
 
-- **Hanya Docker yang dibutuhkan.** Variabel `GO` berisi `docker run ... golang:1.27-alpine`, jadi `make test` menjalankan `go test` *di dalam container* dengan folder `backend/` terpasang. Itu sebabnya perintah yang sama jalan walau Go tidak terpasang di Windows.
+- **Hanya Docker yang dibutuhkan.** Variabel `GO` berisi `docker run ... golang:1.27.4-alpine3.24` (tag pasti sejak 7e, supaya isinya tidak berubah diam-diam), jadi `make test` menjalankan `go test` *di dalam container* dengan folder `backend/` terpasang. Itu sebabnya perintah yang sama jalan walau Go tidak terpasang di Windows.
 - **Cache dengan named volume** (`gomodcache`, `gobuildcache`) membuat unduhan modul dan hasil build tidak diulang tiap run.
 - **Argumen** diteruskan sebagai variabel: `make migrate-create name=add_wishlist`. Bagian `ifndef name` memberi pesan usage kalau Anda lupa.
 - **`MSYS_NO_PATHCONV=1`**: Git Bash di Windows mengubah argumen seperti `-w /src` menjadi path Windows dan merusaknya. Baris itu mematikan perilaku tersebut. Kalau Anda menjalankan `docker run` manual dari Git Bash, `export MSYS_NO_PATHCONV=1` dulu.
@@ -128,7 +128,7 @@ Daftar target (`make help` menampilkan ringkasannya):
 
 ### Konsep dasar
 
-- **Image** = cetakan yang tidak berubah (mis. `postgres:18`). **Container** = proses yang berjalan dari sebuah image.
+- **Image** = cetakan yang tidak berubah (mis. `postgres:18.7-trixie`). Tag seperti `postgres:18` "mengambang": isinya bisa diganti penerbitnya, jadi repo ini memakai tag pasti. **Container** = proses yang berjalan dari sebuah image.
 - **Volume** = penyimpanan yang bertahan walau container dihapus. Data PostgreSQL ada di volume `pgdata`.
 - **Compose** (`docker-compose.yml`) = satu file yang mendefinisikan beberapa container dan cara mereka tersambung.
 - Container tidak melihat `localhost` Anda. Di dalam jaringan Compose, API menyambung ke database lewat nama service: `postgres:5432`. Dari host, Anda memakai `127.0.0.1:5433` (port yang dipublikasikan).
@@ -137,7 +137,7 @@ Daftar target (`make help` menampilkan ringkasannya):
 
 | Service | Jenis | Catatan |
 |---|---|---|
-| `postgres` | berjalan terus | `postgres:18`, healthcheck `pg_isready`, volume `pgdata`, host `127.0.0.1:5433` |
+| `postgres` | berjalan terus | `postgres:18.7-trixie`, healthcheck `pg_isready`, volume `pgdata`, host `127.0.0.1:5433` |
 | `api` | berjalan terus | dibangun dari `backend/Dockerfile`, menunggu `postgres` sehat, host `127.0.0.1:8081` |
 | `migrate` | **sekali jalan** | image `migrate/migrate`, hanya aktif lewat profil `tools`, menjalankan migrasi ke database dev |
 | `migrate-test` | sekali jalan | sama, tetapi ke database `marketplace_test` |
@@ -506,7 +506,7 @@ Menjalankan satu test integration di container (dari Git Bash, setelah `export M
 
 ```bash
 docker run --rm --network goframework_default --env-file .env \
-  -v "$PWD/backend:/src" -v gomodcache:/go/pkg/mod -v gobuildcache:/root/.cache/go-build -w /src golang:1.27-alpine \
+  -v "$PWD/backend:/src" -v gomodcache:/go/pkg/mod -v gobuildcache:/root/.cache/go-build -w /src golang:1.27.4-alpine3.24 \
   sh -c 'TEST_DATABASE_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/marketplace_test?sslmode=disable" \
          go test -tags=integration -count=1 -run TestReviews ./internal/router/'
 ```

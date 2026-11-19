@@ -1,6 +1,8 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-19: Phase 7 plan approved (defaults Q1–Q8). 7a and 7c committed (7c = `1a0e2e3`, `ee43cab`, docs `0cb0fc8`). 7b (CI) committed as `d8cac67`; **the GitHub run has not been seen** (`main` was 8 commits ahead of `origin`). **7d (security pass) is built and verified, uncommitted**: PROJECT_STATE §1r has the evidence and commit commands, and [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) has the findings. Next: developer reviews/commits 7d and pushes, then 7e. Sections §3–§5 still describe the Phase 6 session.
+Updated 2026-11-19: Phase 7 (hardening) is fully built. 7a–7d committed (7d = `a1045ca`, `5e08655`, docs `70c0ac2`). 7b's CI has **never run on GitHub** (`main` was ahead of `origin`). **7e (OpenAPI spec + production build) is built and verified, uncommitted**: PROJECT_STATE §1s has the evidence and commit commands, and [docs/DEPLOY.md](docs/DEPLOY.md) has the runbook. Next: developer reviews/commits 7e and pushes, then chooses the next phase. Sections §3–§5 still describe the Phase 6 session; for the current gaps read PROJECT_STATE §9 and DEPLOY.md §7.
+
+**New to the repo, or lost? Read [docs/START_HERE.md](docs/START_HERE.md) first** (which document answers which question, how to check the project's position in 2 minutes, the working loop with Claude).
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -28,7 +30,7 @@ Updated 2026-11-19: Phase 7 plan approved (defaults Q1–Q8). 7a and 7c committe
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
 | **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); 6d committed (`4ed91de`, `e00c95f`, docs `07bdc43`); 6e committed (`2c44965`, docs `d5b8577`); **Phase 6 closed** |
-| **7 Hardening** | plan approved 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); 7a committed (Vitest 107 tests, Playwright 10 tests via `make e2e`); 7b CI committed, unproven on GitHub; 7c committed; **7d done, uncommitted** (`TRUSTED_PROXIES`, session cleanup, security headers, Secure-cookie test, race-free variant cap, page upper bound, `cn`/`shadcn` cleanup, `docs/SECURITY_REVIEW.md`); 7e open |
+| **7 Hardening** | plan approved 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); 7a committed (Vitest 107 tests, Playwright 10 tests via `make e2e`); 7b CI committed, unproven on GitHub; 7c and 7d committed; **7e done, uncommitted** (`backend/api/openapi.yaml` + route-coverage test + `make api-lint`, `frontend/Dockerfile` + nginx, `docker-compose.prod.yml`, exact image tags, `docs/DEPLOY.md`, CI `images` job) |
 
 ---
 
@@ -98,18 +100,18 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 - JS bundle 672 kB (gzip 208 kB) after Radix; Vite warns about >500 kB chunks → route-level code splitting in Phase 7.
 - Cosmetic: right after "Keluar" the badge keeps the old count until the logout request returns.
 
-**Technical debt**: no frontend unit tests; E2E scripts are hand-run and git-ignored; no CI; floating `golang:1.27-alpine` / `postgres:18` tags; `frontend/README.md` is the Vite template.
+**Technical debt** (Phase 6 view, mostly paid in Phase 7): frontend tests, the E2E suite, CI, pinned images and the README were all done in 7a–7e. Current list: PROJECT_STATE §9.
 
-**Not verified**: more than one API instance, reverse proxy, HTTPS/`APP_ENV=production`; load on catalog/cart queries.
+**Not verified** (as of 7e): more than one API instance; real HTTPS (the reverse proxy and `APP_ENV=production` were verified on localhost, §1s); the first GitHub CI run; load against the API (only SQL plans, 7c).
 
 ---
 
 ## 6. Recommended next steps
 
 1. *(Done)* 6e committed as `2c44965` + `d5b8577`.
-2. **Developer reviews and commits 7d** (PROJECT_STATE §1r).
-3. **Developer pushes** and checks the Actions tab: backend + frontend green (the backend job also migrates through 000016), e2e green on `main`/manual, one deliberately broken test shows red (then revert). If `e2e` fails, fix from its logs (likely Linux-specific: `make e2e-reset`, seed steps).
-4. **Next — 7e (API docs & deploy prep)** per PLAN.md §7.1. Carry over from 7d (SECURITY_REVIEW §4–5): prod compose sets `TRUSTED_PROXIES` to nginx; nginx sends the SPA CSP and HSTS; verify login + Secure cookie through the proxy.
+2. **Developer reviews and commits 7e** (PROJECT_STATE §1s). Phase 7 is then complete.
+3. **Developer pushes** and checks the Actions tab: backend (with the OpenAPI lint), frontend and `images` green; e2e green on `main`/manual; one deliberately broken test shows red (then revert). If `e2e` or `images` fails, fix from its logs (likely Linux-specific: `make e2e-reset`, seed steps, image build).
+4. **Next phase: the developer decides.** Options: real hosting (DEPLOY.md §7: TLS, backups, monitoring), or product backlog (390 px polish, seller cancel, email verification / password reset, image upload). Any new route must update `backend/api/openapi.yaml` in the same change; the coverage test enforces it.
 
 **First 10 minutes in a new session**
 

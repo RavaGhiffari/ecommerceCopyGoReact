@@ -1,32 +1,35 @@
-# React + TypeScript + Vite
+# frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The web app of the marketplace: React 19, TypeScript, Vite, Tailwind 4 and
+shadcn/ui (Radix). It talks only to the Go API under `/api/v1`.
 
-Currently, two official plugins are available:
+Project rules and architecture: [../CLAUDE.md](../CLAUDE.md). How things fit
+together: [../docs/DEV_GUIDE.md](../docs/DEV_GUIDE.md). API contract:
+[../backend/api/openapi.yaml](../backend/api/openapi.yaml).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Commands
 
-## React Compiler
+Run them in this folder. The API must be running (`make up` in the repo root).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Command | What it does |
+|---|---|
+| `npm run dev` | Vite dev server. It proxies `/api`, `/health` and `/ready` to `127.0.0.1:8081`, so the browser sees one origin |
+| `npm run build` | `tsc -b` (type check, `e2e/` included) and `vite build` into `dist/` |
+| `npm run lint` | oxlint |
+| `npm run test` | Vitest + React Testing Library (`src/**/*.test.ts(x)`). On Windows, start from an upper-case drive path (`cd /D/...`) |
+| `npm run e2e` | Playwright. Use `make e2e` from the repo root: it prepares the separate `marketplace_e2e` database and API first |
 
-## Expanding the Oxlint configuration
+## Layout
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+- `src/pages/`: one component per route. Routes are in `src/app/`; most are lazy-loaded.
+- `src/features/<area>/`: the parts of a feature (auth, cart, checkout, orders, seller, admin, …).
+- `src/services/`: the only code that calls the API (`lib/api.ts` handles the envelope and `ApiError`).
+- `src/types/`: TypeScript mirrors of the Go DTOs. Keep them in sync with `openapi.yaml`.
+- `src/components/ui/`: shadcn components (owned by us after generation). `components/shared/`: our own building blocks.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+## Production
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`Dockerfile` builds `dist/` and serves it with nginx (`nginx/default.conf`).
+nginx also forwards `/api` to the API, so production is same-origin like
+development, and it adds the SPA's security headers and CSP. See
+[../docs/DEPLOY.md](../docs/DEPLOY.md).
