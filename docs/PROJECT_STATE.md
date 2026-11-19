@@ -5,11 +5,11 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 
 |  |  |
 |---|---|
-| Snapshot date | 2026-11-17 |
-| Last commit | `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Slice 7a — test suites** (Vitest unit/component tests, Playwright suite in `frontend/e2e/`, `make e2e` stack, configurable rate limits) + doc updates — see §1o |
-| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; **7a done and verified, awaiting review** |
-| Next | review + commit 7a; then 7b (CI) |
+| Snapshot date | 2026-11-18 |
+| Last commit | `d8cac67` (7b CI workflow, committed locally, not pushed when checked); `b20d7ea` (Phase 7a docs; 7a = `bce9df0`, `cdc43ad`); `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Slice 7c — performance & indexes** (query rewrite, migration `000016`, `make seed-load` / `perf-explain`, route-level code splitting) + doc updates — see §1q |
+| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; 7a committed; 7b committed locally, **GitHub run not yet seen**; **7c done and verified, awaiting review** |
+| Next | developer pushes 7b and confirms green jobs + one red run; reviews and commits 7c; then 7d |
 
 ---
 
@@ -36,7 +36,9 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-6c | Phase 6c seller dashboard | `0677906`, `6e18967`, docs `9716ed9` | ✅ committed by the developer | see §1l |
 | CP-6d | Phase 6d admin API (+ demo orders in seed-dev) | `4ed91de`, `e00c95f`, docs `07bdc43` | ✅ committed by the developer | see §1m |
 | CP-6e | Phase 6e admin UI | `2c44965`, docs `d5b8577` | ✅ committed by the developer | see §1n |
-| CP-7a | Phase 7a test suites | **uncommitted** | 🟡 awaiting review | see §1o |
+| CP-7a | Phase 7a test suites | `bce9df0`, `cdc43ad`, docs `b20d7ea` | ✅ committed by the developer | see §1o |
+| CP-7b | Phase 7b CI | `d8cac67` | 🟡 committed locally; GitHub run not seen | see §1p |
+| CP-7c | Phase 7c performance & indexes | **uncommitted** | 🟡 awaiting review | see §1q |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -376,6 +378,81 @@ git add -- CLAUDE.md PLAN.md PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 7a" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+### 1p. CP-7b (CI), written 2026-11-18
+
+| Check | Result |
+|---|---|
+| `.github/workflows/ci.yml` parses | [verified] YAML loads; jobs `backend`, `frontend`, `e2e`; triggers push, pull_request (main), workflow_dispatch |
+| Review against the repo | [verified] `.env.example`, `scripts/reset-e2e-db.sh`, `make e2e-reset` / `e2e-up`, `npm run e2e` exist; `playwright.config.ts` switches to bundled Chromium when `CI` is set; sqlc 1.29.0 and migrate v4.18.3 match the Makefile; Go version read from `go.mod` |
+| Jobs | `backend`: gofmt, `go vet` (+ `-tags=integration`), `sqlc diff`, migrate up → down → up, unit tests, integration tests (`-p 1`, Postgres 18 service), `govulncheck` (non-blocking). `frontend`: `npm ci`, lint, Vitest, build, `npm audit --omit=dev` (non-blocking). `e2e`: only on `main` / manual; random `.env` password, `make e2e-reset e2e-up`, Playwright, logs + report artifact on failure |
+| **Not verified** | **No run on GitHub yet.** `actionlint` was not run (image pull was denied). Linux-specific risks in the `e2e` job: `make e2e-reset` (seed-dev, seed-admin via `docker compose run`), Docker network/healthcheck timing |
+
+Done when (PLAN.md §7.1): a pushed branch shows all jobs green, and a deliberately broken test turns it red (shown once, then reverted).
+
+**Commit CP-7b** (the developer commits and pushes):
+
+```bash
+git add -- .github/workflows/ci.yml
+git commit -m "Add GitHub Actions CI" -m "- backend: gofmt, vet, sqlc diff, migrations up/down/up, unit + integration tests on Postgres 18" -m "- frontend: lint, Vitest, build; npm audit and govulncheck non-blocking" -m "- e2e: Compose e2e stack + Playwright on main and manual runs" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+git add -- PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 7b" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+git push -u origin main   # or a branch + PR; watch the Actions tab
+```
+
+### 1q. Verified at CP-7c (performance & indexes), 2026-11-18
+
+**Method.** `make seed-load` drops and recreates a separate database `marketplace_perf` (never dev/test/e2e), migrates it and bulk-loads 5 200 users, 200 stores, 50 000 products, 200 000 variants + inventory, 75 000 images, 100 000 orders / 200 000 order items and 16 666 reviews in ~25 s (`scripts/seed-load.sql`, deterministic ids). `make perf-explain` PREPAREs every hot query with the same text as `backend/db/queries/` and runs `EXPLAIN (ANALYZE, BUFFERS) EXECUTE` (as pgx does); `make perf-explain generic=1` forces generic plans. Numbers below are a **warm** run (run it twice; the first run after a restart is slower). Plans: `docs/perf/plans-7c-final.txt` (final), `plans-7c-before-indexes.txt` (after the query rewrite, before migration 000016), `plans-7c-original-catalog.txt` (the original catalog query; first run, partly cold, but 1.3 M buffer hits, so it was CPU-bound, not a cache artefact).
+
+| Finding | Evidence | Fix |
+|---|---|---|
+| **`ListPublicProducts` built every product before `LIMIT`** because of `COUNT(*) OVER ()` | 47 500 rows × (variant aggregate + image lookup): **2 195 ms** newest, 1 665 ms popular, 1 385 ms rating | the total moved to a new `CountPublicProducts` (no sort, no per-row lookups); the page query walks `products_status_created_idx` and stops after one page: newest **2.7 ms**, popular 6 ms, category 0.9 ms, store page 1.7 ms, related 0.9 ms. Page + count together ≈ 50 ms (the count is 47 ms) |
+| Price sort needed every product's price before page 1 | LATERAL per product: **1 227 ms**; image lookup inside the sorted query: ~1 010 ms | separate `ListPublicProductsByPrice`: one `GROUP BY` over all variants + a `page` CTE so images are fetched for 24 rows only: **213 ms** (category 167, search 157). The repository converts its row type into the other (identical columns) |
+| Admin lists had no index for `ORDER BY created_at DESC` | Parallel Seq Scan over 100 000 orders + top-N sort: orders 32 ms, orders `?status=` 14 ms, reviews 34 ms | migration `000016`: `orders_created_idx (created_at DESC, id)`, `orders_status_created_idx (status, created_at DESC, id)`, `reviews_created_idx (created_at DESC, id)` → **0.040 ms, 0.049 ms, 0.116 ms** |
+| Bundle was one 838 kB chunk (Vite warning) | `npm run build` | route `lazy` for cart, checkout, payment, orders, account, wishlist, seller and admin (guards stay eager; admin layout and pages lazy) + vendor groups (`react`, `router`, `forms`): entry chunk **190 kB** (gzip 57 kB), `react` 219 kB, `router` 95 kB, `forms` 133 kB, ~40 route chunks of 2–18 kB; **warning gone**. `HydrateFallback` (`app/FirstLoad.tsx`) covers a bookmarked lazy URL |
+
+Recorded, needs nothing: `ListCartLines` 0.06 ms, `ListOrderItems` 0.4 ms, buyer orders 0.05 ms, seller orders 1.1 ms (0.07 ms with `?status=`), seller counts 0.08 ms, seller status counts 0.09 ms, top products 0.7 ms, store rating 0.5 ms, review distribution 0.1 ms, public reviews 1.4 ms, pending reviews 0.09 ms.
+
+**Accepted (recorded, not fixed)**
+
+| Query | Time | Why it stays |
+|---|---|---|
+| `sort=rating` | 85 ms | sorts all 47 000 products by a computed average; an expression index is possible but it is a minority sort |
+| Price sorts | 157–213 ms | the real fix is a denormalised `min_price` on `products` kept in sync by variant writes: a design decision, not an index |
+| `CountPublicProducts` (47 ms); admin stats (public-product count 43 ms, GMV 13–16 ms); `CountAdminOrders` 11 ms | | aggregates over the whole table; admin-only or one extra query per page; cache later if needed |
+| Seller revenue | 45 ms for a store with 500 orders | one `order_items` lookup per order (linear in that store's orders); fine at demo scale |
+| `ListSellerOrders` without status | 1.1 ms | sorts one store's orders; a seller with 50 000 orders would want `(store_id, created_at DESC, id)` |
+
+**Generic plans.** With `generic=1` the catalog query cannot use the index (1.6 s): the sort key is a `CASE` on a parameter, which the planner can only fold when the value is a constant. pgx's default is `plan_cache_mode=auto`, which keeps custom plans while the generic plan's estimated cost is much higher than the custom average (it is, here). Not reproduced end to end against the API.
+
+| Check | Result |
+|---|---|
+| `make sqlc` | regenerated; `products.sql.go` changed only for the catalog queries |
+| `make fmt` / `make vet` / `make test` | ok |
+| `make test-integration` | all packages ok (router 17.9 s); `TestPublicListing_SortSearchFilterPaginate` covers price asc/desc, page 2, total 3 and "total is still reported past the last page" through the new count and price query |
+| Migration 000016 | up on `marketplace_perf` and on the test DB ok; **down → up not run** (CI's backend job does it) |
+| `npm run build` / `lint` / `test` | clean, no chunk warning; 107 tests pass |
+| `make e2e` | 10/10 twice after the router change; after adding `HydrateFallback` the "No `HydrateFallback`" console warning is gone |
+| Not verified | the API under real load (only SQL plans); generic-plan behaviour through pgx; lazy chunks over a slow network |
+
+Pre-existing, not from this slice: the Playwright run logs "Select is changing from uncontrolled to controlled" warnings from a shadcn Select.
+
+**Commit CP-7c** (the developer commits):
+
+```bash
+git add -- backend scripts Makefile docker-compose.yml docs/perf
+git commit -m "Speed up catalog and admin list queries" -m "- ListPublicProducts no longer counts with a window function (2.2 s -> 3 ms); CountPublicProducts added" -m "- ListPublicProductsByPrice: grouped aggregate + page CTE (1.2 s -> 0.2 s)" -m "- migration 000016: indexes for the admin order and review lists (30 ms -> 0.1 ms)" -m "- make seed-load / perf-explain on a separate marketplace_perf database" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+git add -- frontend
+git commit -m "Split the frontend bundle by route" -m "- route-level lazy loading for cart, checkout, orders, seller and admin; vendor chunks; HydrateFallback" -m "- entry chunk 838 kB -> 190 kB, Vite size warning gone" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+git add -- PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
+git commit -m "Update project docs for Phase 7c" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ---
 
 ## 2. What exists, by phase
@@ -390,7 +467,7 @@ git commit -m "Update project docs for Phase 7a" -m "Co-Authored-By: Claude Opus
 | 4 Cart | carts + items, stock-checked add/update/remove (no reservation), issue flags, `/cart` page, header badge, add-to-cart | ✅ committed |
 | 5 Checkout & orders | addresses, shipping sim, transactional multi-store checkout, order lifecycle, payment sim, checkout/payment/order UI | ✅ committed |
 | 6 Reviews & dashboards | reviews, rating aggregates, buyer/seller/admin dashboards | ✅ 6a–6e committed |
-| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | 🟡 plan approved; 7a (test suites) done, awaiting review; 7b–7e open |
+| 7 Hardening | integration + E2E suites, security review, query/index review, OpenAPI, deploy | 🟡 plan approved; 7a committed; 7b (CI) committed, GitHub run not seen; 7c (performance & indexes) done, awaiting review; 7d–7e open |
 
 ---
 
@@ -617,12 +694,12 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | The sweeper runs inside the API process | with several instances each runs one; `SKIP LOCKED` prevents double work, but that setup is untested | before scaling out |
 | A payment event that arrives after expiry is not stored | no audit trail of late notifications | when a real gateway arrives (also signature checks) |
 | Sellers cannot cancel a paid order (e.g. an item turned out to be missing); only the buyer can, before processing | the seller has to ask the buyer | add `paid → cancelled` by seller with restock + refund if needed |
-| The optional `?status=` filter is written as `(@status IS NULL OR status = @status)`; no `EXPLAIN` yet | the planner may not use `orders_store_status_created_idx` fully | Phase 7 index review |
-| `ListCheckoutLines` and `ListOrderItems` use LATERAL image lookups; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
+| The optional `?status=` filter is written as `(@status IS NULL OR status = @status)` | measured in 7c (§1q): custom plans use the indexes (0.07 ms seller, 0.05 ms admin) | resolved |
+| `ListCheckoutLines` and `ListOrderItems` use LATERAL image lookups | measured in 7c: 0.4 ms for order items | resolved |
 | Right after "Keluar", the header badge keeps the old count until the logout request returns (the page navigates first by design) | cosmetic, milliseconds | accept, or clear the cart state optimistically |
 | Cart issue flags are recomputed on every `GET /cart`, but the page does not refresh by itself | a stock change by the seller shows up on the next load/mutation | acceptable; checkout re-validates |
-| `ListCartLines` joins six tables + a LATERAL image lookup; no `EXPLAIN` yet | fine for small carts | Phase 7 index review |
-| Test suites exist (7a) but nothing runs them automatically | a regression shows up only when someone runs `make e2e` / `npm run test` | CI in 7b |
+| `ListCartLines` joins six tables + a LATERAL image lookup | measured in 7c: 0.06 ms | resolved |
+| Test suites exist (7a); CI workflow written (7b) but not yet run on GitHub | until the first green run, CI is unproven | push and watch the Actions tab |
 | `npm audit`: 4 moderate advisories via `shadcn` → `ts-morph` → `minimatch` (a CLI dependency kept at runtime) | ReDoS in a build-time glob library; not reachable from the browser bundle | 7d (move `shadcn` to devDependencies or update) |
 | No `/auth/me`; no email verification; no password reset | account recovery impossible | backlog |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
@@ -630,14 +707,14 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **Phase 7 / deploy**. A `TRUSTED_PROXIES` setting would not help in dev: the Vite proxy sends no `X-Forwarded-For`, and every dev request comes from the same machine anyway |
 | Expired sessions are deleted only when *the same user* logs in again | `user_sessions` grows for users who never return | cleanup job in Phase 7 |
 | Cookie `Secure` flag is set only when `APP_ENV=production`; that path has **no test** | a production misconfiguration would go unnoticed | Phase 7 |
-| No `EXPLAIN` / load check of `ListPublicProducts` (LATERAL joins + window count) | indexes exist but are unproven at scale | Phase 7 |
+| `ListPublicProducts` at scale | fixed in 7c (window count removed, 2.2 s → 3 ms); price sort 0.2 s and rating sort 85 ms accepted (§1q) | `min_price` denormalisation if it ever matters |
 | `AddVariant` checks the 20-variant cap before inserting (check-then-insert) | two concurrent requests can exceed 20 | low priority |
 | Search uses the `simple` config without `unaccent` | "kemeja" ≠ "kémeja"; no stemming | acceptable for now |
 | `.env.example` lists only 9 of the 17 config variables | people don't discover optional tuning | document-only; defaults are safe |
 | `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
 | `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
-| No CI | nothing runs tests on push | Phase 7 |
-| JS bundle grew from 522 kB to 672 kB (gzip 160 → 208 kB) with Radix; Vite warns about chunks over 500 kB | slower first load | route-level code splitting (`React.lazy`) in Phase 7 |
+| CI not yet proven | `ci.yml` written in 7b, no GitHub run yet | see §1p |
+| JS bundle was one 838 kB chunk | fixed in 7c: entry 190 kB + vendor chunks + route chunks (§1q) | resolved |
 
 ---
 
@@ -645,8 +722,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer reviews and commits 7a (§1o has the commands). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted by the developer.
-2. 7b — CI (PLAN.md "Phase 7" §7.1): GitHub Actions running `make`-equivalent backend checks, `npm run build/lint/test`, and the E2E stack.
+1. Developer pushes 7b and checks the Actions tab (all jobs green; one deliberately broken test shows red, then revert; the first run also proves migration 16 on CI's up → down → up). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted.
+2. Developer reviews and commits 7c (§1q has the commands).
+3. 7d — security pass (PLAN.md "Phase 7" §7.1).
 
 ---
 

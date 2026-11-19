@@ -15,7 +15,7 @@ Status legend: ✅ implemented **and verified** · 🟡 implemented, awaiting de
 | 5 Checkout & orders | addresses, shipping simulation, one-transaction multi-store checkout (checkout → per-store orders), `available → reserved`, snapshots, idempotency key, order lifecycle, payment simulation, cancel/expiry release | ✅ 5a–5e committed |
 | 6 Reviews & dashboards | reviews (purchased only, one per purchase), rating aggregates, buyer/seller/admin dashboards, category admin UI | ✅ 6a–6e committed |
 | — Wishlist (practice, outside the plan) | `wishlist_items` (migration `000013`), `/me/wishlist`, heart button, `/wishlist` page | ✅ committed (PLAN.md §6.4b) |
-| 7 Hardening | Playwright + Vitest suites, security review, `EXPLAIN` / index review, OpenAPI, CI, pinned images, session cleanup, deploy prep | 🟡 plan approved 2026-11-17 ([PLAN.md](PLAN.md) "Phase 7"); 7a (Vitest + Playwright suites, `make e2e`) done, awaiting review; 7b–7e open |
+| 7 Hardening | Playwright + Vitest suites, security review, `EXPLAIN` / index review, OpenAPI, CI, pinned images, session cleanup, deploy prep | 🟡 plan approved 2026-11-17 ([PLAN.md](PLAN.md) "Phase 7"); 7a (Vitest + Playwright suites, `make e2e`) committed; 7b (CI, `.github/workflows/ci.yml`) committed, GitHub run not seen; 7c (query plans, migration 000016, route code splitting) done, awaiting review; 7d–7e open |
 
 ## Rules for moving between phases
 
