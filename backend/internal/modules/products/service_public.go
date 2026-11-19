@@ -59,7 +59,7 @@ func (s *Service) ListPublic(ctx context.Context, in PublicQuery) (Page, error) 
 		errs.Add("sort", "must be one of popular, newest, price_asc, price_desc, rating")
 	}
 	if in.Page < 1 || in.Page > 6_000 {
-		errs.Add("page", "must be between 1 and 10000")
+		errs.Add("page", "must be between 1 and 6000")
 	}
 	if in.PageSize < 1 || in.PageSize > MaxPageSize {
 		errs.Add("pageSize", "must be between 1 and 48")

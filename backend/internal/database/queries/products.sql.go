@@ -13,6 +13,21 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const countProductVariants = `-- name: CountProductVariants :one
+SELECT COUNT(*)::int FROM product_variants WHERE product_id = $1
+`
+
+// Must be its own statement AFTER LockStoreProduct: under READ COMMITTED each
+// statement takes a fresh snapshot, so this one sees a variant that a request
+// we waited for has just committed. A count inside the locking SELECT would
+// use that statement's older snapshot and miss it.
+func (q *Queries) CountProductVariants(ctx context.Context, productID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countProductVariants, productID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countPublicProducts = `-- name: CountPublicProducts :one
 SELECT COUNT(*)
 FROM products p
@@ -731,6 +746,29 @@ func (q *Queries) ListVariantsWithStock(ctx context.Context, productID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockStoreProduct = `-- name: LockStoreProduct :one
+SELECT id FROM products
+WHERE id = $1 AND store_id = $2
+FOR NO KEY UPDATE
+`
+
+type LockStoreProductParams struct {
+	ID      uuid.UUID
+	StoreID uuid.UUID
+}
+
+// AddVariant locks the product row before counting its variants, so two
+// concurrent "add variant" requests queue here and the 20-variant cap cannot
+// be overshot. FOR NO KEY UPDATE (not FOR UPDATE) so it does not block inserts
+// that only reference the product (order_items, reviews, wishlist rows take
+// KEY SHARE on it).
+func (q *Queries) LockStoreProduct(ctx context.Context, arg LockStoreProductParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockStoreProduct, arg.ID, arg.StoreID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const nextVariantSortOrder = `-- name: NextVariantSortOrder :one

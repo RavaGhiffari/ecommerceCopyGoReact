@@ -3,6 +3,7 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -48,16 +49,25 @@ func New(cfg config.Config, h Handlers, resolveSession middleware.SessionResolve
 	}
 
 	r := gin.New()
-	// We are not behind a reverse proxy yet, so never trust X-Forwarded-For.
-	_ = r.SetTrustedProxies(nil)
+	// ClientIP() feeds the rate limiter and the logs. With no trusted proxies
+	// it is the TCP peer and X-Forwarded-For is ignored (a client could write
+	// anything there). Behind nginx, TRUSTED_PROXIES names nginx so the header
+	// it appends is believed — and only that one hop. config.Load already
+	// validated the list, so an error here is a programming error.
+	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		panic(fmt.Sprintf("router: trusted proxies: %v", err))
+	}
 
 	// Middleware runs top to bottom on the way in, bottom to top on the way out:
-	//   RequestID -> Logging -> Recovery -> CORS -> Timeout -> SameOrigin -> Authenticate -> handler
+	//   RequestID -> SecurityHeaders -> Logging -> Recovery -> CORS -> Timeout -> SameOrigin -> Authenticate -> handler
+	// SecurityHeaders sits near the top so every answer gets them, including a
+	// recovered panic and a preflight that CORS refuses (it aborts early).
 	// Logging sits outside Recovery so a recovered panic is still logged as a 500.
 	// SameOrigin runs before Authenticate: a forged cross-site request is
 	// rejected before we even look at its cookie.
 	r.Use(
 		middleware.RequestID(),
+		middleware.SecurityHeaders(),
 		middleware.Logging(),
 		middleware.Recovery(),
 		middleware.CORS(cfg.CORSAllowedOrigins),

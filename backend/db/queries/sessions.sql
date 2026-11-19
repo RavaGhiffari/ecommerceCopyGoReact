@@ -16,6 +16,19 @@ WHERE s.token_hash = @token_hash
 DELETE FROM user_sessions
 WHERE token_hash = @token_hash;
 
+-- name: DeleteExpiredSessions :execrows
+-- Background cleanup (auth.Service.CleanupExpiredSessions). Expired sessions
+-- are already useless (GetActiveSession ignores them); this only stops the
+-- table from growing with users who never log in again. The LIMIT keeps one
+-- statement short; the caller repeats it until less than a batch is deleted.
+-- "<= NOW()" is the exact complement of GetActiveSession's "> NOW()".
+DELETE FROM user_sessions
+WHERE id IN (
+    SELECT id FROM user_sessions
+    WHERE expires_at <= NOW()
+    LIMIT @batch_size
+);
+
 -- name: DeleteExpiredSessionsForUser :exec
 DELETE FROM user_sessions
 WHERE user_id = @user_id

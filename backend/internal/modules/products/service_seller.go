@@ -247,25 +247,30 @@ func (s *Service) AddVariant(ctx context.Context, ownerID, productID uuid.UUID, 
 	if err != nil {
 		return SellerProduct{}, err
 	}
-	p, err := s.loadOwned(ctx, st.ID, productID)
-	if err != nil {
-		return SellerProduct{}, err
-	}
-
 	errs := validation.Errors{}
 	name := cleanText(errs, "name", in.Name, 1, 100)
 	sku := cleanSKU(errs, "sku", in.SKU)
 	price := checkPrice(errs, "price", in.Price)
 	stock := checkStock(errs, "stock", in.Stock)
-	if len(p.Variants) >= MaxVariants {
-		errs.Add("variants", fmt.Sprintf("at most %d variants", MaxVariants))
-	}
 	if err := errs.Err(); err != nil {
 		return SellerProduct{}, err
 	}
 
+	// The cap is checked INSIDE the transaction, after locking the product
+	// row. Checked before it (as until 7d), two requests could both see 19
+	// variants and both insert: 10 concurrent requests left 26 variants
+	// (TestAddVariant_CapHoldsUnderConcurrency). The lock also makes
+	// NextVariantSortOrder race-free. Lock order: product row, then the new
+	// inventory row — nothing else is locked, so no deadlock is possible.
 	err = database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		repo := NewRepository(tx)
+		count, err := repo.LockOwnedVariantCount(ctx, st.ID, productID)
+		if err != nil {
+			return err // ErrNotFound for another store's product
+		}
+		if count >= MaxVariants {
+			return validation.Errors{"variants": fmt.Sprintf("at most %d variants", MaxVariants)}
+		}
 		order, err := repo.NextVariantSortOrder(ctx, productID)
 		if err != nil {
 			return err

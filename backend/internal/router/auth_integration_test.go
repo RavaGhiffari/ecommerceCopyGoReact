@@ -54,6 +54,13 @@ type testApp struct {
 
 func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 	t.Helper()
+	return newTestAppWith(t, limits, nil)
+}
+
+// newTestAppWith lets a test change the config (production mode, trusted
+// proxies) before the app is built, the same way main.go builds it.
+func newTestAppWith(t *testing.T, limits auth.Limits, adjust func(*config.Config)) *testApp {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -88,11 +95,14 @@ func newTestApp(t *testing.T, limits auth.Limits) *testApp {
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
 		RequestTimeout:     5 * time.Second,
 	}
+	if adjust != nil {
+		adjust(&cfg)
+	}
 	checkoutSvc := checkout.NewService(pool, checkout.Config{TTL: 30 * time.Minute, Rates: shipping.DefaultRates()})
 	h := router.Handlers{
 		Health:     health.NewHandler(health.NewRepository(pool)),
 		Addresses:  addresses.NewHandler(addresses.NewService(pool)),
-		Auth:       auth.NewHandler(authSvc, false, limits),
+		Auth:       auth.NewHandler(authSvc, cfg.SecureCookies(), limits),
 		Users:      users.NewHandler(users.NewService(pool)),
 		Categories: categories.NewHandler(categories.NewService(pool)),
 		Stores:     stores.NewHandler(stores.NewService(pool)),
@@ -338,6 +348,83 @@ func TestRegister_RateLimitedPerIP(t *testing.T) {
 	assert.Equal(t, "RATE_LIMITED", res.errorCode())
 	assert.NotEmpty(t, res.header.Get("Retry-After"))
 	assert.Equal(t, 2, app.count("SELECT count(*) FROM users"), "the refused sign-up created nothing")
+}
+
+// Behind a trusted proxy each real client gets its own sign-up budget; without
+// one, a forged X-Forwarded-For does not buy a fresh budget. (httptest
+// requests come from 192.0.2.1.)
+func TestRegister_RateLimitKeysOnTheRealClientBehindATrustedProxy(t *testing.T) {
+	oneSignUp := auth.Limits{LoginAttempts: 100, LoginWindow: time.Minute, RegisterAttempts: 1, RegisterWindow: time.Minute}
+	signUp := func(app *testApp, email, xff string) int {
+		return app.do("POST", "/api/v1/auth/register",
+			`{"name":"X","email":"`+email+`","password":"rahasia-123"}`, "", "X-Forwarded-For", xff).status
+	}
+
+	proxied := newTestAppWith(t, oneSignUp, func(c *config.Config) { c.TrustedProxies = []string{"192.0.2.0/24"} })
+	assert.Equal(t, http.StatusCreated, signUp(proxied, "a@example.com", "203.0.113.1"))
+	assert.Equal(t, http.StatusTooManyRequests, signUp(proxied, "b@example.com", "203.0.113.1"), "same client, budget used")
+	assert.Equal(t, http.StatusCreated, signUp(proxied, "c@example.com", "203.0.113.2"), "another client behind the same proxy")
+
+	direct := newTestApp(t, oneSignUp) // TRUSTED_PROXIES empty, the default
+	assert.Equal(t, http.StatusCreated, signUp(direct, "d@example.com", "203.0.113.1"))
+	assert.Equal(t, http.StatusTooManyRequests, signUp(direct, "e@example.com", "203.0.113.99"), "a forged header is ignored")
+}
+
+// APP_ENV=production → every Set-Cookie for the session carries Secure (and
+// keeps HttpOnly + SameSite=Lax): register, login and the logout deletion.
+// The app is built through cfg.SecureCookies(), the same call main.go makes.
+func TestSessionCookie_SecureOnlyInProduction(t *testing.T) {
+	prod := newTestAppWith(t, generousLimits, func(c *config.Config) { c.AppEnv = "production" })
+	token := prod.register("Rava", "rava@example.com", "rahasia-123")
+	login := prod.do("POST", "/api/v1/auth/login", `{"email":"rava@example.com","password":"rahasia-123"}`, token)
+	require.Equal(t, http.StatusOK, login.status, login.raw)
+	logout := prod.do("POST", "/api/v1/auth/logout", "", login.session().Value)
+	require.Equal(t, http.StatusNoContent, logout.status)
+
+	reg := prod.do("POST", "/api/v1/auth/register", `{"name":"B","email":"b@example.com","password":"rahasia-123"}`, "")
+	require.Equal(t, http.StatusCreated, reg.status, reg.raw)
+
+	for name, res := range map[string]result{"register": reg, "login": login, "logout": logout} {
+		c := res.session()
+		require.NotNil(t, c, name)
+		assert.True(t, c.Secure, "%s: Secure", name)
+		assert.True(t, c.HttpOnly, "%s: HttpOnly", name)
+		assert.Equal(t, http.SameSiteLaxMode, c.SameSite, name)
+	}
+
+	dev := newTestApp(t, generousLimits)
+	res := dev.do("POST", "/api/v1/auth/register", `{"name":"C","email":"c@example.com","password":"rahasia-123"}`, "")
+	require.Equal(t, http.StatusCreated, res.status, res.raw)
+	assert.False(t, res.session().Secure, "development runs on plain http://localhost")
+}
+
+// The background cleanup deletes every expired session, in batches, and
+// never an active one.
+func TestCleanupExpiredSessions(t *testing.T) {
+	app := newTestApp(t, generousLimits)
+	ctx := context.Background()
+	app.register("A", "a@example.com", "rahasia-123")
+	app.register("B", "b@example.com", "rahasia-123")
+	active := app.register("C", "c@example.com", "rahasia-123")
+	// A second session for A (login without the old cookie keeps the first).
+	require.Equal(t, http.StatusOK, app.do("POST", "/api/v1/auth/login", `{"email":"a@example.com","password":"rahasia-123"}`, "").status)
+
+	_, err := app.pool.Exec(ctx, `
+		UPDATE user_sessions SET created_at = NOW() - INTERVAL '2 hours', expires_at = NOW() - INTERVAL '1 hour'
+		WHERE user_id IN (SELECT id FROM users WHERE email IN ('a@example.com', 'b@example.com'))`)
+	require.NoError(t, err)
+	require.Equal(t, 4, app.count("SELECT count(*) FROM user_sessions"))
+
+	// Batch of 2 with 3 expired rows: the loop must run twice (2, then 1).
+	n, err := app.auth.CleanupExpiredSessions(ctx, 2)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), n)
+	assert.Equal(t, 1, app.count("SELECT count(*) FROM user_sessions"))
+	assert.Equal(t, http.StatusOK, app.do("GET", "/api/v1/me", "", active).status, "the active session survives")
+
+	n, err = app.auth.CleanupExpiredSessions(ctx, 2)
+	require.NoError(t, err)
+	assert.Zero(t, n, "nothing left to delete")
 }
 
 func TestCrossSiteLoginIsRejected(t *testing.T) {

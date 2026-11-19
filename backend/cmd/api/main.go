@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -80,24 +81,24 @@ func run() error {
 		Rates: shipping.Rates{Regular: cfg.Shipping.Regular, Express: cfg.Shipping.Express, SameDay: cfg.Shipping.SameDay},
 	})
 
-	// The expiry sweeper releases the stock of checkouts nobody paid for. It
-	// stops when ctx is cancelled (shutdown signal). The deferred wait runs
-	// BEFORE the deferred pool.Close above (defers run last-in, first-out),
-	// so the sweeper never uses a closed pool.
-	sweeperDone := make(chan struct{})
-	go func() {
-		defer close(sweeperDone)
-		checkoutSvc.RunSweeper(ctx, cfg.CheckoutSweepInterval)
-	}()
+	// Background jobs, both stopped when ctx is cancelled (shutdown signal):
+	//   - the expiry sweeper releases the stock of checkouts nobody paid for;
+	//   - session cleanup deletes expired login sessions.
+	// They share the sweep interval; each module owns its own job. The
+	// deferred wait runs BEFORE the deferred pool.Close above (defers run
+	// last-in, first-out), so no job ever uses a closed pool.
+	var jobs sync.WaitGroup
+	jobs.Go(func() { checkoutSvc.RunSweeper(ctx, cfg.CheckoutSweepInterval) })
+	jobs.Go(func() { authSvc.RunSessionCleanup(ctx, cfg.CheckoutSweepInterval, cfg.SessionCleanupBatch) })
 	defer func() {
 		stop() // also covers returning early with an error
-		<-sweeperDone
+		jobs.Wait()
 	}()
 
 	handlers := router.Handlers{
 		Health:    health.NewHandler(health.NewRepository(pool)),
 		Addresses: addresses.NewHandler(addresses.NewService(pool)),
-		Auth: auth.NewHandler(authSvc, cfg.IsProduction(), auth.Limits{
+		Auth: auth.NewHandler(authSvc, cfg.SecureCookies(), auth.Limits{
 			LoginAttempts:    cfg.RateLimits.LoginFailures,
 			LoginWindow:      cfg.RateLimits.LoginWindow,
 			RegisterAttempts: cfg.RateLimits.Registrations,

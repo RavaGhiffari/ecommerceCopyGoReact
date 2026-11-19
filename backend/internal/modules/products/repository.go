@@ -246,6 +246,24 @@ func (r *Repository) CreateVariant(ctx context.Context, productID uuid.UUID, sku
 	return Variant{ID: row.ID, SKU: row.Sku, Name: row.Name, Price: row.Price}, nil
 }
 
+// LockOwnedVariantCount locks the product row (only if it belongs to
+// storeID) and then counts its variants in a second statement, which sees
+// every variant committed while we waited for the lock. Must run in a tx.
+func (r *Repository) LockOwnedVariantCount(ctx context.Context, storeID, productID uuid.UUID) (int, error) {
+	_, err := r.q.LockStoreProduct(ctx, queries.LockStoreProductParams{ID: productID, StoreID: storeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("lock store product: %w", err)
+	}
+	n, err := r.q.CountProductVariants(ctx, productID)
+	if err != nil {
+		return 0, fmt.Errorf("count product variants: %w", err)
+	}
+	return int(n), nil
+}
+
 func (r *Repository) NextVariantSortOrder(ctx context.Context, productID uuid.UUID) (int32, error) {
 	n, err := r.q.NextVariantSortOrder(ctx, productID)
 	if err != nil {

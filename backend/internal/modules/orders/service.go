@@ -19,6 +19,7 @@ const ReferenceOrder = "order"
 const (
 	DefaultPageSize = 10
 	MaxPageSize     = 50
+	MaxPage         = 10_000 // × MaxPageSize = 500 000, far inside int32
 )
 
 type Service struct {
@@ -58,8 +59,11 @@ func paging(errs validation.Errors, page, pageSize int) (int, int) {
 	if pageSize == 0 {
 		pageSize = DefaultPageSize
 	}
-	if page < 1 {
-		errs.Add("page", "must be 1 or more")
+	// The upper bound is not cosmetic: the offset is int32((page-1)*pageSize),
+	// and without it page=50000000&pageSize=48 overflowed into a negative
+	// OFFSET, which PostgreSQL refuses -> 500 (7d, paging_integration_test.go).
+	if page < 1 || page > MaxPage {
+		errs.Add("page", fmt.Sprintf("must be between 1 and %d", MaxPage))
 	}
 	if pageSize < 1 || pageSize > MaxPageSize {
 		errs.Add("pageSize", fmt.Sprintf("must be between 1 and %d", MaxPageSize))

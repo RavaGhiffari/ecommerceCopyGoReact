@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -27,12 +28,22 @@ type Config struct {
 	// In development the Vite proxy makes requests same-origin, so this is a backstop.
 	CORSAllowedOrigins []string
 
+	// Reverse proxies (IPs or CIDRs) whose X-Forwarded-For header is believed.
+	// Empty means "trust nobody": ClientIP() is the TCP peer, which is the
+	// right answer when the API is reached directly. Behind nginx it must name
+	// nginx, or every user shares nginx's IP and therefore one rate-limit bucket.
+	TrustedProxies []string
+
 	RequestTimeout  time.Duration // max time a handler's context stays valid
 	ShutdownTimeout time.Duration // how long to wait for in-flight requests on shutdown
 
 	SessionTTL time.Duration // how long a login stays valid
-	Argon2     Argon2Config
-	RateLimits RateLimits
+	// How many expired sessions one DELETE removes. The sweeper repeats it
+	// until less than a full batch is left, so this bounds the lock time of
+	// one statement, not the total cleaned per run.
+	SessionCleanupBatch int32
+	Argon2              Argon2Config
+	RateLimits          RateLimits
 
 	CheckoutTTL time.Duration // how long an unpaid checkout holds its stock
 	// How often the API looks for checkouts whose time ran out.
@@ -82,13 +93,15 @@ func Load() (Config, error) {
 	var errs []error
 
 	cfg := Config{
-		AppEnv:             getString("APP_ENV", "development"),
-		Port:               getString("APP_PORT", "8081"),
-		LogLevel:           getLogLevel("LOG_LEVEL", slog.LevelInfo, &errs),
-		CORSAllowedOrigins: getOrigins("CORS_ALLOWED_ORIGINS", "http://localhost:5173", &errs),
-		RequestTimeout:     getDuration("REQUEST_TIMEOUT", 10*time.Second, &errs),
-		ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 15*time.Second, &errs),
-		SessionTTL:         getDuration("SESSION_TTL", 24*time.Hour, &errs),
+		AppEnv:              getString("APP_ENV", "development"),
+		Port:                getString("APP_PORT", "8081"),
+		LogLevel:            getLogLevel("LOG_LEVEL", slog.LevelInfo, &errs),
+		CORSAllowedOrigins:  getOrigins("CORS_ALLOWED_ORIGINS", "http://localhost:5173", &errs),
+		TrustedProxies:      getProxies("TRUSTED_PROXIES", &errs),
+		RequestTimeout:      getDuration("REQUEST_TIMEOUT", 10*time.Second, &errs),
+		ShutdownTimeout:     getDuration("SHUTDOWN_TIMEOUT", 15*time.Second, &errs),
+		SessionTTL:          getDuration("SESSION_TTL", 24*time.Hour, &errs),
+		SessionCleanupBatch: getInt32("SESSION_CLEANUP_BATCH", 500, &errs),
 		Argon2: Argon2Config{
 			// Defaults: OWASP minimum for Argon2id (19 MiB, t=2, p=1).
 			MemoryKiB:   uint32(getInt32("ARGON2_MEMORY_KIB", 19*1024, &errs)),
@@ -133,6 +146,10 @@ func Load() (Config, error) {
 	if cfg.RateLimits.LoginFailures < 1 || cfg.RateLimits.Registrations < 1 {
 		errs = append(errs, errors.New("RATE_LIMIT_LOGIN_FAILURES and RATE_LIMIT_REGISTRATIONS must be at least 1"))
 	}
+	// 0 would make the cleanup loop delete nothing forever.
+	if cfg.SessionCleanupBatch < 1 {
+		errs = append(errs, errors.New("SESSION_CLEANUP_BATCH must be at least 1"))
+	}
 	if cfg.DB.MinConns > cfg.DB.MaxConns {
 		errs = append(errs, fmt.Errorf("DB_MIN_CONNS (%d) cannot exceed DB_MAX_CONNS (%d)", cfg.DB.MinConns, cfg.DB.MaxConns))
 	}
@@ -141,6 +158,13 @@ func Load() (Config, error) {
 }
 
 func (c Config) IsProduction() bool { return c.AppEnv == "production" }
+
+// SecureCookies says whether the session cookie gets the Secure flag (sent
+// over HTTPS only). Always true in production: there is deliberately no
+// switch to turn it off, so a production deploy cannot leak the session over
+// plain HTTP by misconfiguration. Development runs on http://localhost, where
+// a Secure cookie would never be sent back.
+func (c Config) SecureCookies() bool { return c.IsProduction() }
 
 func getString(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -180,6 +204,40 @@ func getOrigins(key, fallback string, errs *[]error) []string {
 		origins = append(origins, o)
 	}
 	return origins
+}
+
+// getProxies parses a comma-separated list of IPs or CIDRs ("10.0.0.0/8",
+// "172.18.0.5"). Anything else is an error rather than silently skipped: a
+// typo here would quietly put every user behind one IP. "0.0.0.0/0" is
+// refused because trusting every peer lets any client forge its own IP.
+func getProxies(key string, errs *[]error) []string {
+	var proxies []string
+	for _, p := range strings.Split(os.Getenv(key), ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		var bits int
+		if strings.Contains(p, "/") {
+			prefix, err := netip.ParsePrefix(p)
+			if err != nil {
+				*errs = append(*errs, fmt.Errorf("%s entries must be IPs or CIDRs, got %q", key, p))
+				continue
+			}
+			bits = prefix.Bits()
+		} else if _, err := netip.ParseAddr(p); err != nil {
+			*errs = append(*errs, fmt.Errorf("%s entries must be IPs or CIDRs, got %q", key, p))
+			continue
+		} else {
+			bits = -1
+		}
+		if bits == 0 {
+			*errs = append(*errs, fmt.Errorf("%s must not trust every address (%q): clients could then forge their IP", key, p))
+			continue
+		}
+		proxies = append(proxies, p)
+	}
+	return proxies
 }
 
 func getInt32(key string, fallback int32, errs *[]error) int32 {

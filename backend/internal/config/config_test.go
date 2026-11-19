@@ -22,6 +22,7 @@ func clearEnv(t *testing.T) {
 		"SESSION_TTL", "ARGON2_MEMORY_KIB", "ARGON2_ITERATIONS", "ARGON2_PARALLELISM",
 		"CHECKOUT_TTL", "CHECKOUT_SWEEP_INTERVAL", "SHIPPING_FEE_REGULAR", "SHIPPING_FEE_EXPRESS", "SHIPPING_FEE_SAME_DAY",
 		"RATE_LIMIT_LOGIN_FAILURES", "RATE_LIMIT_LOGIN_WINDOW", "RATE_LIMIT_REGISTRATIONS", "RATE_LIMIT_REGISTER_WINDOW",
+		"TRUSTED_PROXIES", "SESSION_CLEANUP_BATCH",
 	} {
 		t.Setenv(k, "")
 	}
@@ -133,6 +134,69 @@ func TestLoad_RateLimits(t *testing.T) {
 		_, err = Load()
 		assert.ErrorContains(t, err, "RATE_LIMIT_LOGIN_FAILURES", bad)
 	}
+}
+
+// Empty is today's behaviour (trust nobody). A typo must stop the start, and
+// "trust everyone" is refused: it would let any client choose its own IP.
+func TestLoad_TrustedProxies(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		want    []string
+		wantErr bool
+	}{
+		{name: "unset trusts nobody", value: "", want: nil},
+		{name: "IPs and CIDRs", value: " 172.18.0.5 , 10.0.0.0/8,::1 ", want: []string{"172.18.0.5", "10.0.0.0/8", "::1"}},
+		{name: "hostname rejected", value: "nginx", wantErr: true},
+		{name: "bad CIDR rejected", value: "10.0.0.0/33", wantErr: true},
+		{name: "IPv4 everything rejected", value: "0.0.0.0/0", wantErr: true},
+		{name: "IPv6 everything rejected", value: "::/0", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+			t.Setenv("TRUSTED_PROXIES", tt.value)
+
+			cfg, err := Load()
+			if tt.wantErr {
+				assert.ErrorContains(t, err, "TRUSTED_PROXIES")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.TrustedProxies)
+		})
+	}
+}
+
+// The session cookie must be Secure in production. There is no separate
+// switch, so this is the only thing that decides it (main.go passes it to
+// auth.NewHandler; the router integration test checks the cookie itself).
+func TestSecureCookies_FollowAppEnv(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.False(t, cfg.SecureCookies(), "development serves plain http://localhost")
+
+	t.Setenv("APP_ENV", "production")
+	cfg, err = Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.SecureCookies())
+}
+
+func TestLoad_SessionCleanupBatch(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, int32(500), cfg.SessionCleanupBatch)
+
+	t.Setenv("SESSION_CLEANUP_BATCH", "0")
+	_, err = Load()
+	assert.ErrorContains(t, err, "SESSION_CLEANUP_BATCH")
 }
 
 func TestLoad_CheckoutAndShipping(t *testing.T) {

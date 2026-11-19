@@ -344,6 +344,45 @@ func TestConcurrentStockChanges_LedgerStaysConsistent(t *testing.T) {
 	assert.Equal(t, available, ledgerSum, "the ledger must explain the current stock exactly")
 }
 
+// A product may have at most 20 variants. Several "add variant" requests on a
+// product that has 19 must leave exactly 20: one 201, the rest 422. Checking
+// the count before the insert (outside a lock) let several of them see 19 and
+// all insert (regression test for 7d; it failed on that code).
+func TestAddVariant_CapHoldsUnderConcurrency(t *testing.T) {
+	app := newTestApp(t, generousLimits)
+	c := app.seedCategories()
+	seller := app.newSeller("Toko Varian")
+	variants := make([]variantBody, 19)
+	for i := range variants {
+		variants[i] = variantBody{fmt.Sprintf("V%d", i), fmt.Sprintf("CAP-%02d", i), "1000", 1}
+	}
+	p := app.createProduct(seller, productBody("Kaos", c.audio, variants...))
+	path := fmt.Sprintf("/api/v1/seller/products/%s/variants", p["id"])
+
+	const racers = 10
+	statuses := make([]int, racers)
+	var wg sync.WaitGroup
+	for i := range racers {
+		wg.Go(func() {
+			statuses[i] = app.do("POST", path, fmt.Sprintf(`{"name":"N%d","sku":"CAP-N%d","price":"1000","stock":1}`, i, i), seller).status
+		})
+	}
+	wg.Wait()
+
+	created, refused := 0, 0
+	for _, s := range statuses {
+		switch s {
+		case http.StatusCreated:
+			created++
+		case http.StatusUnprocessableEntity:
+			refused++
+		}
+	}
+	assert.Equal(t, 1, created, "statuses: %v", statuses)
+	assert.Equal(t, racers-1, refused, "statuses: %v", statuses)
+	assert.Equal(t, 20, app.count("SELECT count(*) FROM product_variants WHERE product_id = $1", p["id"]))
+}
+
 // ---- public catalog ---------------------------------------------------------
 
 func TestPublicListing_SortSearchFilterPaginate(t *testing.T) {

@@ -67,6 +67,16 @@ func (r *Repository) DeleteSession(ctx context.Context, tokenHash []byte) error 
 	return nil
 }
 
+// DeleteExpiredBatch removes up to batch expired sessions of any user and
+// reports how many it removed.
+func (r *Repository) DeleteExpiredBatch(ctx context.Context, batch int32) (int64, error) {
+	n, err := r.q.DeleteExpiredSessions(ctx, batch)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired sessions: %w", err)
+	}
+	return n, nil
+}
+
 func (r *Repository) DeleteExpiredSessions(ctx context.Context, userID uuid.UUID) error {
 	if err := r.q.DeleteExpiredSessionsForUser(ctx, userID); err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)

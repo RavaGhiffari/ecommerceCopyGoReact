@@ -28,6 +28,28 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	return err
 }
 
+const deleteExpiredSessions = `-- name: DeleteExpiredSessions :execrows
+DELETE FROM user_sessions
+WHERE id IN (
+    SELECT id FROM user_sessions
+    WHERE expires_at <= NOW()
+    LIMIT $1
+)
+`
+
+// Background cleanup (auth.Service.CleanupExpiredSessions). Expired sessions
+// are already useless (GetActiveSession ignores them); this only stops the
+// table from growing with users who never log in again. The LIMIT keeps one
+// statement short; the caller repeats it until less than a batch is deleted.
+// "<= NOW()" is the exact complement of GetActiveSession's "> NOW()".
+func (q *Queries) DeleteExpiredSessions(ctx context.Context, batchSize int32) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSessions, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteExpiredSessionsForUser = `-- name: DeleteExpiredSessionsForUser :exec
 DELETE FROM user_sessions
 WHERE user_id = $1

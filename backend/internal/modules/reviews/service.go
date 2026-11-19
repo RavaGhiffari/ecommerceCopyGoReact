@@ -168,7 +168,7 @@ func paging(page, pageSize int) (int, int, error) {
 	}
 	errs := validation.Errors{}
 	if page < 1 || page > 6_000 {
-		errs.Add("page", "must be between 1 and 10000")
+		errs.Add("page", "must be between 1 and 6000")
 	}
 	if pageSize < 1 || pageSize > MaxPageSize {
 		errs.Add("pageSize", "must be between 1 and 50")

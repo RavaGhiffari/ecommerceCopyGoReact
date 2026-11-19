@@ -48,6 +48,7 @@ var accountStatuses = []string{StatusActive, StatusSuspended}
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 50
+	MaxPage         = 10_000 // × MaxPageSize = 500 000, far inside int32
 	MaxSearchLength = 100
 	StatsWindow     = 30 * 24 * time.Hour
 )
@@ -70,8 +71,10 @@ func Paging(errs validation.Errors, page, pageSize int) (int, int) {
 	if pageSize == 0 {
 		pageSize = DefaultPageSize
 	}
-	if page < 1 {
-		errs.Add("page", "must be 1 or more")
+	// The upper bound keeps int32((page-1)*pageSize) from overflowing into a
+	// negative OFFSET (a 500 before 7d; paging_integration_test.go).
+	if page < 1 || page > MaxPage {
+		errs.Add("page", fmt.Sprintf("must be between 1 and %d", MaxPage))
 	}
 	if pageSize < 1 || pageSize > MaxPageSize {
 		errs.Add("pageSize", fmt.Sprintf("must be between 1 and %d", MaxPageSize))

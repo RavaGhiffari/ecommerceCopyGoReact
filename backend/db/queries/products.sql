@@ -217,6 +217,23 @@ SET name = @name, price = @price
 WHERE id = @id
 RETURNING id, sku, name, price, sort_order;
 
+-- name: LockStoreProduct :one
+-- AddVariant locks the product row before counting its variants, so two
+-- concurrent "add variant" requests queue here and the 20-variant cap cannot
+-- be overshot. FOR NO KEY UPDATE (not FOR UPDATE) so it does not block inserts
+-- that only reference the product (order_items, reviews, wishlist rows take
+-- KEY SHARE on it).
+SELECT id FROM products
+WHERE id = @id AND store_id = @store_id
+FOR NO KEY UPDATE;
+
+-- name: CountProductVariants :one
+-- Must be its own statement AFTER LockStoreProduct: under READ COMMITTED each
+-- statement takes a fresh snapshot, so this one sees a variant that a request
+-- we waited for has just committed. A count inside the locking SELECT would
+-- use that statement's older snapshot and miss it.
+SELECT COUNT(*)::int FROM product_variants WHERE product_id = @product_id;
+
 -- name: NextVariantSortOrder :one
 SELECT COALESCE(MAX(sort_order) + 1, 0)::int FROM product_variants WHERE product_id = @product_id;
 
