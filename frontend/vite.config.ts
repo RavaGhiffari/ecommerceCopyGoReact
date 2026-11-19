@@ -16,6 +16,21 @@ export default defineConfig({
     // "@/components/ui/button" → src/components/ui/button (same alias as tsconfig).
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Long-lived libraries get their own files: they change rarely, so a
+        // new deploy of app code does not make browsers re-download them.
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules\/(react|react-dom|scheduler)\//, priority: 30 },
+            { name: 'router', test: /node_modules\/(react-router|react-router-dom)\//, priority: 20 },
+            { name: 'forms', test: /node_modules\/(react-hook-form|@hookform|zod)\//, priority: 10 },
+          ],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       // changeOrigin: false keeps the browser's Host header (e.g. localhost:5174).
