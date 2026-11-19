@@ -11,8 +11,9 @@
 export MSYS_NO_PATHCONV := 1
 
 COMPOSE     := docker compose
-GO_IMAGE    := golang:1.27-alpine
+GO_IMAGE    := golang:1.27.4-alpine3.24
 SQLC_IMAGE  := sqlc/sqlc:1.29.0
+REDOCLY_IMAGE := redocly/cli:2.14.0
 NETWORK     := goframework_default
 BACKEND_DIR := $(CURDIR)/backend
 
@@ -22,13 +23,13 @@ GO := docker run --rm -v "$(BACKEND_DIR):/src" -v gomodcache:/go/pkg/mod -v gobu
 
 .PHONY: help up down logs ps \
         migrate-up migrate-down migrate-version migrate-create migrate-force \
-        sqlc fmt vet test test-db test-integration seed-admin seed-dev \
+        sqlc fmt vet test test-db test-integration api-lint seed-admin seed-dev \
         e2e e2e-reset e2e-up e2e-down seed-load perf-explain
 
 help:
 	@echo "Stack:      up | down | logs | ps"
 	@echo "Migrations: migrate-up | migrate-down | migrate-version | migrate-create name=... | migrate-force version=N"
-	@echo "Code:       sqlc | fmt | vet | test | test-db | test-integration"
+	@echo "Code:       sqlc | fmt | vet | test | test-db | test-integration | api-lint (OpenAPI spec)"
 	@echo "Accounts:   seed-admin email=... name=... | seed-dev (demo catalog + orders)"
 	@echo "Browser:    e2e (reset + seed marketplace_e2e, start api-e2e, run Playwright) | e2e-reset | e2e-up | e2e-down"
 
@@ -89,6 +90,11 @@ vet:
 # Unit tests: no database needed.
 test:
 	$(GO) go test -count=1 ./...
+
+# Lint backend/api/openapi.yaml as OpenAPI 3.1 (CI runs the same image).
+# The route-coverage check is a Go test (internal/router/openapi_test.go).
+api-lint:
+	docker run --rm -v "$(BACKEND_DIR)/api:/spec:ro" $(REDOCLY_IMAGE) lint /spec/openapi.yaml
 
 # Creates (if missing) and migrates the separate marketplace_test database.
 # Integration tests WIPE its tables, so they never touch marketplace_dev.
