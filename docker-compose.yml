@@ -3,7 +3,10 @@ name: goframework
 
 services:
   postgres:
-    image: postgres:18
+    # Exact tag. Same OS (Debian 13 "trixie") as the postgres:18 tag this
+    # volume was created with: a different libc can change text sort order
+    # (collations) under existing indexes.
+    image: postgres:18.7-trixie
     restart: unless-stopped
 
     environment:

@@ -2,7 +2,9 @@
 #
 #   backend   go vet, gofmt, sqlc diff, migrations up → down → up, unit and
 #             integration tests against a Postgres service container
+#             + OpenAPI lint of backend/api/openapi.yaml
 #   frontend  npm ci, lint, Vitest, build (tsc -b also type-checks e2e/)
+#   images    production images build (docker-compose.prod.yml) + nginx -t
 #   e2e       the Compose "e2e" stack + Playwright (Chromium); only on main
 #             and on a manual run, because it takes several minutes
 #
@@ -27,6 +29,7 @@ concurrency:
 env:
   SQLC_IMAGE: sqlc/sqlc:1.29.0
   MIGRATE_IMAGE: migrate/migrate:v4.18.3
+  REDOCLY_IMAGE: redocly/cli:2.14.0
 
 jobs:
   backend:
@@ -38,7 +41,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18.7-trixie
         env:
           POSTGRES_USER: marketplace
           POSTGRES_PASSWORD: ci-only-password
@@ -74,6 +77,11 @@ jobs:
 
       - name: go vet
         run: go vet ./... && go vet -tags=integration ./...
+
+      # Valid OpenAPI 3.1 (Redocly's recommended rules; warnings do not fail).
+      # router/openapi_test.go separately checks that it covers every route.
+      - name: OpenAPI lint
+        run: docker run --rm -v "$PWD/api:/spec:ro" "$REDOCLY_IMAGE" lint /spec/openapi.yaml
 
       - name: sqlc diff (generated code matches the SQL)
         run: docker run --rm -v "$PWD:/src" -w /src "$SQLC_IMAGE" diff
@@ -130,6 +138,23 @@ jobs:
       - name: npm audit (non-blocking)
         continue-on-error: true
         run: npm audit --omit=dev
+
+  # The production images build, and nginx accepts its config (Phase 7e).
+  # Nothing is pushed anywhere.
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build production images
+        run: |
+          cp .env.prod.example .env.prod
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-build-only/" .env.prod
+          docker compose -f docker-compose.prod.yml --env-file .env.prod build
+
+      - name: nginx -t
+        run: docker run --rm --add-host api:127.0.0.1 goframework-prod-web nginx -t
 
   e2e:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

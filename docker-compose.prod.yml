@@ -1,0 +1,109 @@
+# Production-shaped stack (Phase 7e). Not a deployment by itself: see
+# docs/DEPLOY.md for the steps and what is still missing (TLS, backups).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml run --rm migrate up
+#
+# Differences from docker-compose.yml (development):
+#   - its own project name and volume, so it never touches the dev database;
+#   - APP_ENV=production: Secure session cookie, Gin release mode, and
+#     seed-dev refuses to run;
+#   - only the web container (nginx) is published. nginx serves the built SPA
+#     and forwards /api, so the browser sees one origin. The API and Postgres
+#     are reachable only on the internal network;
+#   - TRUSTED_PROXIES = nginx's fixed address, so ClientIP() (rate limits,
+#     logs) is the address nginx saw, not nginx's own;
+#   - exact image tags.
+
+name: goframework-prod
+
+services:
+  postgres:
+    image: postgres:18.7-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+    volumes:
+      - pgdata-prod:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_PORT: 8081
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # The public origin of the site, e.g. https://shop.example.com. Requests
+      # through nginx are same-origin anyway; this is the CORS/CSRF allow-list.
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env (e.g. https://shop.example.com)}
+      # Exactly nginx's address, NOT the whole network: traffic to a published
+      # port reaches nginx from the network gateway (172.31.240.1), so
+      # trusting the /24 also trusted the gateway, and a client's own
+      # X-Forwarded-For was believed (verified in 7e: a forged 1.2.3.4 showed
+      # up as client_ip). nginx also overwrites the header (default.conf).
+      TRUSTED_PROXIES: 172.31.240.10
+      SESSION_TTL: ${SESSION_TTL:-24h}
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    networks: [internal]
+    healthcheck:
+      # busybox wget is in the alpine runtime image.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      internal:
+        ipv4_address: 172.31.240.10   # = TRUSTED_PROXIES of the api
+    # Loopback by default, for trying it on this machine. On a server, publish
+    # it to the TLS terminator only (see docs/DEPLOY.md).
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_HOST_PORT:-8080}:8080"
+
+  # One-off: docker compose -f docker-compose.prod.yml run --rm migrate up
+  migrate:
+    image: migrate/migrate:v4.18.3
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    volumes:
+      - ./backend/db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+
+networks:
+  internal:
+    ipam:
+      config:
+        # Fixed so nginx can have a fixed address (TRUSTED_PROXIES). If it
+        # clashes with a network on the host, change the subnet, web's
+        # ipv4_address and the api's TRUSTED_PROXIES together.
+        - subnet: 172.31.240.0/24
+
+volumes:
+  pgdata-prod:

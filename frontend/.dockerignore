@@ -1,0 +1,11 @@
+# e2e/ stays: `tsc -b` type-checks it (tsconfig.e2e.json); only .auth/ is secret.
+node_modules
+dist
+e2e/.auth
+playwright-report
+test-results
+.env
+.env.*
+*.md
+Dockerfile
+.dockerignore
