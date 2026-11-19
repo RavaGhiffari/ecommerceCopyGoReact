@@ -3,9 +3,15 @@
 -- ============================================================================
 
 -- name: ListPublicProducts :many
--- One page of the public catalog. Every filter is optional: a NULL parameter
--- switches its condition off. total_count (a window function) is the number of
--- matching rows before LIMIT, so one query returns both the page and the total.
+-- One page of the public catalog, sorted by newest / popular / rating (the
+-- price sorts live in ListPublicProductsByPrice). Every filter is optional: a
+-- NULL parameter switches its condition off.
+--
+-- There is deliberately NO count here. A COUNT(*) OVER () window forces
+-- PostgreSQL to build every matching row (variant aggregate + image lookup for
+-- all 47 000 products) before LIMIT, which measured 2.2 s; without it the
+-- planner walks products_status_created_idx and stops after one page (1.6 ms).
+-- The total comes from CountPublicProducts.
 --
 -- A product is public only when it is active, its store is active, and it has
 -- at least one variant (the inner LATERAL join drops products without one).
@@ -16,8 +22,7 @@ SELECT p.id, p.slug, p.name, p.category_id, p.sold_count, p.created_at,
        -- LEFT JOIN: NULL when the product has no image. COALESCE makes that an
        -- explicit '' (sqlc cannot infer nullability through a LATERAL join).
        COALESCE(img.url, '')::text AS image_url,
-       COALESCE(img.alt, '')::text AS image_alt,
-       COUNT(*) OVER () AS total_count
+       COALESCE(img.alt, '')::text AS image_alt
 FROM products p
 JOIN stores s ON s.id = p.store_id AND s.status = 'active'
 JOIN LATERAL (
@@ -43,8 +48,6 @@ WHERE p.status = 'active'
   -- The tsquery is built in Go from sanitised words (see products/search.go).
   AND (sqlc.narg('search')::text IS NULL OR p.search @@ to_tsquery('simple', sqlc.narg('search')::text))
 ORDER BY
-  CASE WHEN @sort::text = 'price_asc'  THEN v.min_price END ASC,
-  CASE WHEN @sort::text = 'price_desc' THEN v.min_price END DESC,
   CASE WHEN @sort::text = 'popular'    THEN p.sold_count END DESC,
   -- rating: highest average first; products without reviews (NULL average)
   -- last; equal averages -> more reviews first.
@@ -54,6 +57,75 @@ ORDER BY
   p.created_at DESC,
   p.id
 LIMIT @page_limit OFFSET @page_offset;
+
+-- name: ListPublicProductsByPrice :many
+-- Same rows and filters as ListPublicProducts, ordered by the lowest variant
+-- price. The price is a computed value, so every product's variants must be
+-- aggregated before the first page can be known. Per product (LATERAL) that
+-- measured 1.2 s; one GROUP BY over all variants 0.2 s. The page CTE picks the
+-- 24 winners first, so the image lookup runs for 24 rows, not for every product
+-- (with the lookup inside the sorted query: 1.0 s).
+-- The column list must stay identical to ListPublicProducts: the repository
+-- converts one row type into the other.
+WITH page AS (
+    SELECT p.id, v.min_price, v.max_price, v.in_stock
+    FROM products p
+    JOIN stores s ON s.id = p.store_id AND s.status = 'active'
+    JOIN (
+        SELECT pv.product_id,
+               MIN(pv.price)::numeric AS min_price,
+               MAX(pv.price)::numeric AS max_price,
+               COALESCE(BOOL_OR(i.available_quantity > 0), false)::boolean AS in_stock
+        FROM product_variants pv
+        LEFT JOIN inventory i ON i.variant_id = pv.id
+        GROUP BY pv.product_id
+    ) v ON v.product_id = p.id
+    WHERE p.status = 'active'
+      AND (sqlc.narg('category_ids')::uuid[] IS NULL OR p.category_id = ANY (sqlc.narg('category_ids')::uuid[]))
+      AND (sqlc.narg('store_id')::uuid IS NULL OR p.store_id = sqlc.narg('store_id')::uuid)
+      AND (sqlc.narg('exclude_id')::uuid IS NULL OR p.id <> sqlc.narg('exclude_id')::uuid)
+      AND (sqlc.narg('search')::text IS NULL OR p.search @@ to_tsquery('simple', sqlc.narg('search')::text))
+    ORDER BY
+      CASE WHEN @descending::boolean THEN v.min_price END DESC,
+      CASE WHEN NOT @descending::boolean THEN v.min_price END ASC,
+      p.created_at DESC,
+      p.id
+    LIMIT @page_limit OFFSET @page_offset
+)
+SELECT p.id, p.slug, p.name, p.category_id, p.sold_count, p.created_at,
+       p.rating_count, p.rating_total,
+       s.id AS store_id, s.slug AS store_slug, s.name AS store_name, s.location AS store_location,
+       page.min_price, page.max_price, page.in_stock,
+       COALESCE(img.url, '')::text AS image_url,
+       COALESCE(img.alt, '')::text AS image_alt
+FROM page
+JOIN products p ON p.id = page.id
+JOIN stores s ON s.id = p.store_id
+LEFT JOIN LATERAL (
+    SELECT pi.url, pi.alt
+    FROM product_images pi
+    WHERE pi.product_id = p.id
+    ORDER BY pi.sort_order, pi.created_at
+    LIMIT 1
+) img ON true
+ORDER BY
+  CASE WHEN @descending::boolean THEN page.min_price END DESC,
+  CASE WHEN NOT @descending::boolean THEN page.min_price END ASC,
+  p.created_at DESC,
+  p.id;
+
+-- name: CountPublicProducts :one
+-- The total behind the page above: the same visibility rule and filters,
+-- without sorting or per-row lookups.
+SELECT COUNT(*)
+FROM products p
+JOIN stores s ON s.id = p.store_id AND s.status = 'active'
+WHERE p.status = 'active'
+  AND EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id)
+  AND (sqlc.narg('category_ids')::uuid[] IS NULL OR p.category_id = ANY (sqlc.narg('category_ids')::uuid[]))
+  AND (sqlc.narg('store_id')::uuid IS NULL OR p.store_id = sqlc.narg('store_id')::uuid)
+  AND (sqlc.narg('exclude_id')::uuid IS NULL OR p.id <> sqlc.narg('exclude_id')::uuid)
+  AND (sqlc.narg('search')::text IS NULL OR p.search @@ to_tsquery('simple', sqlc.narg('search')::text));
 
 -- name: GetPublicProduct :one
 -- Product detail by its store-scoped address /stores/{store}/products/{product}.

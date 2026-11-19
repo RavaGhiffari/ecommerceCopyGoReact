@@ -120,6 +120,20 @@ services:
       - -path=/migrations
       - -database=postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/marketplace_e2e?sslmode=disable
 
+  # Load-measurement database (Phase 7c): `make seed-load` recreates it.
+  migrate-perf:
+    image: migrate/migrate:v4.18.3
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/db/migrations:/migrations
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=postgres://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD}@postgres:5432/marketplace_perf?sslmode=disable
+
 volumes:
   pgdata:
     driver: local

@@ -1,0 +1,1618 @@
+Pager usage is off.
+SET
+plan_cache_mode = force_custom_plan
+
+#### ListPublicProducts: newest, no filter
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=132.80..1724.93 rows=24 width=292) (actual time=2.520..2.527 rows=24.00 loops=1)
+   Buffers: shared hit=749 read=6
+   ->  Incremental Sort  (cost=132.80..3121839.10 rows=47057 width=292) (actual time=2.519..2.523 rows=24.00 loops=1)
+         Sort Key: p.created_at DESC, p.id
+         Presorted Key: p.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 31kB  Peak Memory: 31kB
+         Buffers: shared hit=749 read=6
+         ->  Nested Loop Left Join  (cost=66.50..3119721.54 rows=47057 width=292) (actual time=0.261..2.424 rows=25.00 loops=1)
+               Buffers: shared hit=740 read=6
+               ->  Nested Loop  (cost=54.28..2543792.47 rows=47057 width=188) (actual time=0.210..1.258 rows=25.00 loops=1)
+                     Buffers: shared hit=627 read=3
+                     ->  Nested Loop  (cost=0.44..9356.51 rows=47057 width=123) (actual time=0.082..0.207 rows=25.00 loops=1)
+                           Buffers: shared hit=53 read=2
+                           ->  Index Scan using products_status_created_idx on products p  (cost=0.29..8138.52 rows=47532 width=99) (actual time=0.053..0.089 rows=25.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Index Searches: 1
+                                 Buffers: shared hit=3 read=2
+                           ->  Memoize  (cost=0.15..0.18 rows=1 width=40) (actual time=0.004..0.004 rows=1.00 loops=25)
+                                 Cache Key: p.store_id
+                                 Cache Mode: logical
+                                 Hits: 0  Misses: 25  Evictions: 0  Overflows: 0  Memory Usage: 4kB
+                                 Buffers: shared hit=50
+                                 ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.17 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=25)
+                                       Index Cond: (id = p.store_id)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Index Searches: 25
+                                       Buffers: shared hit=50
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.041..0.041 rows=1.00 loops=25)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=574 read=1
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.022..0.039 rows=4.00 loops=25)
+                                 Buffers: shared hit=574 read=1
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.008..0.011 rows=4.00 loops=25)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=100
+                                       Buffers: shared hit=175
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.006..0.006 rows=4.00 loops=25)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 25
+                                             Buffers: shared hit=75
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.006..0.006 rows=1.00 loops=100)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 100
+                                       Buffers: shared hit=399 read=1
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.046..0.046 rows=1.00 loops=25)
+                     Buffers: shared hit=113 read=3
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.045..0.045 rows=1.00 loops=25)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=113 read=3
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.039..0.040 rows=1.52 loops=25)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=38
+                                 Buffers: shared hit=110 read=3
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.037..0.037 rows=1.52 loops=25)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 25
+                                       Buffers: shared hit=72 read=3
+ Planning:
+   Buffers: shared hit=436 read=20
+ Planning Time: 1.640 ms
+ Execution Time: 2.735 ms
+(62 rows)
+
+#### ListPublicProducts: popular
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=690.49..2281.76 rows=24 width=292) (actual time=5.977..5.984 rows=24.00 loops=1)
+   Buffers: shared hit=869 read=20
+   ->  Incremental Sort  (cost=690.49..3120706.76 rows=47057 width=292) (actual time=5.976..5.980 rows=24.00 loops=1)
+         Sort Key: p.sold_count DESC, p.created_at DESC, p.id
+         Presorted Key: p.sold_count
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 32kB  Peak Memory: 32kB
+         Buffers: shared hit=869 read=20
+         ->  Nested Loop Left Join  (cost=66.50..3119257.54 rows=47057 width=292) (actual time=0.221..5.929 rows=31.00 loops=1)
+               Buffers: shared hit=869 read=20
+               ->  Nested Loop  (cost=54.28..2543328.47 rows=47057 width=188) (actual time=0.195..2.688 rows=31.00 loops=1)
+                     Buffers: shared hit=752 read=2
+                     ->  Nested Loop  (cost=0.44..8892.51 rows=47057 width=123) (actual time=0.086..0.376 rows=31.00 loops=1)
+                           Buffers: shared hit=39 read=2
+                           ->  Index Scan using products_status_sold_idx on products p  (cost=0.29..7674.52 rows=47532 width=99) (actual time=0.069..0.271 rows=31.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Index Searches: 1
+                                 Buffers: shared hit=31 read=2
+                           ->  Memoize  (cost=0.15..0.18 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=31)
+                                 Cache Key: p.store_id
+                                 Cache Mode: logical
+                                 Hits: 27  Misses: 4  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                 Buffers: shared hit=8
+                                 ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.17 rows=1 width=40) (actual time=0.007..0.007 rows=1.00 loops=4)
+                                       Index Cond: (id = p.store_id)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Index Searches: 4
+                                       Buffers: shared hit=8
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.073..0.074 rows=1.00 loops=31)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=713
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.028..0.069 rows=4.00 loops=31)
+                                 Buffers: shared hit=713
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.014..0.025 rows=4.00 loops=31)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=124
+                                       Buffers: shared hit=217
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.008..0.008 rows=4.00 loops=31)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 31
+                                             Buffers: shared hit=93
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.010..0.010 rows=1.00 loops=124)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 124
+                                       Buffers: shared hit=496
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.103..0.103 rows=1.00 loops=31)
+                     Buffers: shared hit=117 read=18
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.102..0.102 rows=1.00 loops=31)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=117 read=18
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.096..0.097 rows=1.35 loops=31)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=42
+                                 Buffers: shared hit=117 read=18
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.007..0.007 rows=1.35 loops=31)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 31
+                                       Buffers: shared hit=91 read=2
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.709 ms
+ Execution Time: 6.078 ms
+(62 rows)
+
+#### ListPublicProducts: rating
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=6023.86..7613.80 rows=24 width=292) (actual time=80.923..84.521 rows=24.00 loops=1)
+   Buffers: shared hit=3292 read=3
+   ->  Nested Loop Left Join  (cost=6023.86..3123428.49 rows=47057 width=292) (actual time=80.922..84.517 rows=24.00 loops=1)
+         Buffers: shared hit=3292 read=3
+         ->  Nested Loop  (cost=6011.64..2547028.85 rows=47057 width=188) (actual time=80.893..84.153 rows=24.00 loops=1)
+               Buffers: shared hit=3184
+               ->  Nested Loop  (cost=5957.81..12592.89 rows=47057 width=123) (actual time=80.827..83.345 rows=24.00 loops=1)
+                     Buffers: shared hit=2632
+                     ->  Gather Merge  (cost=5957.65..11374.90 rows=47532 width=99) (actual time=80.764..83.232 rows=24.00 loops=1)
+                           Workers Planned: 1
+                           Workers Launched: 1
+                           Buffers: shared hit=2584
+                           ->  Sort  (cost=4957.64..5027.54 rows=27960 width=99) (actual time=70.882..70.892 rows=246.50 loops=2)
+                                 Sort Key: (((p.rating_total)::numeric / (NULLIF(p.rating_count, 0))::numeric)) DESC NULLS LAST, p.rating_count DESC, p.created_at DESC, p.id
+                                 Sort Method: quicksort  Memory: 4088kB
+                                 Buffers: shared hit=2584
+                                 Worker 0:  Sort Method: quicksort  Memory: 3153kB
+                                 ->  Parallel Seq Scan on products p  (cost=0.00..2892.65 rows=27960 width=99) (actual time=0.013..11.757 rows=23750.00 loops=2)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Rows Removed by Filter: 1250
+                                       Buffers: shared hit=2525
+                     ->  Memoize  (cost=0.15..0.18 rows=1 width=40) (actual time=0.004..0.004 rows=1.00 loops=24)
+                           Cache Key: p.store_id
+                           Cache Mode: logical
+                           Hits: 0  Misses: 24  Evictions: 0  Overflows: 0  Memory Usage: 4kB
+                           Buffers: shared hit=48
+                           ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.17 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=24)
+                                 Index Cond: (id = p.store_id)
+                                 Filter: ((status)::text = 'active'::text)
+                                 Index Searches: 24
+                                 Buffers: shared hit=48
+               ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.033..0.033 rows=1.00 loops=24)
+                     Filter: (count(*) > 0)
+                     Buffers: shared hit=552
+                     ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.013..0.032 rows=4.00 loops=24)
+                           Buffers: shared hit=552
+                           ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.007..0.011 rows=4.00 loops=24)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=96
+                                 Buffers: shared hit=168
+                                 ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.004..0.004 rows=4.00 loops=24)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 24
+                                       Buffers: shared hit=72
+                           ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.005..0.005 rows=1.00 loops=96)
+                                 Index Cond: (variant_id = pv.id)
+                                 Index Searches: 96
+                                 Buffers: shared hit=384
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.014..0.014 rows=1.00 loops=24)
+               Buffers: shared hit=108 read=3
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.014..0.014 rows=1.00 loops=24)
+                     Sort Key: pi.sort_order, pi.created_at
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=108 read=3
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.011..0.012 rows=1.62 loops=24)
+                           Recheck Cond: (product_id = p.id)
+                           Heap Blocks: exact=39
+                           Buffers: shared hit=108 read=3
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.009..0.009 rows=1.62 loops=24)
+                                 Index Cond: (product_id = p.id)
+                                 Index Searches: 24
+                                 Buffers: shared hit=69 read=3
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.589 ms
+ Execution Time: 84.811 ms
+(66 rows)
+
+#### ListPublicProducts: category tree, newest
+                                                                                                                             QUERY PLAN                                                                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=134.42..1765.01 rows=24 width=292) (actual time=0.860..0.864 rows=24.00 loops=1)
+   Buffers: shared hit=746 read=3
+   ->  Incremental Sort  (cost=134.42..319459.13 rows=4700 width=292) (actual time=0.859..0.862 rows=24.00 loops=1)
+         Sort Key: p.created_at DESC, p.id
+         Presorted Key: p.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 31kB  Peak Memory: 31kB
+         Buffers: shared hit=746 read=3
+         ->  Nested Loop Left Join  (cost=66.50..319247.63 rows=4700 width=292) (actual time=0.074..0.844 rows=25.00 loops=1)
+               Buffers: shared hit=746 read=3
+               ->  Nested Loop  (cost=54.28..261724.49 rows=4700 width=188) (actual time=0.060..0.621 rows=25.00 loops=1)
+                     Buffers: shared hit=632 read=2
+                     ->  Nested Loop  (cost=0.44..8587.89 rows=4700 width=123) (actual time=0.023..0.102 rows=25.00 loops=1)
+                           Buffers: shared hit=59
+                           ->  Index Scan using products_status_created_idx on products p  (cost=0.29..8435.59 rows=4747 width=99) (actual time=0.014..0.056 rows=25.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Filter: (category_id = ANY ('{2f04b2dd-38bf-bc42-488a-01486c9f4bb2,8087d606-162c-658e-a342-810b9f608903,9a557854-9a3e-b7d3-2566-131c4bdc0e23,323a9a72-8687-8d00-4b41-6ef585a01251,c67b6bfb-22ce-aa72-d953-b31c63c5b95b}'::uuid[]))
+                                 Rows Removed by Filter: 170
+                                 Index Searches: 1
+                                 Buffers: shared hit=19
+                           ->  Memoize  (cost=0.15..0.18 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=25)
+                                 Cache Key: p.store_id
+                                 Cache Mode: logical
+                                 Hits: 5  Misses: 20  Evictions: 0  Overflows: 0  Memory Usage: 3kB
+                                 Buffers: shared hit=40
+                                 ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.17 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=20)
+                                       Index Cond: (id = p.store_id)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Index Searches: 20
+                                       Buffers: shared hit=40
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.020..0.020 rows=1.00 loops=25)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=573 read=2
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.007..0.019 rows=4.00 loops=25)
+                                 Buffers: shared hit=573 read=2
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.004..0.005 rows=4.00 loops=25)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=100
+                                       Buffers: shared hit=175
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.003..0.003 rows=4.00 loops=25)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 25
+                                             Buffers: shared hit=75
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.003..0.003 rows=1.00 loops=100)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 100
+                                       Buffers: shared hit=398 read=2
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.008..0.008 rows=1.00 loops=25)
+                     Buffers: shared hit=114 read=1
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.008..0.008 rows=1.00 loops=25)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=114 read=1
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.006..0.007 rows=1.60 loops=25)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=40
+                                 Buffers: shared hit=114 read=1
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.005..0.005 rows=1.60 loops=25)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 25
+                                       Buffers: shared hit=74 read=1
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.533 ms
+ Execution Time: 0.907 ms
+(64 rows)
+
+#### ListPublicProducts: single category, popular
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=146.54..1928.15 rows=24 width=292) (actual time=4.586..4.591 rows=24.00 loops=1)
+   Buffers: shared hit=2394 read=16
+   ->  Incremental Sort  (cost=146.54..70297.24 rows=945 width=292) (actual time=4.585..4.588 rows=24.00 loops=1)
+         Sort Key: p.sold_count DESC, p.created_at DESC, p.id
+         Presorted Key: p.sold_count
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 32kB  Peak Memory: 32kB
+         Buffers: shared hit=2394 read=16
+         ->  Nested Loop Left Join  (cost=66.50..70257.09 rows=945 width=292) (actual time=0.317..4.542 rows=31.00 loops=1)
+               Buffers: shared hit=2394 read=16
+               ->  Nested Loop  (cost=54.28..58691.27 rows=945 width=188) (actual time=0.291..2.936 rows=31.00 loops=1)
+                     Buffers: shared hit=2252 read=3
+                     ->  Nested Loop  (cost=0.44..7794.65 rows=945 width=123) (actual time=0.232..1.763 rows=31.00 loops=1)
+                           Buffers: shared hit=1540 read=2
+                           ->  Index Scan using products_status_sold_idx on products p  (cost=0.29..7733.93 rows=955 width=99) (actual time=0.210..1.691 rows=31.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Filter: (category_id = ANY ('{9a557854-9a3e-b7d3-2566-131c4bdc0e23}'::uuid[]))
+                                 Rows Removed by Filter: 1500
+                                 Index Searches: 1
+                                 Buffers: shared hit=1532 read=2
+                           ->  Memoize  (cost=0.15..0.20 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=31)
+                                 Cache Key: p.store_id
+                                 Cache Mode: logical
+                                 Hits: 27  Misses: 4  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                 Buffers: shared hit=8
+                                 ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.19 rows=1 width=40) (actual time=0.005..0.005 rows=1.00 loops=4)
+                                       Index Cond: (id = p.store_id)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Index Searches: 4
+                                       Buffers: shared hit=8
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.037..0.037 rows=1.00 loops=31)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=712 read=1
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.014..0.035 rows=4.00 loops=31)
+                                 Buffers: shared hit=712 read=1
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.007..0.012 rows=4.00 loops=31)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=124
+                                       Buffers: shared hit=217
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.004..0.004 rows=4.00 loops=31)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 31
+                                             Buffers: shared hit=93
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.005..0.005 rows=1.00 loops=124)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 124
+                                       Buffers: shared hit=495 read=1
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.051..0.051 rows=1.00 loops=31)
+                     Buffers: shared hit=142 read=13
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.050..0.050 rows=1.00 loops=31)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=142 read=13
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.043..0.047 rows=2.00 loops=31)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=62
+                                 Buffers: shared hit=142 read=13
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.004..0.004 rows=2.00 loops=31)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 31
+                                       Buffers: shared hit=92 read=1
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.571 ms
+ Execution Time: 4.651 ms
+(64 rows)
+
+#### ListPublicProducts: search "kemeja:* & premium:*", newest
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1373.52..1373.56 rows=19 width=292) (actual time=91.987..91.992 rows=24.00 loops=1)
+   Buffers: shared hit=44522 read=817
+   ->  Sort  (cost=1373.52..1373.56 rows=19 width=292) (actual time=91.986..91.990 rows=24.00 loops=1)
+         Sort Key: p.created_at DESC, p.id
+         Sort Method: top-N heapsort  Memory: 31kB
+         Buffers: shared hit=44522 read=817
+         ->  Nested Loop Left Join  (cost=108.30..1373.11 rows=19 width=292) (actual time=1.848..91.047 rows=1563.00 loops=1)
+               Buffers: shared hit=44522 read=817
+               ->  Nested Loop  (cost=96.08..1140.57 rows=19 width=188) (actual time=1.825..41.842 rows=1563.00 loops=1)
+                     Buffers: shared hit=37464 read=60
+                     ->  Hash Join  (cost=42.24..117.25 rows=19 width=123) (actual time=1.762..4.939 rows=1563.00 loops=1)
+                           Hash Cond: (p.store_id = s.id)
+                           Buffers: shared hit=1568 read=7
+                           ->  Bitmap Heap Scan on products p  (cost=34.27..109.23 rows=19 width=99) (actual time=1.632..4.083 rows=1563.00 loops=1)
+                                 Recheck Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                                 Filter: ((status)::text = 'active'::text)
+                                 Heap Blocks: exact=1560
+                                 Buffers: shared hit=1565 read=7
+                                 ->  Bitmap Index Scan on products_search_idx  (cost=0.00..34.27 rows=20 width=0) (actual time=1.489..1.490 rows=1563.00 loops=1)
+                                       Index Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                                       Index Searches: 1
+                                       Buffers: shared hit=5 read=7
+                           ->  Hash  (cost=5.50..5.50 rows=198 width=40) (actual time=0.110..0.110 rows=198.00 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 23kB
+                                 Buffers: shared hit=3
+                                 ->  Seq Scan on stores s  (cost=0.00..5.50 rows=198 width=40) (actual time=0.006..0.029 rows=198.00 loops=1)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Rows Removed by Filter: 2
+                                       Buffers: shared hit=3
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.023..0.023 rows=1.00 loops=1563)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=35896 read=53
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.009..0.021 rows=4.00 loops=1563)
+                                 Buffers: shared hit=35896 read=53
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.005..0.007 rows=4.00 loops=1563)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=6252
+                                       Buffers: shared hit=10941
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.003..0.003 rows=4.00 loops=1563)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 1563
+                                             Buffers: shared hit=4689
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.003..0.003 rows=1.00 loops=6252)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 6252
+                                       Buffers: shared hit=24955 read=53
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.031..0.031 rows=1.00 loops=1563)
+                     Buffers: shared hit=7058 read=757
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.030..0.030 rows=1.00 loops=1563)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=7058 read=757
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.028..0.029 rows=2.00 loops=1563)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=3126
+                                 Buffers: shared hit=7058 read=757
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.006..0.006 rows=2.00 loops=1563)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 1563
+                                       Buffers: shared hit=4547 read=142
+ Planning:
+   Buffers: shared hit=41 read=13
+ Planning Time: 0.752 ms
+ Execution Time: 92.047 ms
+(64 rows)
+
+#### ListPublicProducts: store page
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=167.05..2574.66 rows=24 width=292) (actual time=1.623..1.627 rows=24.00 loops=1)
+   Buffers: shared hit=1011 read=19
+   ->  Incremental Sort  (cost=167.05..23942.16 rows=237 width=292) (actual time=1.622..1.625 rows=24.00 loops=1)
+         Sort Key: p.created_at DESC, p.id
+         Presorted Key: p.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 31kB  Peak Memory: 31kB
+         Buffers: shared hit=1011 read=19
+         ->  Nested Loop Left Join  (cost=66.34..23931.50 rows=237 width=292) (actual time=0.071..1.607 rows=25.00 loops=1)
+               Buffers: shared hit=1011 read=19
+               ->  Nested Loop  (cost=54.13..21030.86 rows=237 width=188) (actual time=0.062..1.433 rows=25.00 loops=1)
+                     Buffers: shared hit=912 read=18
+                     ->  Nested Loop  (cost=0.29..8266.31 rows=237 width=123) (actual time=0.027..0.831 rows=25.00 loops=1)
+                           Buffers: shared hit=338 read=17
+                           ->  Index Scan using products_status_created_idx on products p  (cost=0.29..8257.35 rows=237 width=99) (actual time=0.017..0.802 rows=25.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Filter: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+                                 Rows Removed by Filter: 4541
+                                 Index Searches: 1
+                                 Buffers: shared hit=335 read=17
+                           ->  Materialize  (cost=0.00..6.00 rows=1 width=40) (actual time=0.000..0.001 rows=1.00 loops=25)
+                                 Storage: Memory  Maximum Storage: 17kB
+                                 Buffers: shared hit=3
+                                 ->  Seq Scan on stores s  (cost=0.00..6.00 rows=1 width=40) (actual time=0.006..0.016 rows=1.00 loops=1)
+                                       Filter: ((id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = 'active'::text))
+                                       Rows Removed by Filter: 199
+                                       Buffers: shared hit=3
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.024..0.024 rows=1.00 loops=25)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=574 read=1
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.011..0.022 rows=4.00 loops=25)
+                                 Buffers: shared hit=574 read=1
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.005..0.007 rows=4.00 loops=25)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=100
+                                       Buffers: shared hit=175
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.002..0.002 rows=4.00 loops=25)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 25
+                                             Buffers: shared hit=75
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.003..0.003 rows=1.00 loops=100)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 100
+                                       Buffers: shared hit=399 read=1
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.006..0.007 rows=1.00 loops=25)
+                     Buffers: shared hit=99 read=1
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.006..0.006 rows=1.00 loops=25)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=99 read=1
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.005..0.005 rows=1.00 loops=25)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=25
+                                 Buffers: shared hit=99 read=1
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.004..0.004 rows=1.00 loops=25)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 25
+                                       Buffers: shared hit=74 read=1
+ Planning:
+   Buffers: shared hit=16
+ Planning Time: 0.424 ms
+ Execution Time: 1.673 ms
+(61 rows)
+
+#### ListPublicProducts: related (category, exclude self)
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=146.68..741.55 rows=8 width=292) (actual time=0.837..0.840 rows=8.00 loops=1)
+   Buffers: shared hit=895
+   ->  Incremental Sort  (cost=146.68..70416.07 rows=945 width=292) (actual time=0.836..0.838 rows=8.00 loops=1)
+         Sort Key: p.sold_count DESC, p.created_at DESC, p.id
+         Presorted Key: p.sold_count
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+         Buffers: shared hit=895
+         ->  Nested Loop Left Join  (cost=66.50..70375.92 rows=945 width=292) (actual time=0.180..0.828 rows=11.00 loops=1)
+               Buffers: shared hit=895
+               ->  Nested Loop  (cost=54.28..58810.10 rows=945 width=188) (actual time=0.169..0.748 rows=11.00 loops=1)
+                     Buffers: shared hit=840
+                     ->  Nested Loop  (cost=0.44..7913.48 rows=945 width=123) (actual time=0.137..0.508 rows=11.00 loops=1)
+                           Buffers: shared hit=587
+                           ->  Index Scan using products_status_sold_idx on products p  (cost=0.29..7852.76 rows=955 width=99) (actual time=0.128..0.492 rows=11.00 loops=1)
+                                 Index Cond: ((status)::text = 'active'::text)
+                                 Filter: ((category_id = ANY ('{9a557854-9a3e-b7d3-2566-131c4bdc0e23}'::uuid[])) AND (id <> 'bb570e6e-7131-d4ae-9ca7-abbbb10aeb70'::uuid))
+                                 Rows Removed by Filter: 570
+                                 Index Searches: 1
+                                 Buffers: shared hit=583
+                           ->  Memoize  (cost=0.15..0.20 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=11)
+                                 Cache Key: p.store_id
+                                 Cache Mode: logical
+                                 Hits: 9  Misses: 2  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                 Buffers: shared hit=4
+                                 ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.19 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=2)
+                                       Index Cond: (id = p.store_id)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Index Searches: 2
+                                       Buffers: shared hit=4
+                     ->  Aggregate  (cost=53.84..53.85 rows=1 width=65) (actual time=0.021..0.021 rows=1.00 loops=11)
+                           Filter: (count(*) > 0)
+                           Buffers: shared hit=253
+                           ->  Nested Loop Left Join  (cost=4.87..53.79 rows=4 width=10) (actual time=0.008..0.020 rows=4.00 loops=11)
+                                 Buffers: shared hit=253
+                                 ->  Bitmap Heap Scan on product_variants pv  (cost=4.45..20.04 rows=4 width=22) (actual time=0.005..0.007 rows=4.00 loops=11)
+                                       Recheck Cond: (product_id = p.id)
+                                       Heap Blocks: exact=44
+                                       Buffers: shared hit=77
+                                       ->  Bitmap Index Scan on product_variants_product_id_idx  (cost=0.00..4.45 rows=4 width=0) (actual time=0.003..0.003 rows=4.00 loops=11)
+                                             Index Cond: (product_id = p.id)
+                                             Index Searches: 11
+                                             Buffers: shared hit=33
+                                 ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..8.44 rows=1 width=20) (actual time=0.003..0.003 rows=1.00 loops=44)
+                                       Index Cond: (variant_id = pv.id)
+                                       Index Searches: 44
+                                       Buffers: shared hit=176
+               ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.007..0.007 rows=1.00 loops=11)
+                     Buffers: shared hit=55
+                     ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.007..0.007 rows=1.00 loops=11)
+                           Sort Key: pi.sort_order, pi.created_at
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=55
+                           ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.004..0.005 rows=2.00 loops=11)
+                                 Recheck Cond: (product_id = p.id)
+                                 Heap Blocks: exact=22
+                                 Buffers: shared hit=55
+                                 ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.002..0.002 rows=2.00 loops=11)
+                                       Index Cond: (product_id = p.id)
+                                       Index Searches: 11
+                                       Buffers: shared hit=33
+ Planning:
+   Buffers: shared hit=30
+ Planning Time: 0.501 ms
+ Execution Time: 0.881 ms
+(64 rows)
+
+#### ListPublicProductsByPrice: asc
+                                                                                                     QUERY PLAN                                                                                                      
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=41126.29..41588.00 rows=24 width=316) (actual time=210.565..211.915 rows=24.00 loops=1)
+   Sort Key: (min(pv.price)), p.created_at DESC, p.id
+   Presorted Key: (min(pv.price))
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+   Buffers: shared hit=6884 read=21, temp read=931 written=933
+   ->  Nested Loop Left Join  (cost=41106.25..41586.92 rows=24 width=316) (actual time=210.236..211.881 rows=24.00 loops=1)
+         Buffers: shared hit=6881 read=21, temp read=931 written=933
+         ->  Nested Loop  (cost=41094.03..41293.19 rows=24 width=188) (actual time=210.205..211.704 rows=24.00 loops=1)
+               Buffers: shared hit=6772 read=21, temp read=931 written=933
+               ->  Nested Loop  (cost=41093.89..41289.28 rows=24 width=164) (actual time=210.197..211.672 rows=24.00 loops=1)
+                     Buffers: shared hit=6724 read=21, temp read=931 written=933
+                     ->  Limit  (cost=41093.60..41093.66 rows=24 width=153) (actual time=210.156..211.505 rows=24.00 loops=1)
+                           Buffers: shared hit=6673, temp read=931 written=933
+                           ->  Sort  (cost=41093.60..41211.24 rows=47057 width=153) (actual time=210.155..211.503 rows=24.00 loops=1)
+                                 Sort Key: (min(pv.price)), p_1.created_at DESC, p_1.id
+                                 Sort Method: top-N heapsort  Memory: 27kB
+                                 Buffers: shared hit=6673, temp read=931 written=933
+                                 ->  Hash Join  (cost=25748.29..39779.54 rows=47057 width=153) (actual time=110.751..202.640 rows=47500.00 loops=1)
+                                       Hash Cond: (p_1.store_id = s_1.id)
+                                       Buffers: shared hit=6673, temp read=931 written=933
+                                       ->  Hash Join  (cost=25740.32..39644.14 rows=47532 width=105) (actual time=110.703..196.061 rows=47500.00 loops=1)
+                                             Hash Cond: (pv.product_id = p_1.id)
+                                             Buffers: shared hit=6670, temp read=931 written=933
+                                             ->  Finalize GroupAggregate  (cost=21996.17..35263.73 rows=50396 width=81) (actual time=93.434..157.757 rows=50000.00 loops=1)
+                                                   Group Key: pv.product_id
+                                                   Buffers: shared hit=4145, temp read=931 written=933
+                                                   ->  Gather Merge  (cost=21996.17..33903.04 rows=85673 width=81) (actual time=93.425..135.937 rows=94175.00 loops=1)
+                                                         Workers Planned: 1
+                                                         Workers Launched: 1
+                                                         Buffers: shared hit=4145, temp read=931 written=933
+                                                         ->  Partial GroupAggregate  (cost=20996.16..23264.82 rows=50396 width=81) (actual time=91.376..121.536 rows=47087.50 loops=2)
+                                                               Group Key: pv.product_id
+                                                               Buffers: shared hit=4145, temp read=931 written=933
+                                                               ->  Sort  (cost=20996.16..21290.27 rows=117647 width=26) (actual time=91.363..99.370 rows=100000.00 loops=2)
+                                                                     Sort Key: pv.product_id
+                                                                     Sort Method: external merge  Disk: 3768kB
+                                                                     Buffers: shared hit=4145, temp read=931 written=933
+                                                                     Worker 0:  Sort Method: external merge  Disk: 3680kB
+                                                                     ->  Parallel Hash Left Join  (cost=4118.06..8270.36 rows=117647 width=26) (actual time=26.884..61.004 rows=100000.00 loops=2)
+                                                                           Hash Cond: (pv.id = i.variant_id)
+                                                                           Buffers: shared hit=4138
+                                                                           ->  Parallel Seq Scan on product_variants pv  (cost=0.00..3843.47 rows=117647 width=38) (actual time=0.007..5.898 rows=100000.00 loops=2)
+                                                                                 Buffers: shared hit=2667
+                                                                           ->  Parallel Hash  (cost=2647.47..2647.47 rows=117647 width=20) (actual time=25.888..25.889 rows=100000.00 loops=2)
+                                                                                 Buckets: 262144  Batches: 1  Memory Usage: 13024kB
+                                                                                 Buffers: shared hit=1471
+                                                                                 ->  Parallel Seq Scan on inventory i  (cost=0.00..2647.47 rows=117647 width=20) (actual time=0.009..6.038 rows=100000.00 loops=2)
+                                                                                       Buffers: shared hit=1471
+                                             ->  Hash  (cost=3150.00..3150.00 rows=47532 width=40) (actual time=17.185..17.186 rows=47500.00 loops=1)
+                                                   Buckets: 65536  Batches: 1  Memory Usage: 3852kB
+                                                   Buffers: shared hit=2525
+                                                   ->  Seq Scan on products p_1  (cost=0.00..3150.00 rows=47532 width=40) (actual time=0.004..9.622 rows=47500.00 loops=1)
+                                                         Filter: ((status)::text = 'active'::text)
+                                                         Rows Removed by Filter: 2500
+                                                         Buffers: shared hit=2525
+                                       ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.044..0.044 rows=198.00 loops=1)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                             Buffers: shared hit=3
+                                             ->  Seq Scan on stores s_1  (cost=0.00..5.50 rows=198 width=16) (actual time=0.007..0.026 rows=198.00 loops=1)
+                                                   Filter: ((status)::text = 'active'::text)
+                                                   Rows Removed by Filter: 2
+                                                   Buffers: shared hit=3
+                     ->  Index Scan using products_pkey on products p  (cost=0.29..8.14 rows=1 width=99) (actual time=0.006..0.006 rows=1.00 loops=24)
+                           Index Cond: (id = p_1.id)
+                           Index Searches: 24
+                           Buffers: shared hit=51 read=21
+               ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.16 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=24)
+                     Index Cond: (id = p.store_id)
+                     Index Searches: 24
+                     Buffers: shared hit=48
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.007..0.007 rows=1.00 loops=24)
+               Buffers: shared hit=109
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.007..0.007 rows=1.00 loops=24)
+                     Sort Key: pi.sort_order, pi.created_at
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=109
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.005..0.005 rows=1.54 loops=24)
+                           Recheck Cond: (product_id = p.id)
+                           Heap Blocks: exact=37
+                           Buffers: shared hit=109
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.003..0.003 rows=1.54 loops=24)
+                                 Index Cond: (product_id = p.id)
+                                 Index Searches: 24
+                                 Buffers: shared hit=72
+ Planning:
+   Buffers: shared hit=50
+ Planning Time: 0.743 ms
+ Execution Time: 212.927 ms
+(88 rows)
+
+#### ListPublicProductsByPrice: desc, category tree
+                                                                                                                                                                  QUERY PLAN                                                                                                                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=38884.34..39346.05 rows=24 width=316) (actual time=163.720..165.682 rows=24.00 loops=1)
+   Sort Key: (min(pv.price)) DESC, p.created_at DESC, p.id
+   Presorted Key: (min(pv.price))
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+   Buffers: shared hit=5386 read=26, temp read=931 written=933
+   ->  Nested Loop Left Join  (cost=38864.30..39344.97 rows=24 width=316) (actual time=163.370..165.657 rows=24.00 loops=1)
+         Buffers: shared hit=5386 read=26, temp read=931 written=933
+         ->  Nested Loop  (cost=38852.08..39051.24 rows=24 width=188) (actual time=163.340..165.457 rows=24.00 loops=1)
+               Buffers: shared hit=5276 read=26, temp read=931 written=933
+               ->  Nested Loop  (cost=38851.94..39047.33 rows=24 width=164) (actual time=163.332..165.424 rows=24.00 loops=1)
+                     Buffers: shared hit=5228 read=26, temp read=931 written=933
+                     ->  Limit  (cost=38851.65..38851.71 rows=24 width=153) (actual time=163.291..165.251 rows=24.00 loops=1)
+                           Buffers: shared hit=5176 read=6, temp read=931 written=933
+                           ->  Sort  (cost=38851.65..38863.40 rows=4700 width=153) (actual time=163.289..165.248 rows=24.00 loops=1)
+                                 Sort Key: (min(pv.price)) DESC, p_1.created_at DESC, p_1.id
+                                 Sort Method: top-N heapsort  Memory: 27kB
+                                 Buffers: shared hit=5176 read=6, temp read=931 written=933
+                                 ->  Hash Join  (cost=24803.85..38720.40 rows=4700 width=153) (actual time=89.912..163.951 rows=5000.00 loops=1)
+                                       Hash Cond: (p_1.store_id = s_1.id)
+                                       Buffers: shared hit=5176 read=6, temp read=931 written=933
+                                       ->  Hash Join  (cost=24795.87..38699.70 rows=4747 width=105) (actual time=89.844..162.987 rows=5000.00 loops=1)
+                                             Hash Cond: (pv.product_id = p_1.id)
+                                             Buffers: shared hit=5173 read=6, temp read=931 written=933
+                                             ->  Finalize GroupAggregate  (cost=21996.17..35263.73 rows=50396 width=81) (actual time=86.318..149.944 rows=50000.00 loops=1)
+                                                   Group Key: pv.product_id
+                                                   Buffers: shared hit=4145, temp read=931 written=933
+                                                   ->  Gather Merge  (cost=21996.17..33903.04 rows=85673 width=81) (actual time=86.311..128.612 rows=93900.00 loops=1)
+                                                         Workers Planned: 1
+                                                         Workers Launched: 1
+                                                         Buffers: shared hit=4145, temp read=931 written=933
+                                                         ->  Partial GroupAggregate  (cost=20996.16..23264.82 rows=50396 width=81) (actual time=83.615..112.713 rows=46950.00 loops=2)
+                                                               Group Key: pv.product_id
+                                                               Buffers: shared hit=4145, temp read=931 written=933
+                                                               ->  Sort  (cost=20996.16..21290.27 rows=117647 width=26) (actual time=83.604..91.212 rows=100000.00 loops=2)
+                                                                     Sort Key: pv.product_id
+                                                                     Sort Method: external merge  Disk: 3968kB
+                                                                     Buffers: shared hit=4145, temp read=931 written=933
+                                                                     Worker 0:  Sort Method: external merge  Disk: 3480kB
+                                                                     ->  Parallel Hash Left Join  (cost=4118.06..8270.36 rows=117647 width=26) (actual time=27.623..59.401 rows=100000.00 loops=2)
+                                                                           Hash Cond: (pv.id = i.variant_id)
+                                                                           Buffers: shared hit=4138
+                                                                           ->  Parallel Seq Scan on product_variants pv  (cost=0.00..3843.47 rows=117647 width=38) (actual time=0.010..5.542 rows=100000.00 loops=2)
+                                                                                 Buffers: shared hit=2667
+                                                                           ->  Parallel Hash  (cost=2647.47..2647.47 rows=117647 width=20) (actual time=26.710..26.711 rows=100000.00 loops=2)
+                                                                                 Buckets: 262144  Batches: 1  Memory Usage: 13024kB
+                                                                                 Buffers: shared hit=1471
+                                                                                 ->  Parallel Seq Scan on inventory i  (cost=0.00..2647.47 rows=117647 width=20) (actual time=0.011..6.419 rows=100000.00 loops=2)
+                                                                                       Buffers: shared hit=1471
+                                             ->  Hash  (cost=2740.37..2740.37 rows=4747 width=40) (actual time=3.491..3.492 rows=5000.00 loops=1)
+                                                   Buckets: 8192  Batches: 1  Memory Usage: 416kB
+                                                   Buffers: shared hit=1028 read=6
+                                                   ->  Bitmap Heap Scan on products p_1  (cost=90.09..2740.37 rows=4747 width=40) (actual time=0.346..2.650 rows=5000.00 loops=1)
+                                                         Recheck Cond: ((category_id = ANY ('{2f04b2dd-38bf-bc42-488a-01486c9f4bb2,8087d606-162c-658e-a342-810b9f608903,9a557854-9a3e-b7d3-2566-131c4bdc0e23,323a9a72-8687-8d00-4b41-6ef585a01251,c67b6bfb-22ce-aa72-d953-b31c63c5b95b}'::uuid[])) AND ((status)::text = 'active'::text))
+                                                         Heap Blocks: exact=1024
+                                                         Buffers: shared hit=1028 read=6
+                                                         ->  Bitmap Index Scan on products_category_status_idx  (cost=0.00..88.90 rows=4747 width=0) (actual time=0.253..0.253 rows=5000.00 loops=1)
+                                                               Index Cond: ((category_id = ANY ('{2f04b2dd-38bf-bc42-488a-01486c9f4bb2,8087d606-162c-658e-a342-810b9f608903,9a557854-9a3e-b7d3-2566-131c4bdc0e23,323a9a72-8687-8d00-4b41-6ef585a01251,c67b6bfb-22ce-aa72-d953-b31c63c5b95b}'::uuid[])) AND ((status)::text = 'active'::text))
+                                                               Index Searches: 4
+                                                               Buffers: shared hit=4 read=6
+                                       ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.062..0.063 rows=198.00 loops=1)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                             Buffers: shared hit=3
+                                             ->  Seq Scan on stores s_1  (cost=0.00..5.50 rows=198 width=16) (actual time=0.025..0.045 rows=198.00 loops=1)
+                                                   Filter: ((status)::text = 'active'::text)
+                                                   Rows Removed by Filter: 2
+                                                   Buffers: shared hit=3
+                     ->  Index Scan using products_pkey on products p  (cost=0.29..8.14 rows=1 width=99) (actual time=0.007..0.007 rows=1.00 loops=24)
+                           Index Cond: (id = p_1.id)
+                           Index Searches: 24
+                           Buffers: shared hit=52 read=20
+               ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.16 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=24)
+                     Index Cond: (id = p.store_id)
+                     Index Searches: 24
+                     Buffers: shared hit=48
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.008..0.008 rows=1.00 loops=24)
+               Buffers: shared hit=110
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.007..0.007 rows=1.00 loops=24)
+                     Sort Key: pi.sort_order, pi.created_at
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=110
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.005..0.006 rows=1.58 loops=24)
+                           Recheck Cond: (product_id = p.id)
+                           Heap Blocks: exact=38
+                           Buffers: shared hit=110
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.003..0.003 rows=1.58 loops=24)
+                                 Index Cond: (product_id = p.id)
+                                 Index Searches: 24
+                                 Buffers: shared hit=72
+ Planning:
+   Buffers: shared hit=46
+ Planning Time: 0.904 ms
+ Execution Time: 166.566 ms
+(92 rows)
+
+#### ListPublicProductsByPrice: asc, search
+                                                                                                     QUERY PLAN                                                                                                      
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=36044.75..36406.60 rows=19 width=316) (actual time=154.175..155.945 rows=24.00 loops=1)
+   Sort Key: (min(pv.price)), p.created_at DESC, p.id
+   Presorted Key: (min(pv.price))
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+   Buffers: shared hit=5940 read=20, temp read=931 written=933
+   ->  Nested Loop Left Join  (cost=36024.68..36405.75 rows=19 width=316) (actual time=153.817..155.925 rows=24.00 loops=1)
+         Buffers: shared hit=5940 read=20, temp read=931 written=933
+         ->  Nested Loop  (cost=36012.46..36173.21 rows=19 width=188) (actual time=153.775..155.714 rows=24.00 loops=1)
+               Buffers: shared hit=5820 read=20, temp read=931 written=933
+               ->  Nested Loop  (cost=36012.32..36170.11 rows=19 width=164) (actual time=153.767..155.680 rows=24.00 loops=1)
+                     Buffers: shared hit=5772 read=20, temp read=931 written=933
+                     ->  Limit  (cost=36012.03..36012.08 rows=19 width=153) (actual time=153.739..155.508 rows=24.00 loops=1)
+                           Buffers: shared hit=5720, temp read=931 written=933
+                           ->  Sort  (cost=36012.03..36012.08 rows=19 width=153) (actual time=153.737..155.505 rows=24.00 loops=1)
+                                 Sort Key: (min(pv.price)), p_1.created_at DESC, p_1.id
+                                 Sort Method: top-N heapsort  Memory: 28kB
+                                 Buffers: shared hit=5720, temp read=931 written=933
+                                 ->  Hash Join  (cost=22113.77..36011.63 rows=19 width=153) (actual time=88.052..155.069 rows=1563.00 loops=1)
+                                       Hash Cond: (p_1.store_id = s_1.id)
+                                       Buffers: shared hit=5720, temp read=931 written=933
+                                       ->  Merge Join  (cost=22105.80..36003.60 rows=19 width=105) (actual time=87.999..154.587 rows=1563.00 loops=1)
+                                             Merge Cond: (p_1.id = pv.product_id)
+                                             Buffers: shared hit=5717, temp read=931 written=933
+                                             ->  Sort  (cost=109.63..109.68 rows=19 width=40) (actual time=3.240..3.597 rows=1563.00 loops=1)
+                                                   Sort Key: p_1.id
+                                                   Sort Method: quicksort  Memory: 134kB
+                                                   Buffers: shared hit=1572
+                                                   ->  Bitmap Heap Scan on products p_1  (cost=34.27..109.23 rows=19 width=40) (actual time=1.374..2.995 rows=1563.00 loops=1)
+                                                         Recheck Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                                                         Filter: ((status)::text = 'active'::text)
+                                                         Heap Blocks: exact=1560
+                                                         Buffers: shared hit=1572
+                                                         ->  Bitmap Index Scan on products_search_idx  (cost=0.00..34.27 rows=20 width=0) (actual time=1.240..1.240 rows=1563.00 loops=1)
+                                                               Index Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                                                               Index Searches: 1
+                                                               Buffers: shared hit=12
+                                             ->  Finalize GroupAggregate  (cost=21996.17..35263.73 rows=50396 width=81) (actual time=84.708..148.278 rows=49923.00 loops=1)
+                                                   Group Key: pv.product_id
+                                                   Buffers: shared hit=4145, temp read=931 written=933
+                                                   ->  Gather Merge  (cost=21996.17..33903.04 rows=85673 width=81) (actual time=84.704..127.954 rows=93135.00 loops=1)
+                                                         Workers Planned: 1
+                                                         Workers Launched: 1
+                                                         Buffers: shared hit=4145, temp read=931 written=933
+                                                         ->  Partial GroupAggregate  (cost=20996.16..23264.82 rows=50396 width=81) (actual time=82.148..111.827 rows=46602.00 loops=2)
+                                                               Group Key: pv.product_id
+                                                               Buffers: shared hit=4145, temp read=931 written=933
+                                                               ->  Sort  (cost=20996.16..21290.27 rows=117647 width=26) (actual time=82.137..90.653 rows=99918.00 loops=2)
+                                                                     Sort Key: pv.product_id
+                                                                     Sort Method: external merge  Disk: 3968kB
+                                                                     Buffers: shared hit=4145, temp read=931 written=933
+                                                                     Worker 0:  Sort Method: external merge  Disk: 3480kB
+                                                                     ->  Parallel Hash Left Join  (cost=4118.06..8270.36 rows=117647 width=26) (actual time=27.422..57.748 rows=100000.00 loops=2)
+                                                                           Hash Cond: (pv.id = i.variant_id)
+                                                                           Buffers: shared hit=4138
+                                                                           ->  Parallel Seq Scan on product_variants pv  (cost=0.00..3843.47 rows=117647 width=38) (actual time=0.006..5.206 rows=100000.00 loops=2)
+                                                                                 Buffers: shared hit=2667
+                                                                           ->  Parallel Hash  (cost=2647.47..2647.47 rows=117647 width=20) (actual time=26.762..26.763 rows=100000.00 loops=2)
+                                                                                 Buckets: 262144  Batches: 1  Memory Usage: 13056kB
+                                                                                 Buffers: shared hit=1471
+                                                                                 ->  Parallel Seq Scan on inventory i  (cost=0.00..2647.47 rows=117647 width=20) (actual time=0.008..7.619 rows=100000.00 loops=2)
+                                                                                       Buffers: shared hit=1471
+                                       ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.047..0.048 rows=198.00 loops=1)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                             Buffers: shared hit=3
+                                             ->  Seq Scan on stores s_1  (cost=0.00..5.50 rows=198 width=16) (actual time=0.009..0.029 rows=198.00 loops=1)
+                                                   Filter: ((status)::text = 'active'::text)
+                                                   Rows Removed by Filter: 2
+                                                   Buffers: shared hit=3
+                     ->  Index Scan using products_pkey on products p  (cost=0.29..8.31 rows=1 width=99) (actual time=0.007..0.007 rows=1.00 loops=24)
+                           Index Cond: (id = p_1.id)
+                           Index Searches: 24
+                           Buffers: shared hit=52 read=20
+               ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.16 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=24)
+                     Index Cond: (id = p.store_id)
+                     Index Searches: 24
+                     Buffers: shared hit=48
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.008..0.008 rows=1.00 loops=24)
+               Buffers: shared hit=120
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.008..0.008 rows=1.00 loops=24)
+                     Sort Key: pi.sort_order, pi.created_at
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=120
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.006..0.006 rows=2.00 loops=24)
+                           Recheck Cond: (product_id = p.id)
+                           Heap Blocks: exact=48
+                           Buffers: shared hit=120
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.003..0.003 rows=2.00 loops=24)
+                                 Index Cond: (product_id = p.id)
+                                 Index Searches: 24
+                                 Buffers: shared hit=72
+ Planning:
+   Buffers: shared hit=47
+ Planning Time: 0.728 ms
+ Execution Time: 156.769 ms
+(94 rows)
+
+#### CountPublicProducts: no filter
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=9739.66..9739.67 rows=1 width=8) (actual time=44.853..47.216 rows=1.00 loops=1)
+   Buffers: shared hit=5198
+   ->  Gather  (cost=9739.45..9739.66 rows=2 width=8) (actual time=44.475..47.211 rows=2.00 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=5198
+         ->  Partial Aggregate  (cost=8739.45..8739.46 rows=1 width=8) (actual time=42.147..42.151 rows=1.00 loops=2)
+               Buffers: shared hit=5198
+               ->  Parallel Hash Semi Join  (cost=5322.03..8670.25 rows=27681 width=0) (actual time=28.301..41.257 rows=23750.00 loops=2)
+                     Hash Cond: (p.id = pv.product_id)
+                     Buffers: shared hit=5198
+                     ->  Hash Join  (cost=7.97..2975.57 rows=27681 width=16) (actual time=0.101..8.091 rows=23750.00 loops=2)
+                           Hash Cond: (p.store_id = s.id)
+                           Buffers: shared hit=2531
+                           ->  Parallel Seq Scan on products p  (cost=0.00..2892.65 rows=27960 width=32) (actual time=0.021..5.500 rows=23750.00 loops=2)
+                                 Filter: ((status)::text = 'active'::text)
+                                 Rows Removed by Filter: 1250
+                                 Buffers: shared hit=2525
+                           ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.064..0.064 rows=198.00 loops=2)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                 Buffers: shared hit=6
+                                 ->  Seq Scan on stores s  (cost=0.00..5.50 rows=198 width=16) (actual time=0.022..0.044 rows=198.00 loops=2)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Rows Removed by Filter: 2
+                                       Buffers: shared hit=6
+                     ->  Parallel Hash  (cost=3843.47..3843.47 rows=117647 width=16) (actual time=27.357..27.358 rows=100000.00 loops=2)
+                           Buckets: 262144  Batches: 1  Memory Usage: 11488kB
+                           Buffers: shared hit=2667
+                           ->  Parallel Seq Scan on product_variants pv  (cost=0.00..3843.47 rows=117647 width=16) (actual time=0.011..7.225 rows=100000.00 loops=2)
+                                 Buffers: shared hit=2667
+ Planning:
+   Buffers: shared hit=28 read=1
+ Planning Time: 0.381 ms
+ Execution Time: 47.249 ms
+(34 rows)
+
+#### CountPublicProducts: category tree
+                                                                                                                                                      QUERY PLAN                                                                                                                                                      
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=5495.84..5495.85 rows=1 width=8) (actual time=8.104..10.234 rows=1.00 loops=1)
+   Buffers: shared hit=16063
+   ->  Gather  (cost=5495.63..5495.84 rows=2 width=8) (actual time=7.915..10.228 rows=2.00 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=16063
+         ->  Partial Aggregate  (cost=4495.63..4495.64 rows=1 width=8) (actual time=5.962..5.965 rows=1.00 loops=2)
+               Buffers: shared hit=16063
+               ->  Nested Loop Semi Join  (cost=98.48..4488.72 rows=2765 width=0) (actual time=0.467..5.840 rows=2500.00 loops=2)
+                     Buffers: shared hit=16063
+                     ->  Hash Join  (cost=98.06..2719.18 rows=2765 width=16) (actual time=0.443..1.797 rows=2500.00 loops=2)
+                           Hash Cond: (p.store_id = s.id)
+                           Buffers: shared hit=1060
+                           ->  Parallel Bitmap Heap Scan on products p  (cost=90.09..2703.72 rows=2792 width=32) (actual time=0.353..1.395 rows=2500.00 loops=2)
+                                 Recheck Cond: ((category_id = ANY ('{2f04b2dd-38bf-bc42-488a-01486c9f4bb2,8087d606-162c-658e-a342-810b9f608903,9a557854-9a3e-b7d3-2566-131c4bdc0e23,323a9a72-8687-8d00-4b41-6ef585a01251,c67b6bfb-22ce-aa72-d953-b31c63c5b95b}'::uuid[])) AND ((status)::text = 'active'::text))
+                                 Heap Blocks: exact=724
+                                 Buffers: shared hit=1034
+                                 Worker 0:  Heap Blocks: exact=300
+                                 ->  Bitmap Index Scan on products_category_status_idx  (cost=0.00..88.90 rows=4747 width=0) (actual time=0.491..0.492 rows=5000.00 loops=1)
+                                       Index Cond: ((category_id = ANY ('{2f04b2dd-38bf-bc42-488a-01486c9f4bb2,8087d606-162c-658e-a342-810b9f608903,9a557854-9a3e-b7d3-2566-131c4bdc0e23,323a9a72-8687-8d00-4b41-6ef585a01251,c67b6bfb-22ce-aa72-d953-b31c63c5b95b}'::uuid[])) AND ((status)::text = 'active'::text))
+                                       Index Searches: 4
+                                       Buffers: shared hit=10
+                           ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.083..0.084 rows=198.00 loops=2)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                 Buffers: shared hit=26
+                                 ->  Seq Scan on stores s  (cost=0.00..5.50 rows=198 width=16) (actual time=0.036..0.061 rows=198.00 loops=2)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Rows Removed by Filter: 2
+                                       Buffers: shared hit=26
+                     ->  Index Only Scan using product_variants_product_id_idx on product_variants pv  (cost=0.42..0.93 rows=4 width=16) (actual time=0.001..0.001 rows=1.00 loops=5000)
+                           Index Cond: (product_id = p.id)
+                           Heap Fetches: 0
+                           Index Searches: 5000
+                           Buffers: shared hit=15003
+ Planning:
+   Buffers: shared hit=26
+ Planning Time: 0.402 ms
+ Execution Time: 10.291 ms
+(38 rows)
+
+#### CountPublicProducts: search
+                                                                                 QUERY PLAN                                                                                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=156.72..156.73 rows=1 width=8) (actual time=6.342..6.345 rows=1.00 loops=1)
+   Buffers: shared hit=6265
+   ->  Nested Loop Semi Join  (cost=42.66..156.67 rows=19 width=0) (actual time=1.529..6.244 rows=1563.00 loops=1)
+         Buffers: shared hit=6265
+         ->  Hash Join  (cost=42.24..117.25 rows=19 width=16) (actual time=1.519..3.406 rows=1563.00 loops=1)
+               Hash Cond: (p.store_id = s.id)
+               Buffers: shared hit=1575
+               ->  Bitmap Heap Scan on products p  (cost=34.27..109.23 rows=19 width=32) (actual time=1.473..3.147 rows=1563.00 loops=1)
+                     Recheck Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                     Filter: ((status)::text = 'active'::text)
+                     Heap Blocks: exact=1560
+                     Buffers: shared hit=1572
+                     ->  Bitmap Index Scan on products_search_idx  (cost=0.00..34.27 rows=20 width=0) (actual time=1.342..1.342 rows=1563.00 loops=1)
+                           Index Cond: (search @@ '''kemeja'':* & ''premium'':*'::tsquery)
+                           Index Searches: 1
+                           Buffers: shared hit=12
+               ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.042..0.043 rows=198.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                     Buffers: shared hit=3
+                     ->  Seq Scan on stores s  (cost=0.00..5.50 rows=198 width=16) (actual time=0.006..0.025 rows=198.00 loops=1)
+                           Filter: ((status)::text = 'active'::text)
+                           Rows Removed by Filter: 2
+                           Buffers: shared hit=3
+         ->  Index Only Scan using product_variants_product_id_idx on product_variants pv  (cost=0.42..4.49 rows=4 width=16) (actual time=0.002..0.002 rows=1.00 loops=1563)
+               Index Cond: (product_id = p.id)
+               Heap Fetches: 0
+               Index Searches: 1563
+               Buffers: shared hit=4690
+ Planning:
+   Buffers: shared hit=27
+ Planning Time: 0.408 ms
+ Execution Time: 6.385 ms
+(32 rows)
+
+#### ListCartLines
+                                                                      QUERY PLAN                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=21.71..21.72 rows=1 width=239) (actual time=0.027..0.028 rows=0.00 loops=1)
+   Sort Key: s.name, s.id, ci.created_at, ci.id
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=3
+   ->  Nested Loop Left Join  (cost=13.49..21.70 rows=1 width=239) (actual time=0.006..0.007 rows=0.00 loops=1)
+         ->  Nested Loop Left Join  (cost=1.27..9.46 rows=1 width=175) (actual time=0.006..0.007 rows=0.00 loops=1)
+               ->  Nested Loop  (cost=0.85..8.98 rows=1 width=171) (actual time=0.006..0.006 rows=0.00 loops=1)
+                     ->  Nested Loop  (cost=0.71..8.81 rows=1 width=140) (actual time=0.006..0.006 rows=0.00 loops=1)
+                           ->  Nested Loop  (cost=0.42..8.45 rows=1 width=86) (actual time=0.006..0.006 rows=0.00 loops=1)
+                                 ->  Nested Loop  (cost=0.00..0.01 rows=1 width=44) (actual time=0.006..0.006 rows=0.00 loops=1)
+                                       Join Filter: (c.id = ci.cart_id)
+                                       ->  Seq Scan on carts c  (cost=0.00..0.00 rows=1 width=16) (actual time=0.006..0.006 rows=0.00 loops=1)
+                                             Filter: (user_id = '7a1e1867-a3fc-92e1-71ad-12cb9d9a9bfd'::uuid)
+                                       ->  Seq Scan on cart_items ci  (cost=0.00..0.00 rows=1 width=60) (never executed)
+                                 ->  Index Scan using product_variants_pkey on product_variants pv  (cost=0.42..8.44 rows=1 width=58) (never executed)
+                                       Index Cond: (id = ci.variant_id)
+                                       Index Searches: 0
+                           ->  Index Scan using products_pkey on products p  (cost=0.29..0.36 rows=1 width=70) (never executed)
+                                 Index Cond: (id = pv.product_id)
+                                 Index Searches: 0
+                     ->  Index Scan using stores_pkey on stores s  (cost=0.14..0.16 rows=1 width=47) (never executed)
+                           Index Cond: (id = p.store_id)
+                           Index Searches: 0
+               ->  Index Scan using inventory_pkey on inventory i  (cost=0.42..0.49 rows=1 width=20) (never executed)
+                     Index Cond: (variant_id = pv.id)
+                     Index Searches: 0
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (never executed)
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (never executed)
+                     Sort Key: pi.sort_order, pi.created_at
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (never executed)
+                           Recheck Cond: (product_id = p.id)
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (never executed)
+                                 Index Cond: (product_id = p.id)
+                                 Index Searches: 0
+ Planning:
+   Buffers: shared hit=128 read=4
+ Planning Time: 1.101 ms
+ Execution Time: 0.062 ms
+(38 rows)
+
+#### ListOrderItems (10 orders of the buyer)
+                                                                                                                                                                                                                       QUERY PLAN                                                                                                                                                                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=47.24..694.48 rows=20 width=226) (actual time=0.370..0.372 rows=20.00 loops=1)
+   Sort Key: oi.order_id, oi.created_at, oi.id
+   Presorted Key: oi.order_id
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+   Buffers: shared hit=191 read=39
+   ->  Nested Loop Left Join  (cost=13.21..693.58 rows=20 width=226) (actual time=0.054..0.354 rows=20.00 loops=1)
+         Buffers: shared hit=191 read=39
+         ->  Nested Loop Left Join  (cost=1.00..448.80 rows=20 width=162) (actual time=0.038..0.263 rows=20.00 loops=1)
+               Buffers: shared hit=111 read=39
+               ->  Nested Loop  (cost=0.71..290.70 rows=20 width=132) (actual time=0.031..0.178 rows=20.00 loops=1)
+                     Buffers: shared hit=88 read=22
+                     ->  Index Scan using order_items_order_variant_key on order_items oi  (cost=0.42..124.55 rows=20 width=120) (actual time=0.021..0.119 rows=20.00 loops=1)
+                           Index Cond: (order_id = ANY ('{e84b0025-c5f1-3d70-d5d6-395c3e1c7bd6,fd97c16b-5d2a-127e-219a-7087cf5c76f4,9373eb1a-b68d-72be-5512-cf4d32c0a225,4a07b6ba-11d7-8d16-1f33-65bcbff36b25,f05b3714-16a3-4ad1-6849-2b4605ed0f99,99d70b74-8f2e-8357-deb4-08adb45a9880,3cabaafa-2029-2a72-33f3-5877788472cc,c3789395-1d4d-deca-2295-26849eb1a9fd,b5da92c4-dd37-cb58-73fc-4863264d811b,382320c6-c6c4-b5a7-6949-ddfc3ef05922}'::uuid[]))
+                           Index Searches: 10
+                           Buffers: shared hit=31 read=19
+                     ->  Index Scan using products_pkey on products p  (cost=0.29..8.31 rows=1 width=28) (actual time=0.003..0.003 rows=1.00 loops=20)
+                           Index Cond: (id = oi.product_id)
+                           Index Searches: 20
+                           Buffers: shared hit=57 read=3
+               ->  Index Scan using reviews_order_item_key on reviews r  (cost=0.29..7.90 rows=1 width=46) (actual time=0.004..0.004 rows=0.00 loops=20)
+                     Index Cond: (order_item_id = oi.id)
+                     Index Searches: 20
+                     Buffers: shared hit=23 read=17
+         ->  Limit  (cost=12.22..12.22 rows=1 width=55) (actual time=0.004..0.004 rows=1.00 loops=20)
+               Buffers: shared hit=80
+               ->  Sort  (cost=12.22..12.22 rows=2 width=55) (actual time=0.004..0.004 rows=1.00 loops=20)
+                     Sort Key: pi.sort_order, pi.created_at
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=80
+                     ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (actual time=0.003..0.003 rows=1.00 loops=20)
+                           Recheck Cond: (product_id = oi.product_id)
+                           Heap Blocks: exact=20
+                           Buffers: shared hit=80
+                           ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (actual time=0.002..0.002 rows=1.00 loops=20)
+                                 Index Cond: (product_id = oi.product_id)
+                                 Index Searches: 20
+                                 Buffers: shared hit=60
+ Planning:
+   Buffers: shared hit=182 read=10
+ Planning Time: 0.760 ms
+ Execution Time: 0.401 ms
+(41 rows)
+
+#### ListBuyerOrders
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5.95..57.44 rows=10 width=206) (actual time=0.038..0.039 rows=10.00 loops=1)
+   Buffers: shared hit=36
+   ->  Incremental Sort  (cost=5.95..108.93 rows=20 width=206) (actual time=0.038..0.038 rows=10.00 loops=1)
+         Sort Key: o.created_at DESC, o.id
+         Presorted Key: o.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+         Buffers: shared hit=36
+         ->  Nested Loop  (cost=0.56..108.03 rows=20 width=206) (actual time=0.009..0.028 rows=11.00 loops=1)
+               Buffers: shared hit=36
+               ->  Index Scan using orders_buyer_created_idx on orders o  (cost=0.42..84.77 rows=20 width=198) (actual time=0.005..0.015 rows=11.00 loops=1)
+                     Index Cond: (buyer_id = '7a1e1867-a3fc-92e1-71ad-12cb9d9a9bfd'::uuid)
+                     Index Searches: 1
+                     Buffers: shared hit=14
+               ->  Index Scan using stores_pkey on stores s  (cost=0.14..1.16 rows=1 width=24) (actual time=0.001..0.001 rows=1.00 loops=11)
+                     Index Cond: (id = o.store_id)
+                     Index Searches: 11
+                     Buffers: shared hit=22
+ Planning:
+   Buffers: shared hit=79
+ Planning Time: 0.282 ms
+ Execution Time: 0.053 ms
+(21 rows)
+
+#### ListSellerOrders: no status
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1370.83..1370.85 rows=10 width=206) (actual time=1.084..1.086 rows=10.00 loops=1)
+   Buffers: shared hit=510
+   ->  Sort  (cost=1370.83..1372.07 rows=498 width=206) (actual time=1.082..1.083 rows=10.00 loops=1)
+         Sort Key: o.created_at DESC, o.id
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=510
+         ->  Nested Loop  (cost=28.28..1360.07 rows=498 width=206) (actual time=0.117..0.849 rows=500.00 loops=1)
+               Buffers: shared hit=510
+               ->  Seq Scan on stores s  (cost=0.00..5.50 rows=1 width=24) (actual time=0.014..0.026 rows=1.00 loops=1)
+                     Filter: (id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+                     Rows Removed by Filter: 199
+                     Buffers: shared hit=3
+               ->  Bitmap Heap Scan on orders o  (cost=28.28..1349.59 rows=498 width=198) (actual time=0.101..0.719 rows=500.00 loops=1)
+                     Recheck Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+                     Heap Blocks: exact=500
+                     Buffers: shared hit=507
+                     ->  Bitmap Index Scan on orders_store_status_created_idx  (cost=0.00..28.15 rows=498 width=0) (actual time=0.055..0.056 rows=500.00 loops=1)
+                           Index Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+                           Index Searches: 1
+                           Buffers: shared hit=7
+ Planning Time: 0.202 ms
+ Execution Time: 1.112 ms
+(22 rows)
+
+#### ListSellerOrders: status = paid
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=4.65..46.45 rows=10 width=206) (actual time=0.054..0.055 rows=10.00 loops=1)
+   Buffers: shared hit=17
+   ->  Incremental Sort  (cost=4.65..217.85 rows=51 width=206) (actual time=0.053..0.054 rows=10.00 loops=1)
+         Sort Key: o.created_at DESC, o.id
+         Presorted Key: o.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+         Buffers: shared hit=17
+         ->  Nested Loop  (cost=0.42..215.55 rows=51 width=206) (actual time=0.022..0.043 rows=11.00 loops=1)
+               Buffers: shared hit=17
+               ->  Index Scan using orders_store_status_created_idx on orders o  (cost=0.42..209.41 rows=51 width=198) (actual time=0.014..0.023 rows=11.00 loops=1)
+                     Index Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = 'paid'::text))
+                     Index Searches: 1
+                     Buffers: shared hit=14
+               ->  Materialize  (cost=0.00..5.50 rows=1 width=24) (actual time=0.001..0.001 rows=1.00 loops=11)
+                     Storage: Memory  Maximum Storage: 17kB
+                     Buffers: shared hit=3
+                     ->  Seq Scan on stores s  (cost=0.00..5.50 rows=1 width=24) (actual time=0.006..0.013 rows=1.00 loops=1)
+                           Filter: (id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+                           Rows Removed by Filter: 199
+                           Buffers: shared hit=3
+ Planning Time: 0.158 ms
+ Execution Time: 0.072 ms
+(22 rows)
+
+#### CountSellerOrders: no status
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=34.38..34.39 rows=1 width=8) (actual time=0.071..0.071 rows=1.00 loops=1)
+   Buffers: shared hit=8
+   ->  Index Only Scan using orders_store_status_created_idx on orders o  (cost=0.42..33.13 rows=498 width=0) (actual time=0.012..0.050 rows=500.00 loops=1)
+         Index Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=8
+ Planning Time: 0.080 ms
+ Execution Time: 0.083 ms
+(9 rows)
+
+#### CountSellerOrders: status = paid
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=5.57..5.58 rows=1 width=8) (actual time=0.080..0.080 rows=1.00 loops=1)
+   Buffers: shared hit=8
+   ->  Index Only Scan using orders_store_status_created_idx on orders o  (cost=0.42..5.44 rows=51 width=0) (actual time=0.013..0.058 rows=500.00 loops=1)
+         Index Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND (status = 'paid'::text))
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=8
+ Planning Time: 0.071 ms
+ Execution Time: 0.093 ms
+(9 rows)
+
+#### ListAdminOrders: no status
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5561.29..5562.45 rows=10 width=206) (actual time=30.068..32.337 rows=10.00 loops=1)
+   Buffers: shared hit=2562 read=602
+   ->  Gather Merge  (cost=5561.29..17208.05 rows=100001 width=206) (actual time=30.067..32.334 rows=10.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=2562 read=602
+         ->  Sort  (cost=4561.27..4665.43 rows=41667 width=206) (actual time=27.703..27.708 rows=10.00 loops=3)
+               Sort Key: o.created_at DESC, o.id
+               Sort Method: top-N heapsort  Memory: 27kB
+               Buffers: shared hit=2562 read=602
+               Worker 0:  Sort Method: top-N heapsort  Memory: 27kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 27kB
+               ->  Hash Join  (cost=7.50..3660.86 rows=41667 width=206) (actual time=0.065..11.852 rows=33333.33 loops=3)
+                     Hash Cond: (o.store_id = s.id)
+                     Buffers: shared hit=2532 read=602
+                     ->  Parallel Seq Scan on orders o  (cost=0.00..3541.67 rows=41667 width=198) (actual time=0.004..4.048 rows=33333.33 loops=3)
+                           Buffers: shared hit=2523 read=602
+                     ->  Hash  (cost=5.00..5.00 rows=200 width=24) (actual time=0.053..0.054 rows=200.00 loops=3)
+                           Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                           Buffers: shared hit=9
+                           ->  Seq Scan on stores s  (cost=0.00..5.00 rows=200 width=24) (actual time=0.014..0.029 rows=200.00 loops=3)
+                                 Buffers: shared hit=9
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.177 ms
+ Execution Time: 32.370 ms
+(26 rows)
+
+#### ListAdminOrders: status = paid
+                                                                              QUERY PLAN                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=4418.82..4418.85 rows=10 width=206) (actual time=13.802..13.808 rows=10.00 loops=1)
+   Buffers: shared hit=3500 read=387
+   ->  Sort  (cost=4418.82..4444.57 rows=10300 width=206) (actual time=13.801..13.805 rows=10.00 loops=1)
+         Sort Key: o.created_at DESC, o.id
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=3500 read=387
+         ->  Hash Join  (cost=914.88..4196.24 rows=10300 width=206) (actual time=2.740..8.972 rows=10000.00 loops=1)
+               Hash Cond: (o.store_id = s.id)
+               Buffers: shared hit=3500 read=387
+               ->  Bitmap Heap Scan on orders o  (cost=907.38..4161.12 rows=10300 width=198) (actual time=2.691..6.245 rows=10000.00 loops=1)
+                     Recheck Cond: ((status)::text = 'paid'::text)
+                     Heap Blocks: exact=3125
+                     Buffers: shared hit=3497 read=387
+                     ->  Bitmap Index Scan on orders_store_status_created_idx  (cost=0.00..904.80 rows=10300 width=0) (actual time=2.411..2.411 rows=10000.00 loops=1)
+                           Index Cond: ((status)::text = 'paid'::text)
+                           Index Searches: 181
+                           Buffers: shared hit=372 read=387
+               ->  Hash  (cost=5.00..5.00 rows=200 width=24) (actual time=0.043..0.045 rows=200.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                     Buffers: shared hit=3
+                     ->  Seq Scan on stores s  (cost=0.00..5.00 rows=200 width=24) (actual time=0.007..0.021 rows=200.00 loops=1)
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.304 ms
+ Execution Time: 13.837 ms
+(26 rows)
+
+#### CountAdminOrders: no status
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=3742.42..3742.43 rows=1 width=8) (actual time=11.451..11.451 rows=1.00 loops=1)
+   Buffers: shared hit=1 read=495
+   ->  Index Only Scan using orders_order_number_key on orders o  (cost=0.42..3492.42 rows=100000 width=0) (actual time=0.042..8.041 rows=100000.00 loops=1)
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=1 read=495
+ Planning Time: 0.142 ms
+ Execution Time: 11.468 ms
+(8 rows)
+
+#### CountAdminOrders: status = paid
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=1033.55..1033.56 rows=1 width=8) (actual time=1.865..1.865 rows=1.00 loops=1)
+   Buffers: shared hit=757
+   ->  Index Only Scan using orders_store_status_created_idx on orders o  (cost=0.42..1007.80 rows=10300 width=0) (actual time=0.074..1.423 rows=10000.00 loops=1)
+         Index Cond: (status = 'paid'::text)
+         Heap Fetches: 0
+         Index Searches: 181
+         Buffers: shared hit=757
+ Planning Time: 0.139 ms
+ Execution Time: 1.885 ms
+(9 rows)
+
+#### Seller stats: status counts
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.42..35.68 rows=6 width=17) (actual time=0.080..0.081 rows=1.00 loops=1)
+   Group Key: status
+   Buffers: shared hit=8
+   ->  Index Only Scan using orders_store_status_created_idx on orders o  (cost=0.42..33.13 rows=498 width=9) (actual time=0.012..0.050 rows=500.00 loops=1)
+         Index Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=8
+ Planning Time: 0.098 ms
+ Execution Time: 0.094 ms
+(10 rows)
+
+#### Seller stats: revenue
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=6075.78..6075.80 rows=1 width=80) (actual time=45.014..45.015 rows=1.00 loops=1)
+   Buffers: shared hit=1772 read=1235
+   ->  Nested Loop  (cost=50.10..6069.80 rows=398 width=22) (actual time=0.365..44.735 rows=500.00 loops=1)
+         Buffers: shared hit=1772 read=1235
+         ->  Bitmap Heap Scan on orders o  (cost=37.77..1155.02 rows=398 width=30) (actual time=0.109..0.739 rows=500.00 loops=1)
+               Recheck Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = ANY ('{paid,processing,shipped,delivered}'::text[])))
+               Heap Blocks: exact=500
+               Buffers: shared hit=507
+               ->  Bitmap Index Scan on orders_store_status_created_idx  (cost=0.00..37.67 rows=398 width=0) (actual time=0.066..0.066 rows=500.00 loops=1)
+                     Index Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = ANY ('{paid,processing,shipped,delivered}'::text[])))
+                     Index Searches: 1
+                     Buffers: shared hit=7
+         ->  Aggregate  (cost=12.33..12.34 rows=1 width=8) (actual time=0.087..0.087 rows=1.00 loops=500)
+               Buffers: shared hit=1265 read=1235
+               ->  Bitmap Heap Scan on order_items oi  (cost=4.44..12.32 rows=2 width=4) (actual time=0.064..0.085 rows=2.00 loops=500)
+                     Recheck Cond: (order_id = o.id)
+                     Heap Blocks: exact=1000
+                     Buffers: shared hit=1265 read=1235
+                     ->  Bitmap Index Scan on order_items_order_variant_key  (cost=0.00..4.43 rows=2 width=0) (actual time=0.007..0.007 rows=2.00 loops=500)
+                           Index Cond: (order_id = o.id)
+                           Index Searches: 500
+                           Buffers: shared hit=1073 read=427
+ Planning:
+   Buffers: shared hit=53 read=1
+ Planning Time: 0.264 ms
+ Execution Time: 45.053 ms
+(26 rows)
+
+#### Seller stats: top products
+                                                                                                                                  QUERY PLAN                                                                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=576.80..576.81 rows=5 width=82) (actual time=0.676..0.678 rows=5.00 loops=1)
+   Buffers: shared hit=490 read=23
+   ->  Sort  (cost=576.80..576.96 rows=66 width=82) (actual time=0.675..0.677 rows=5.00 loops=1)
+         Sort Key: (sum(oi.quantity)) DESC, (sum(oi.line_total)) DESC, p.name, oi.product_id
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=490 read=23
+         ->  GroupAggregate  (cost=573.89..575.70 rows=66 width=82) (actual time=0.626..0.655 rows=40.00 loops=1)
+               Group Key: oi.product_id, p.name, p.status
+               Buffers: shared hit=487 read=23
+               ->  Sort  (cost=573.89..574.05 rows=66 width=52) (actual time=0.617..0.621 rows=84.00 loops=1)
+                     Sort Key: oi.product_id, p.name, p.status
+                     Sort Method: quicksort  Memory: 30kB
+                     Buffers: shared hit=487 read=23
+                     ->  Nested Loop  (cost=22.80..571.89 rows=66 width=52) (actual time=0.045..0.579 rows=84.00 loops=1)
+                           Buffers: shared hit=487 read=23
+                           ->  Nested Loop  (cost=22.51..547.91 rows=66 width=26) (actual time=0.039..0.323 rows=84.00 loops=1)
+                                 Buffers: shared hit=258
+                                 ->  Bitmap Heap Scan on orders o  (cost=18.08..140.56 rows=33 width=16) (actual time=0.030..0.074 rows=42.00 loops=1)
+                                       Recheck Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = ANY ('{paid,processing,shipped,delivered}'::text[])) AND (created_at >= '2026-10-19 09:28:57.098884+00'::timestamp with time zone))
+                                       Heap Blocks: exact=42
+                                       Buffers: shared hit=48
+                                       ->  Bitmap Index Scan on orders_store_status_created_idx  (cost=0.00..18.07 rows=33 width=0) (actual time=0.021..0.021 rows=42.00 loops=1)
+                                             Index Cond: ((store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid) AND ((status)::text = ANY ('{paid,processing,shipped,delivered}'::text[])) AND (created_at >= '2026-10-19 09:28:57.098884+00'::timestamp with time zone))
+                                             Index Searches: 2
+                                             Buffers: shared hit=6
+                                 ->  Bitmap Heap Scan on order_items oi  (cost=4.44..12.32 rows=2 width=42) (actual time=0.005..0.005 rows=2.00 loops=42)
+                                       Recheck Cond: (order_id = o.id)
+                                       Heap Blocks: exact=84
+                                       Buffers: shared hit=210
+                                       ->  Bitmap Index Scan on order_items_order_variant_key  (cost=0.00..4.43 rows=2 width=0) (actual time=0.003..0.003 rows=2.00 loops=42)
+                                             Index Cond: (order_id = o.id)
+                                             Index Searches: 42
+                                             Buffers: shared hit=126
+                           ->  Index Scan using products_pkey on products p  (cost=0.29..0.36 rows=1 width=42) (actual time=0.003..0.003 rows=1.00 loops=84)
+                                 Index Cond: (id = oi.product_id)
+                                 Index Searches: 84
+                                 Buffers: shared hit=229 read=23
+ Planning:
+   Buffers: shared hit=38 read=6
+ Planning Time: 0.520 ms
+ Execution Time: 0.708 ms
+(41 rows)
+
+#### Store rating
+                                                                  QUERY PLAN                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=751.49..751.51 rows=1 width=8) (actual time=0.438..0.439 rows=1.00 loops=1)
+   Buffers: shared hit=252 read=3
+   ->  Bitmap Heap Scan on products  (cost=14.34..750.25 rows=249 width=8) (actual time=0.068..0.424 rows=250.00 loops=1)
+         Recheck Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+         Heap Blocks: exact=250
+         Buffers: shared hit=252 read=3
+         ->  Bitmap Index Scan on products_store_slug_key  (cost=0.00..14.28 rows=249 width=0) (actual time=0.044..0.044 rows=250.00 loops=1)
+               Index Cond: (store_id = 'c8495071-1220-f3a1-972c-0cdb673ac88f'::uuid)
+               Index Searches: 1
+               Buffers: shared hit=2 read=3
+ Planning Time: 0.085 ms
+ Execution Time: 0.451 ms
+(12 rows)
+
+#### Admin stats: public product count
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=9739.66..9739.67 rows=1 width=8) (actual time=41.250..43.593 rows=1.00 loops=1)
+   Buffers: shared hit=5198
+   ->  Gather  (cost=9739.45..9739.66 rows=2 width=8) (actual time=40.685..43.583 rows=2.00 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=5198
+         ->  Partial Aggregate  (cost=8739.45..8739.46 rows=1 width=8) (actual time=39.046..39.050 rows=1.00 loops=2)
+               Buffers: shared hit=5198
+               ->  Parallel Hash Semi Join  (cost=5322.03..8670.25 rows=27681 width=0) (actual time=26.755..38.143 rows=23750.00 loops=2)
+                     Hash Cond: (p.id = v.product_id)
+                     Buffers: shared hit=5198
+                     ->  Hash Join  (cost=7.97..2975.57 rows=27681 width=16) (actual time=0.083..7.440 rows=23750.00 loops=2)
+                           Hash Cond: (p.store_id = s.id)
+                           Buffers: shared hit=2531
+                           ->  Parallel Seq Scan on products p  (cost=0.00..2892.65 rows=27960 width=32) (actual time=0.010..5.070 rows=23750.00 loops=2)
+                                 Filter: ((status)::text = 'active'::text)
+                                 Rows Removed by Filter: 1250
+                                 Buffers: shared hit=2525
+                           ->  Hash  (cost=5.50..5.50 rows=198 width=16) (actual time=0.060..0.061 rows=198.00 loops=2)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                                 Buffers: shared hit=6
+                                 ->  Seq Scan on stores s  (cost=0.00..5.50 rows=198 width=16) (actual time=0.020..0.041 rows=198.00 loops=2)
+                                       Filter: ((status)::text = 'active'::text)
+                                       Rows Removed by Filter: 2
+                                       Buffers: shared hit=6
+                     ->  Parallel Hash  (cost=3843.47..3843.47 rows=117647 width=16) (actual time=25.999..25.999 rows=100000.00 loops=2)
+                           Buckets: 262144  Batches: 1  Memory Usage: 11456kB
+                           Buffers: shared hit=2667
+                           ->  Parallel Seq Scan on product_variants v  (cost=0.00..3843.47 rows=117647 width=16) (actual time=0.008..7.105 rows=100000.00 loops=2)
+                                 Buffers: shared hit=2667
+ Planning:
+   Buffers: shared hit=26
+ Planning Time: 0.386 ms
+ Execution Time: 43.628 ms
+(34 rows)
+
+#### Admin stats: GMV
+                                                                QUERY PLAN                                                                
+------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=5000.25..5000.26 rows=1 width=64) (actual time=14.349..16.306 rows=1.00 loops=1)
+   Buffers: shared hit=3131
+   ->  Gather  (cost=5000.02..5000.23 rows=2 width=64) (actual time=14.179..16.295 rows=3.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3131
+         ->  Partial Aggregate  (cost=4000.02..4000.03 rows=1 width=64) (actual time=11.767..11.768 rows=1.00 loops=3)
+               Buffers: shared hit=3131
+               ->  Parallel Seq Scan on orders  (cost=0.00..3750.00 rows=33335 width=14) (actual time=0.012..7.565 rows=26666.67 loops=3)
+                     Filter: ((status)::text = ANY ('{paid,processing,shipped,delivered}'::text[]))
+                     Rows Removed by Filter: 6667
+                     Buffers: shared hit=3131
+ Planning Time: 0.126 ms
+ Execution Time: 16.336 ms
+(14 rows)
+
+#### Review distribution (a reviewed product)
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=102.72..102.98 rows=1 width=6) (actual time=0.073..0.073 rows=1.00 loops=1)
+   Group Key: rating
+   Buffers: shared hit=37 read=2
+   ->  Sort  (cost=102.72..102.81 rows=33 width=2) (actual time=0.068..0.069 rows=34.00 loops=1)
+         Sort Key: rating
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=37 read=2
+         ->  Bitmap Heap Scan on reviews  (cost=4.54..101.89 rows=33 width=2) (actual time=0.025..0.057 rows=34.00 loops=1)
+               Recheck Cond: ((product_id = 'eafd5415-5c44-2102-9b25-9d2afef30607'::uuid) AND ((status)::text = 'visible'::text))
+               Heap Blocks: exact=34
+               Buffers: shared hit=34 read=2
+               ->  Bitmap Index Scan on reviews_product_visible_created_idx  (cost=0.00..4.53 rows=33 width=0) (actual time=0.018..0.018 rows=34.00 loops=1)
+                     Index Cond: (product_id = 'eafd5415-5c44-2102-9b25-9d2afef30607'::uuid)
+                     Index Searches: 1
+                     Buffers: shared read=2
+ Planning:
+   Buffers: shared hit=12
+ Planning Time: 0.129 ms
+ Execution Time: 0.095 ms
+(19 rows)
+
+#### Public reviews page
+                                                                                     QUERY PLAN                                                                                      
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=562.70..562.72 rows=10 width=77) (actual time=1.374..1.378 rows=10.00 loops=1)
+   Buffers: shared hit=168 read=74
+   ->  Sort  (cost=562.70..562.78 rows=33 width=77) (actual time=1.373..1.376 rows=10.00 loops=1)
+         Sort Key: r.created_at DESC, r.id
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=168 read=74
+         ->  WindowAgg  (cost=548.07..561.98 rows=33 width=77) (actual time=1.356..1.363 rows=34.00 loops=1)
+               Window: w1 AS ()
+               Storage: Memory  Maximum Storage: 20kB
+               Buffers: shared hit=168 read=74
+               ->  Nested Loop  (cost=102.72..561.57 rows=33 width=69) (actual time=0.263..1.329 rows=34.00 loops=1)
+                     Buffers: shared hit=168 read=74
+                     ->  Hash Join  (cost=102.30..283.13 rows=33 width=76) (actual time=0.242..1.003 rows=34.00 loops=1)
+                           Hash Cond: (u.id = r.user_id)
+                           Buffers: shared hit=100 read=6
+                           ->  Seq Scan on users u  (cost=0.00..122.00 rows=5200 width=30) (actual time=0.004..0.643 rows=5200.00 loops=1)
+                                 Buffers: shared hit=64 read=6
+                           ->  Hash  (cost=101.89..101.89 rows=33 width=78) (actual time=0.042..0.044 rows=34.00 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                 Buffers: shared hit=36
+                                 ->  Bitmap Heap Scan on reviews r  (cost=4.54..101.89 rows=33 width=78) (actual time=0.011..0.036 rows=34.00 loops=1)
+                                       Recheck Cond: ((product_id = 'eafd5415-5c44-2102-9b25-9d2afef30607'::uuid) AND ((status)::text = 'visible'::text))
+                                       Heap Blocks: exact=34
+                                       Buffers: shared hit=36
+                                       ->  Bitmap Index Scan on reviews_product_visible_created_idx  (cost=0.00..4.53 rows=33 width=0) (actual time=0.005..0.006 rows=34.00 loops=1)
+                                             Index Cond: (product_id = 'eafd5415-5c44-2102-9b25-9d2afef30607'::uuid)
+                                             Index Searches: 1
+                                             Buffers: shared hit=2
+                     ->  Index Scan using order_items_pkey on order_items oi  (cost=0.42..8.44 rows=1 width=25) (actual time=0.009..0.009 rows=1.00 loops=34)
+                           Index Cond: (id = r.order_item_id)
+                           Index Searches: 34
+                           Buffers: shared hit=68 read=68
+ Planning:
+   Buffers: shared hit=69 read=9
+ Planning Time: 0.540 ms
+ Execution Time: 1.406 ms
+(36 rows)
+
+#### Pending reviews of a buyer
+                                                                                      QUERY PLAN                                                                                      
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=224.77..224.77 rows=1 width=196) (actual time=0.049..0.050 rows=0.00 loops=1)
+   Buffers: shared hit=23
+   ->  Sort  (cost=224.77..224.77 rows=1 width=196) (actual time=0.048..0.049 rows=0.00 loops=1)
+         Sort Key: o.updated_at DESC, oi.id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=23
+         ->  WindowAgg  (cost=21.94..224.76 rows=1 width=196) (actual time=0.044..0.045 rows=0.00 loops=1)
+               Window: w1 AS ()
+               Buffers: shared hit=23
+               ->  Nested Loop Left Join  (cost=21.94..224.74 rows=1 width=167) (actual time=0.044..0.045 rows=0.00 loops=1)
+                     Buffers: shared hit=23
+                     ->  Nested Loop  (cost=9.73..212.51 rows=1 width=124) (actual time=0.044..0.044 rows=0.00 loops=1)
+                           Buffers: shared hit=23
+                           ->  Nested Loop  (cost=9.58..210.32 rows=1 width=132) (actual time=0.044..0.044 rows=0.00 loops=1)
+                                 Buffers: shared hit=23
+                                 ->  Nested Loop Left Join  (cost=9.29..209.96 rows=1 width=120) (actual time=0.044..0.044 rows=0.00 loops=1)
+                                       Filter: (r.id IS NULL)
+                                       Buffers: shared hit=23
+                                       ->  Nested Loop  (cost=9.01..203.51 rows=20 width=120) (actual time=0.043..0.044 rows=0.00 loops=1)
+                                             Buffers: shared hit=23
+                                             ->  Bitmap Heap Scan on orders o  (cost=4.57..80.07 rows=10 width=67) (actual time=0.043..0.044 rows=0.00 loops=1)
+                                                   Recheck Cond: (buyer_id = '7a1e1867-a3fc-92e1-71ad-12cb9d9a9bfd'::uuid)
+                                                   Filter: ((status)::text = 'delivered'::text)
+                                                   Rows Removed by Filter: 20
+                                                   Heap Blocks: exact=20
+                                                   Buffers: shared hit=23
+                                                   ->  Bitmap Index Scan on orders_buyer_created_idx  (cost=0.00..4.57 rows=20 width=0) (actual time=0.009..0.010 rows=20.00 loops=1)
+                                                         Index Cond: (buyer_id = '7a1e1867-a3fc-92e1-71ad-12cb9d9a9bfd'::uuid)
+                                                         Index Searches: 1
+                                                         Buffers: shared hit=3
+                                             ->  Bitmap Heap Scan on order_items oi  (cost=4.44..12.32 rows=2 width=69) (never executed)
+                                                   Recheck Cond: (order_id = o.id)
+                                                   ->  Bitmap Index Scan on order_items_order_variant_key  (cost=0.00..4.43 rows=2 width=0) (never executed)
+                                                         Index Cond: (order_id = o.id)
+                                                         Index Searches: 0
+                                       ->  Index Scan using reviews_order_item_key on reviews r  (cost=0.29..0.31 rows=1 width=32) (never executed)
+                                             Index Cond: (order_item_id = oi.id)
+                                             Index Searches: 0
+                                 ->  Index Scan using products_pkey on products p  (cost=0.29..0.36 rows=1 width=28) (never executed)
+                                       Index Cond: (id = oi.product_id)
+                                       Index Searches: 0
+                           ->  Index Scan using stores_pkey on stores s  (cost=0.14..2.16 rows=1 width=24) (never executed)
+                                 Index Cond: (id = o.store_id)
+                                 Index Searches: 0
+                     ->  Limit  (cost=12.22..12.22 rows=1 width=55) (never executed)
+                           ->  Sort  (cost=12.22..12.22 rows=2 width=55) (never executed)
+                                 Sort Key: pi.sort_order, pi.created_at
+                                 ->  Bitmap Heap Scan on product_images pi  (cost=4.43..12.21 rows=2 width=55) (never executed)
+                                       Recheck Cond: (product_id = oi.product_id)
+                                       ->  Bitmap Index Scan on product_images_product_id_idx  (cost=0.00..4.43 rows=2 width=0) (never executed)
+                                             Index Cond: (product_id = oi.product_id)
+                                             Index Searches: 0
+ Planning:
+   Buffers: shared hit=48
+ Planning Time: 0.799 ms
+ Execution Time: 0.091 ms
+(56 rows)
+
+#### Admin reviews: no status
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=6959.51..6960.67 rows=10 width=123) (actual time=32.266..34.420 rows=10.00 loops=1)
+   Buffers: shared hit=1738 read=3270
+   ->  Gather Merge  (cost=6959.51..8900.54 rows=16666 width=123) (actual time=32.265..34.414 rows=10.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=1738 read=3270
+         ->  Sort  (cost=5959.48..5976.84 rows=6944 width=123) (actual time=29.937..29.945 rows=10.00 loops=3)
+               Sort Key: r.created_at DESC, r.id
+               Sort Method: top-N heapsort  Memory: 27kB
+               Buffers: shared hit=1738 read=3270
+               Worker 0:  Sort Method: top-N heapsort  Memory: 27kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 27kB
+               ->  Hash Join  (cost=873.49..5809.42 rows=6944 width=123) (actual time=7.313..28.226 rows=5555.33 loops=3)
+                     Hash Cond: (r.store_id = s.id)
+                     Buffers: shared hit=1708 read=3270
+                     ->  Hash Join  (cost=865.99..5783.31 rows=6944 width=131) (actual time=7.255..27.325 rows=5555.33 loops=3)
+                           Hash Cond: (r.user_id = u.id)
+                           Buffers: shared hit=1699 read=3270
+                           ->  Hash Join  (cost=678.99..5578.07 rows=6944 width=114) (actual time=6.003..24.408 rows=5555.33 loops=3)
+                                 Hash Cond: (oi.id = r.order_item_id)
+                                 Buffers: shared hit=1489 read=3270
+                                 ->  Parallel Seq Scan on order_items oi  (cost=0.00..4680.33 rows=83333 width=28) (actual time=0.076..9.011 rows=66666.67 loops=3)
+                                       Buffers: shared hit=577 read=3270
+                                 ->  Hash  (cost=470.66..470.66 rows=16666 width=118) (actual time=5.853..5.853 rows=16666.00 loops=3)
+                                       Buckets: 32768  Batches: 1  Memory Usage: 2730kB
+                                       Buffers: shared hit=912
+                                       ->  Seq Scan on reviews r  (cost=0.00..470.66 rows=16666 width=118) (actual time=0.013..1.922 rows=16666.00 loops=3)
+                                             Buffers: shared hit=912
+                           ->  Hash  (cost=122.00..122.00 rows=5200 width=49) (actual time=1.233..1.234 rows=5200.00 loops=3)
+                                 Buckets: 8192  Batches: 1  Memory Usage: 484kB
+                                 Buffers: shared hit=210
+                                 ->  Seq Scan on users u  (cost=0.00..122.00 rows=5200 width=49) (actual time=0.008..0.415 rows=5200.00 loops=3)
+                                       Buffers: shared hit=210
+                     ->  Hash  (cost=5.00..5.00 rows=200 width=24) (actual time=0.051..0.052 rows=200.00 loops=3)
+                           Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                           Buffers: shared hit=9
+                           ->  Seq Scan on stores s  (cost=0.00..5.00 rows=200 width=24) (actual time=0.011..0.025 rows=200.00 loops=3)
+                                 Buffers: shared hit=9
+ Planning:
+   Buffers: shared hit=36
+ Planning Time: 0.431 ms
+ Execution Time: 34.514 ms
+(42 rows)
+
+#### Admin reviews: status = hidden
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=536.58..536.58 rows=1 width=123) (actual time=1.104..1.105 rows=0.00 loops=1)
+   Buffers: shared hit=304
+   ->  Sort  (cost=536.58..536.58 rows=1 width=123) (actual time=1.103..1.104 rows=0.00 loops=1)
+         Sort Key: r.created_at DESC, r.id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=304
+         ->  Nested Loop  (cost=0.70..536.57 rows=1 width=123) (actual time=1.099..1.100 rows=0.00 loops=1)
+               Buffers: shared hit=304
+               ->  Nested Loop  (cost=0.28..528.13 rows=1 width=127) (actual time=1.098..1.099 rows=0.00 loops=1)
+                     Join Filter: (s.id = r.store_id)
+                     Buffers: shared hit=304
+                     ->  Nested Loop  (cost=0.28..520.63 rows=1 width=135) (actual time=1.098..1.099 rows=0.00 loops=1)
+                           Buffers: shared hit=304
+                           ->  Seq Scan on reviews r  (cost=0.00..512.33 rows=1 width=118) (actual time=1.098..1.098 rows=0.00 loops=1)
+                                 Filter: ((status)::text = 'hidden'::text)
+                                 Rows Removed by Filter: 16666
+                                 Buffers: shared hit=304
+                           ->  Index Scan using users_pkey on users u  (cost=0.28..8.30 rows=1 width=49) (never executed)
+                                 Index Cond: (id = r.user_id)
+                                 Index Searches: 0
+                     ->  Seq Scan on stores s  (cost=0.00..5.00 rows=200 width=24) (never executed)
+               ->  Index Scan using order_items_pkey on order_items oi  (cost=0.42..8.44 rows=1 width=28) (never executed)
+                     Index Cond: (id = r.order_item_id)
+                     Index Searches: 0
+ Planning:
+   Buffers: shared hit=30
+ Planning Time: 0.488 ms
+ Execution Time: 1.157 ms
+(28 rows)
+

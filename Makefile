@@ -23,7 +23,7 @@ GO := docker run --rm -v "$(BACKEND_DIR):/src" -v gomodcache:/go/pkg/mod -v gobu
 .PHONY: help up down logs ps \
         migrate-up migrate-down migrate-version migrate-create migrate-force \
         sqlc fmt vet test test-db test-integration seed-admin seed-dev \
-        e2e e2e-reset e2e-up e2e-down
+        e2e e2e-reset e2e-up e2e-down seed-load perf-explain
 
 help:
 	@echo "Stack:      up | down | logs | ps"
@@ -155,3 +155,18 @@ e2e-up:
 
 e2e-down:
 	$(E2E) stop api-e2e
+
+# ---- Query-plan measurement (Phase 7c) ---------------------------------------
+#
+# Own database, marketplace_perf (never dev/test/e2e): ~50k products, 200k
+# variants, 100k orders. Postgres must be up. Takes a minute or two.
+#   make seed-load                  drop, migrate, bulk load, ANALYZE
+#   make perf-explain               EXPLAIN (ANALYZE, BUFFERS) of the hot queries
+#   make perf-explain generic=1     same with generic plans (pgx may switch to them)
+seed-load:
+	$(COMPOSE) exec -T postgres sh -s < scripts/reset-perf-db.sh
+	$(COMPOSE) run --rm migrate-perf up
+	$(COMPOSE) exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d marketplace_perf' < scripts/seed-load.sql
+
+perf-explain:
+	$(COMPOSE) exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d marketplace_perf -v generic=$(if $(generic),1,0)' < scripts/perf-explain.sql

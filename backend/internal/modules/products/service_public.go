@@ -99,18 +99,13 @@ func (s *Service) ListPublic(ctx context.Context, in PublicQuery) (Page, error) 
 		p.StoreID = &st.ID
 	}
 
-	items, total, err := s.repo.ListPublic(ctx, p)
+	items, err := s.repo.ListPublic(ctx, p)
 	if err != nil {
 		return Page{}, err
 	}
-	// Past the last page there are no rows, so the window-function total is
-	// missing; ask for one row of the first page just to learn it.
-	if len(items) == 0 && in.Page > 1 {
-		first := p
-		first.Limit, first.Offset = 1, 0
-		if _, total, err = s.repo.ListPublic(ctx, first); err != nil {
-			return Page{}, err
-		}
+	total, err := s.repo.CountPublic(ctx, p)
+	if err != nil {
+		return Page{}, err
 	}
 
 	totalPages := int((total + int64(in.PageSize) - 1) / int64(in.PageSize))
@@ -178,7 +173,7 @@ func (s *Service) Related(ctx context.Context, productID uuid.UUID, limit int) (
 	if err != nil {
 		return nil, err
 	}
-	items, _, err := s.repo.ListPublic(ctx, listParams{
+	items, err := s.repo.ListPublic(ctx, listParams{
 		CategoryIDs: []uuid.UUID{categoryID},
 		ExcludeID:   &productID,
 		Sort:        SortPopular,

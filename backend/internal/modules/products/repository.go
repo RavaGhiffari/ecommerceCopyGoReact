@@ -51,24 +51,43 @@ type listParams struct {
 	Offset      int32
 }
 
-func (r *Repository) ListPublic(ctx context.Context, p listParams) ([]Summary, int64, error) {
-	rows, err := r.q.ListPublicProducts(ctx, queries.ListPublicProductsParams{
-		CategoryIds: p.CategoryIDs,
-		StoreID:     p.StoreID,
-		ExcludeID:   p.ExcludeID,
-		Search:      p.Search,
-		Sort:        p.Sort,
-		PageLimit:   p.Limit,
-		PageOffset:  p.Offset,
-	})
+// ListPublic returns one page of the public catalog (no total: see CountPublic).
+// The price sorts use their own query, whose column list is identical.
+func (r *Repository) ListPublic(ctx context.Context, p listParams) ([]Summary, error) {
+	var rows []queries.ListPublicProductsRow
+	var err error
+	if p.Sort == SortPriceAsc || p.Sort == SortPriceDesc {
+		var byPrice []queries.ListPublicProductsByPriceRow
+		byPrice, err = r.q.ListPublicProductsByPrice(ctx, queries.ListPublicProductsByPriceParams{
+			CategoryIds: p.CategoryIDs,
+			StoreID:     p.StoreID,
+			ExcludeID:   p.ExcludeID,
+			Search:      p.Search,
+			Descending:  p.Sort == SortPriceDesc,
+			PageLimit:   p.Limit,
+			PageOffset:  p.Offset,
+		})
+		rows = make([]queries.ListPublicProductsRow, len(byPrice))
+		for i, row := range byPrice {
+			rows[i] = queries.ListPublicProductsRow(row) // same columns, same order
+		}
+	} else {
+		rows, err = r.q.ListPublicProducts(ctx, queries.ListPublicProductsParams{
+			CategoryIds: p.CategoryIDs,
+			StoreID:     p.StoreID,
+			ExcludeID:   p.ExcludeID,
+			Search:      p.Search,
+			Sort:        p.Sort,
+			PageLimit:   p.Limit,
+			PageOffset:  p.Offset,
+		})
+	}
 	if err != nil {
-		return nil, 0, fmt.Errorf("list public products: %w", err)
+		return nil, fmt.Errorf("list public products: %w", err)
 	}
 
-	var total int64
 	items := make([]Summary, len(rows))
 	for i, row := range rows {
-		total = row.TotalCount // the same on every row (window function)
 		items[i] = Summary{
 			ID: row.ID, Slug: row.Slug, Name: row.Name, CategoryID: row.CategoryID,
 			LowestPrice: row.MinPrice, HighestPrice: row.MaxPrice, SoldCount: row.SoldCount,
@@ -80,7 +99,21 @@ func (r *Repository) ListPublic(ctx context.Context, p listParams) ([]Summary, i
 			items[i].Image = &Image{URL: row.ImageUrl, Alt: row.ImageAlt}
 		}
 	}
-	return items, total, nil
+	return items, nil
+}
+
+// CountPublic is the number of products ListPublic can return for the same filters.
+func (r *Repository) CountPublic(ctx context.Context, p listParams) (int64, error) {
+	n, err := r.q.CountPublicProducts(ctx, queries.CountPublicProductsParams{
+		CategoryIds: p.CategoryIDs,
+		StoreID:     p.StoreID,
+		ExcludeID:   p.ExcludeID,
+		Search:      p.Search,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("count public products: %w", err)
+	}
+	return n, nil
 }
 
 func (r *Repository) GetPublic(ctx context.Context, storeSlug, productSlug string) (queries.GetPublicProductRow, error) {
