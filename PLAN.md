@@ -322,6 +322,10 @@ Built by the developer as the DEV_GUIDE §13 level-3 exercise, between 6b and 6c
 
 **7a as built (uncommitted, PROJECT_STATE §1o):** as planned, with these details: env names are `RATE_LIMIT_LOGIN_FAILURES`, `RATE_LIMIT_LOGIN_WINDOW`, `RATE_LIMIT_REGISTRATIONS`, `RATE_LIMIT_REGISTER_WINDOW` (the hard-coded `auth.DefaultLimits` is gone; config is the single source); Vite for the suite runs on `127.0.0.1:5191` with `API_TARGET=http://127.0.0.1:8082`; every spec signs up its own customer instead of reusing `penjual3`, so specs are rerunnable without a reset; the admin password lives in the git-ignored `frontend/e2e/.auth/admin-password` (or `E2E_ADMIN_PASSWORD`); a 9th spec checks 390 px on the buyer pages (Q8).
 
+**7c committed** (`1a0e2e3`, `ee43cab`, docs `0cb0fc8`).
+
+**7d as built (uncommitted, PROJECT_STATE §1r; findings in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)):** as planned, with these details. Session cleanup is its own goroutine in `auth` (`RunSessionCleanup`), not a task inside the checkout sweeper; it shares `CHECKOUT_SWEEP_INTERVAL` and the shutdown wait. No index on `user_sessions.expires_at` (measured 5–10 ms per run at 208 k rows). The API sends `Cache-Control: no-store` and CSP `default-src 'none'; frame-ancestors 'none'`; the SPA CSP and HSTS go to nginx in 7e. The `AddVariant` race was proven first (26 variants), and the count is a separate statement after the lock (READ COMMITTED snapshot). New finding fixed: no `page` upper bound on order/admin lists → negative OFFSET → 500. `TRUSTED_PROXIES` refuses `0.0.0.0/0` and `::/0`.
+
 Goal: make what exists trustworthy and repeatable: automated tests that anyone can run, CI on every push, proven query plans, a security pass over the known gaps (PROJECT_STATE §9), API docs and a production-shaped build. **No new product features.** One slice at a time, stop for review after each (CLAUDE.md §16).
 
 ### 7.0 Open questions (proposed default in bold)

@@ -5,11 +5,11 @@ Where the project stands, how it fits together, and a trail of verified checkpoi
 
 |  |  |
 |---|---|
-| Snapshot date | 2026-11-18 |
-| Last commit | `d8cac67` (7b CI workflow, committed locally, not pushed when checked); `b20d7ea` (Phase 7a docs; 7a = `bce9df0`, `cdc43ad`); `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
-| Uncommitted | **Slice 7c — performance & indexes** (query rewrite, migration `000016`, `make seed-load` / `perf-explain`, route-level code splitting) + doc updates — see §1q |
-| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; 7a committed; 7b committed locally, **GitHub run not yet seen**; **7c done and verified, awaiting review** |
-| Next | developer pushes 7b and confirms green jobs + one red run; reviews and commits 7c; then 7d |
+| Snapshot date | 2026-11-19 |
+| Last commit | `0cb0fc8` (Phase 7c docs; 7c = `1a0e2e3`, `ee43cab`); `d8cac67` (7b CI workflow; `main` was 8 commits ahead of `origin` when checked, so not pushed); `b20d7ea` (Phase 7a docs; 7a = `bce9df0`, `cdc43ad`); `6b6d7d7` (Phase 7 plan docs); `d5b8577` (Phase 6e docs; 6e = `2c44965`; 6d docs `07bdc43`; 6d = `e00c95f`, demo orders in seed-dev `4ed91de`; loading skeletons `019fdbb`; Phase 6c = `0677906`, `6e18967`, docs `9716ed9`; wishlist practice feature `3d722a3` + `12bbd7f`; brand name `a1c4a27`; Phase 6b = `6f01036`, docs `b5fe739`; homepage carousel `932065a`; Phase 5e = `33e046e`, docs `6f10765`; Phase 5d = `2cf29fb`, docs `1dde9e0`; 5c = `870bcbe`, docs `c9caf97` — committed with the backend message by mistake, content is the docs; 5b = `9eec081`, docs `98bff00`; 5a = `f7ef72f`, `7c1d441`, docs `5efc212`; shadcn/ui migration = `db15fef`) |
+| Uncommitted | **Slice 7d — security pass** (`docs/SECURITY_REVIEW.md`, `TRUSTED_PROXIES`, session cleanup, Secure-cookie test, security headers, race-free variant cap, page upper bound, `cn`/`shadcn` cleanup) + doc updates — see §1r |
+| Current phase | **Phase 7 (hardening)**: plan approved 2026-11-17 with the Q1–Q8 defaults; 7a and 7c committed; 7b committed, **GitHub run not yet seen**; **7d done and verified, awaiting review** |
+| Next | developer reviews and commits 7d; pushes and confirms green CI jobs + one red run; then 7e |
 
 ---
 
@@ -38,7 +38,8 @@ A checkpoint is a state where **everything listed under "Verified" was actually 
 | CP-6e | Phase 6e admin UI | `2c44965`, docs `d5b8577` | ✅ committed by the developer | see §1n |
 | CP-7a | Phase 7a test suites | `bce9df0`, `cdc43ad`, docs `b20d7ea` | ✅ committed by the developer | see §1o |
 | CP-7b | Phase 7b CI | `d8cac67` | 🟡 committed locally; GitHub run not seen | see §1p |
-| CP-7c | Phase 7c performance & indexes | **uncommitted** | 🟡 awaiting review | see §1q |
+| CP-7c | Phase 7c performance & indexes | `1a0e2e3`, `ee43cab`, docs `0cb0fc8` | ✅ committed by the developer | see §1q |
+| CP-7d | Phase 7d security pass | **uncommitted** | 🟡 awaiting review | see §1r |
 
 ### 1a. Re-verified at the handoff session (2026-11-13)
 
@@ -451,6 +452,47 @@ git add -- PHASES.md SESSION_HANDOFF.md docs/PROJECT_STATE.md
 git commit -m "Update project docs for Phase 7c" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
+### 1r. Verified at CP-7d (security pass), 2026-11-19
+
+The findings table, OWASP mapping and decisions are in [SECURITY_REVIEW.md](SECURITY_REVIEW.md). In short:
+
+| Change | Files | Proof |
+|---|---|---|
+| `TRUSTED_PROXIES` (IPs/CIDRs; empty = trust nobody; `0.0.0.0/0` and `::/0` refused) | `config/config.go`, `router/router.go` | `TestClientIP_TrustedProxies`, `TestLoad_TrustedProxies`, `TestRegister_RateLimitKeysOnTheRealClientBehindATrustedProxy` |
+| Expired-session cleanup: query `DeleteExpiredSessions` (batched), `auth/cleanup.go` (`CleanupExpiredSessions`, `RunSessionCleanup`), its own goroutine in `main.go` (`sync.WaitGroup`, waited for before `pool.Close`), `SESSION_CLEANUP_BATCH` (500) | `db/queries/sessions.sql`, `auth/`, `cmd/api/main.go` | `TestCleanupExpiredSessions`; on `api-e2e` start 26 expired sessions → 0. No index (measured: 5–10 ms per run at 208 k sessions) |
+| `config.SecureCookies()`, used by `main.go` and the test app | `config/config.go` | `TestSecureCookies_FollowAppEnv`, `TestSessionCookie_SecureOnlyInProduction` |
+| `middleware.SecurityHeaders` (nosniff, DENY, CSP `default-src 'none'; frame-ancestors 'none'`, Referrer-Policy, `Cache-Control: no-store`) right after RequestID | `middleware/security_headers.go`, `router/router.go` | `TestSecurityHeaders_OnSuccessAndOnAbort`, `TestSecurityHeaders_OnEveryKindOfResponse`; `curl -i` on the dev API shows all five |
+| `AddVariant`: lock the product row, then count, inside the tx | `db/queries/products.sql` (`LockStoreProduct`, `CountProductVariants`), `products/repository.go`, `products/service_seller.go` | `TestAddVariant_CapHoldsUnderConcurrency`: **26 variants on the old code (3/3 runs)**, 20 with the fix (3/3) |
+| **New finding:** no `page` upper bound in orders/admin → negative OFFSET → 500 | `orders/service.go`, `admin/service.go` (`MaxPage = 10_000`); messages in `products`, `reviews` corrected to 6000 | `TestEveryListEndpoint_RejectsOutOfRangePaging` (12 endpoints): 6 returned 500 before the fix |
+| `cn` removed, `shadcn` → devDependencies | `frontend/package.json`, `package-lock.json` | `npm audit --omit=dev`: 4 moderate → 0; the lockfile changes only `dev` flags and the `cn` entry |
+| `.env.example` documents `TRUSTED_PROXIES`, `SESSION_CLEANUP_BATCH` | `.env.example` | — |
+
+| Check | Result |
+|---|---|
+| `make sqlc` | only `products.sql.go` and `sessions.sql.go` changed |
+| `make fmt` / `make vet` / `go vet -tags=integration` | ok |
+| `make test` | 20 packages ok |
+| `make test-integration` | all packages ok (router 26 s) |
+| `npm run build` / `lint` / `test` | clean, entry chunk 190 kB, 107 tests |
+| `make e2e` | 10/10, then `npm run e2e` again 10/10 |
+| No migration | none needed (no new index) |
+| Not verified | `TRUSTED_PROXIES` through a real nginx (7e); Secure cookie over real HTTPS; cleanup with several API instances |
+
+Deviation from the plan: session cleanup is its own goroutine owned by `auth`, not a second task inside the checkout sweeper (keeps `checkout` free of session knowledge); it shares the interval and the shutdown wait. Added beyond the plan: `Cache-Control: no-store` and the page upper bound (a found bug).
+
+**Commit CP-7d** (the developer commits):
+
+```bash
+git add -- backend .env.example
+git commit -m "Harden the API: proxies, sessions, headers, limits" -m "- TRUSTED_PROXIES so ClientIP (rate limits) is the real client behind nginx" -m "- background cleanup of expired sessions (batched, SESSION_CLEANUP_BATCH)" -m "- security headers on every response; Secure cookie tested in production" -m "- AddVariant locks the product before counting: the 20-variant cap held 26 under concurrency" -m "- page upper bound on order/admin lists (negative OFFSET gave a 500)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- frontend/package.json frontend/package-lock.json
+git commit -m "Drop unused cn package, move shadcn to devDependencies" -m "npm audit --omit=dev: 4 moderate -> 0" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add -- docs/SECURITY_REVIEW.md docs/PROJECT_STATE.md PLAN.md PHASES.md SESSION_HANDOFF.md CLAUDE.md
+git commit -m "Add security review and update project docs for Phase 7d" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 ---
 
 ---
@@ -700,17 +742,18 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 | Cart issue flags are recomputed on every `GET /cart`, but the page does not refresh by itself | a stock change by the seller shows up on the next load/mutation | acceptable; checkout re-validates |
 | `ListCartLines` joins six tables + a LATERAL image lookup | measured in 7c: 0.06 ms | resolved |
 | Test suites exist (7a); CI workflow written (7b) but not yet run on GitHub | until the first green run, CI is unproven | push and watch the Actions tab |
-| `npm audit`: 4 moderate advisories via `shadcn` → `ts-morph` → `minimatch` (a CLI dependency kept at runtime) | ReDoS in a build-time glob library; not reachable from the browser bundle | 7d (move `shadcn` to devDependencies or update) |
+| `npm audit`: 4 moderate advisories via `shadcn` → `ts-morph` → `minimatch` | fixed in 7d: `shadcn` is a devDependency, `npm audit --omit=dev` = 0 (§1r) | resolved |
 | No `/auth/me`; no email verification; no password reset | account recovery impossible | backlog |
 | Mobile layout checked only down to ~500 px | 390 px unverified (headless limit) | Phase 3 polish |
 | Money display converts strings to JS numbers | fine for display; never sum client-side for charging | rule for Phase 4–5 |
-| **Rate limiter keys on `c.ClientIP()`, and every request reaches the API from the Docker gateway `172.18.0.1`** (verified in logs) while `SetTrustedProxies(nil)` ignores `X-Forwarded-For` | in dev all users share one budget (10 sign-ups/hour!); in production behind a reverse proxy the same happens unless trusted proxies are configured | **Phase 7 / deploy**. A `TRUSTED_PROXIES` setting would not help in dev: the Vite proxy sends no `X-Forwarded-For`, and every dev request comes from the same machine anyway |
-| Expired sessions are deleted only when *the same user* logs in again | `user_sessions` grows for users who never return | cleanup job in Phase 7 |
-| Cookie `Secure` flag is set only when `APP_ENV=production`; that path has **no test** | a production misconfiguration would go unnoticed | Phase 7 |
+| Rate limiter keys on `c.ClientIP()`; in dev every request comes from the Docker gateway `172.18.0.1` | dev: all users share one budget (by design; the Vite proxy sends no `X-Forwarded-For`). Production: `TRUSTED_PROXIES` added in 7d (§1r) | set it to nginx in the 7e prod compose |
+| Expired sessions were deleted only when the same user logged in again | fixed in 7d: background cleanup (§1r) | resolved |
+| Cookie `Secure` flag path had no test | fixed in 7d: `TestSessionCookie_SecureOnlyInProduction` (§1r) | resolved; real HTTPS still unverified (7e) |
+| Seller and admin order lists, admin user/store/audit lists had no `page` upper bound (negative OFFSET → 500) | fixed in 7d: `MaxPage = 10_000` (§1r) | resolved |
 | `ListPublicProducts` at scale | fixed in 7c (window count removed, 2.2 s → 3 ms); price sort 0.2 s and rating sort 85 ms accepted (§1q) | `min_price` denormalisation if it ever matters |
-| `AddVariant` checks the 20-variant cap before inserting (check-then-insert) | two concurrent requests can exceed 20 | low priority |
+| `AddVariant` checked the 20-variant cap before inserting | fixed in 7d: lock the product, then count (26 → 20 under concurrency, §1r) | resolved |
 | Search uses the `simple` config without `unaccent` | "kemeja" ≠ "kémeja"; no stemming | acceptable for now |
-| `.env.example` lists only 9 of the 17 config variables | people don't discover optional tuning | document-only; defaults are safe |
+| `.env.example` lists the main variables plus commented tuning (7d added `TRUSTED_PROXIES`, `SESSION_CLEANUP_BATCH`); the checkout/shipping ones are still missing | people don't discover optional tuning | document-only; defaults are safe |
 | `frontend/README.md` is still the Vite template | misleading | replace with a short pointer to docs |
 | `golang:1.27-alpine` / `postgres:18` tags float | builds can change under you | pin in Phase 7 |
 | CI not yet proven | `ci.yml` written in 7b, no GitHub run yet | see §1p |
@@ -722,9 +765,9 @@ Demo logins (local only): `penjual1@contoh.id` … `penjual4@contoh.id` / `penju
 
 The dependency-checked version, with the exact next task, is in [SESSION_HANDOFF.md](../SESSION_HANDOFF.md); the Phase 5 questions are in [PLAN.md](../PLAN.md).
 
-1. Developer pushes 7b and checks the Actions tab (all jobs green; one deliberately broken test shows red, then revert; the first run also proves migration 16 on CI's up → down → up). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted.
-2. Developer reviews and commits 7c (§1q has the commands).
-3. 7d — security pass (PLAN.md "Phase 7" §7.1).
+1. Developer reviews and commits 7d (§1r has the commands).
+2. Developer pushes and checks the Actions tab (all jobs green; one deliberately broken test shows red, then revert; the first run also proves migration 16 on CI's up → down → up). `docs/e2e-reference/` (git-ignored, local only) is superseded and can be deleted.
+3. 7e — API docs & deploy prep (PLAN.md "Phase 7" §7.1): include `TRUSTED_PROXIES` = nginx, the SPA CSP and HSTS in nginx (SECURITY_REVIEW §4).
 
 ---
 

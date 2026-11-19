@@ -1,6 +1,6 @@
 # SESSION_HANDOFF.md
 
-Updated 2026-11-18: Phase 6 committed; Phase 7 plan approved (defaults Q1–Q8). 7a committed. 7b (CI) committed locally as `d8cac67`; **the GitHub run has not been seen** (not pushed when checked; `gh` is not logged in). **7c (performance & indexes) is built and verified, uncommitted** — PROJECT_STATE §1q has the plans, evidence and commit commands. Next: developer pushes 7b and reviews/commits 7c, then 7d. Sections §3–§5 still describe the Phase 6 session.
+Updated 2026-11-19: Phase 7 plan approved (defaults Q1–Q8). 7a and 7c committed (7c = `1a0e2e3`, `ee43cab`, docs `0cb0fc8`). 7b (CI) committed as `d8cac67`; **the GitHub run has not been seen** (`main` was 8 commits ahead of `origin`). **7d (security pass) is built and verified, uncommitted**: PROJECT_STATE §1r has the evidence and commit commands, and [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) has the findings. Next: developer reviews/commits 7d and pushes, then 7e. Sections §3–§5 still describe the Phase 6 session.
 
 **Read order:** this file → [CLAUDE.md](CLAUDE.md) (rules, loaded automatically) → [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) (checkpoints, decision log, known issues, failed approaches) → [PLAN.md](PLAN.md) (Phase 4 as built + Phase 5 open questions).
 
@@ -28,7 +28,7 @@ Updated 2026-11-18: Phase 6 committed; Phase 7 plan approved (defaults Q1–Q8).
 | Dev housekeeping (loopback ports, Vite target, `.gitignore`) | committed (`ac4e163`); Phase 5 plan `d4dde07` |
 | 5 Checkout & orders | committed: 5a–5d as before, 5e `33e046e`, docs `6f10765`; homepage carousel `932065a` |
 | **6 Reviews & dashboards** | plan approved 2026-11-15 (PLAN.md Q1–Q15 defaults); 6a committed (`491953f`, `f8ab642`); 6b committed (`6f01036`, `b5fe739`); wishlist practice feature committed (`3d722a3`, `12bbd7f`); 6c committed (`0677906`, `6e18967`, docs `9716ed9`); 6d committed (`4ed91de`, `e00c95f`, docs `07bdc43`); 6e committed (`2c44965`, docs `d5b8577`); **Phase 6 closed** |
-| **7 Hardening** | plan approved 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); 7a committed (Vitest 107 tests, Playwright 10 tests via `make e2e`); 7b CI committed locally, unproven on GitHub; **7c done, uncommitted** (catalog count split, price query, migration 000016, `make seed-load` / `perf-explain`, route code splitting); 7d–7e open |
+| **7 Hardening** | plan approved 2026-11-17 (PLAN.md "Phase 7", slices 7a–7e); 7a committed (Vitest 107 tests, Playwright 10 tests via `make e2e`); 7b CI committed, unproven on GitHub; 7c committed; **7d done, uncommitted** (`TRUSTED_PROXIES`, session cleanup, security headers, Secure-cookie test, race-free variant cap, page upper bound, `cn`/`shadcn` cleanup, `docs/SECURITY_REVIEW.md`); 7e open |
 
 ---
 
@@ -107,9 +107,9 @@ Full tables: PROJECT_STATE §9 (debt/risks) and §11 (failed approaches).
 ## 6. Recommended next steps
 
 1. *(Done)* 6e committed as `2c44965` + `d5b8577`.
-2. **Developer pushes 7b** and checks the Actions tab: backend + frontend green (the backend job now also migrates through 000016), e2e green on `main`/manual, one deliberately broken test shows red (then revert). If `e2e` fails, fix from its logs (likely Linux-specific: `make e2e-reset`, seed steps).
-3. **Developer reviews and commits 7c** (PROJECT_STATE §1q).
-4. **Next — 7d (security pass)** per PLAN.md §7.1: `docs/SECURITY_REVIEW.md`, `TRUSTED_PROXIES`, expired-session cleanup, `Secure` cookie test, security headers, race-free 20-variant cap, remove the unused `cn` package. Stop for review after each slice.
+2. **Developer reviews and commits 7d** (PROJECT_STATE §1r).
+3. **Developer pushes** and checks the Actions tab: backend + frontend green (the backend job also migrates through 000016), e2e green on `main`/manual, one deliberately broken test shows red (then revert). If `e2e` fails, fix from its logs (likely Linux-specific: `make e2e-reset`, seed steps).
+4. **Next — 7e (API docs & deploy prep)** per PLAN.md §7.1. Carry over from 7d (SECURITY_REVIEW §4–5): prod compose sets `TRUSTED_PROXIES` to nginx; nginx sends the SPA CSP and HSTS; verify login + Secure cookie through the proxy.
 
 **First 10 minutes in a new session**
 
